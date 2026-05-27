@@ -772,7 +772,7 @@ export default function App() {
           { sc: "proyectos" as Screen, icon: <FolderOpen size={20} />, label: "Proyectos" },
           { sc: "crearProyecto" as Screen, icon: <Plus size={20} />, label: "Crear" },
           ...(isAdmin ? [{ sc: "admin" as Screen, icon: <Shield size={20} />, label: "Admin" }] : []),
-        ] as { sc: Screen; icon: JSX.Element; label: string }[]).map(({ sc, icon, label }) => {
+        ] as { sc: Screen; icon: React.ReactNode; label: string }[]).map(({ sc, icon, label }) => {
           const active = screen === sc;
           return (
             <button key={sc} onClick={() => setScreen(sc)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: active ? C.orange : C.muted }}>
