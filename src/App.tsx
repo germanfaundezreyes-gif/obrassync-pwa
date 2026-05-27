@@ -260,7 +260,7 @@ export default function App() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Informe_${selectedProject.code}_${new Date().toLocaleDateString("es-CL").replace(/\//g, "-")}.docx`;
+      a.download = `Informe_${selectedProject.name.replace(/[^a-zA-Z0-9 ]/g, "").trim().replace(/ /g, "_")}_${new Date().toLocaleDateString("es-CL").replace(/\//g, "-")}.docx`;
       a.click();
       URL.revokeObjectURL(url);
     } catch { alert("Error generando informe"); }
