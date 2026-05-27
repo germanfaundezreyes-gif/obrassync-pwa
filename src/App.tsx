@@ -1,3 +1,4 @@
+import React from "react";
 import { useState, useEffect, useRef } from "react";
 import { Camera, LogOut, CheckCircle2, Mail, Lock, Trash2, FileText, Menu, Plus, ChevronLeft, FolderOpen, Home, Shield, Eye, EyeOff } from "lucide-react";
 
