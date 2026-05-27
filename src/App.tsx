@@ -12,10 +12,10 @@ const C = {
 };
 
 type Screen = "inicio" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario";
-type Project = { id: string; code: string; name: string; client_name?: string; start_date?: string; end_date?: string; progress_percent?: number };
+type Project = { id: string; code: string; name: string; client_name?: string; start_date?: string; end_date?: string };
 type Task = { id: string; name: string; duration?: string; start_date?: string; end_date?: string; progress_percent?: number; status?: string; photo_count?: number };
 type TaskPhoto = { id: string; filename: string; local_path?: string; onedrive_url?: string; created_at: string };
-type User = { id: string; full_name: string; email: string; role: string; is_active: boolean; permissions?: Record<string, boolean>; created_at?: string };
+type User = { id: string; full_name: string; email: string; role: string; is_active: boolean; permissions?: Record<string, boolean> };
 
 const PERMISSIONS = [
   { key: "photos", label: "Fotos", sub: "Subir y ver fotos", icon: "📷" },
@@ -28,6 +28,13 @@ const ROLES = [
   { value: "administrador", label: "Admin", icon: "👑", color: "#F97316", bg: "#1A0D00", border: "#7C3913" },
   { value: "jefe_obra", label: "Jefe obra", icon: "🦺", color: "#60A5FA", bg: "#0D1A2E", border: "#1E3A5F" },
   { value: "inspector", label: "Trabajador", icon: "👷", color: "#22C55E", bg: "#14532D", border: "#14532D" },
+];
+
+const STATUS_OPTIONS = [
+  { value: "pendiente", label: "Pendiente" },
+  { value: "en_curso", label: "En curso" },
+  { value: "completada", label: "Completada" },
+  { value: "atrasada", label: "Atrasada" },
 ];
 
 function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
@@ -85,13 +92,19 @@ export default function App() {
 
   const [generatingReport, setGeneratingReport] = useState(false);
 
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [taskStatus, setTaskStatus] = useState("pendiente");
+  const [taskProgress, setTaskProgress] = useState(0);
+  const [savingTask, setSavingTask] = useState(false);
+  const [taskName, setTaskName] = useState("");
+
   const [users, setUsers] = useState<User[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPassword, setEditPassword] = useState("");
-  const [editRole, setEditRole] = useState("worker");
+  const [editRole, setEditRole] = useState("inspector");
   const [editActive, setEditActive] = useState(true);
   const [editPermissions, setEditPermissions] = useState<Record<string, boolean>>({});
   const [savingUser, setSavingUser] = useState(false);
@@ -99,14 +112,14 @@ export default function App() {
   const [newUserName, setNewUserName] = useState("");
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserPassword, setNewUserPassword] = useState("");
-  const [newUserRole, setNewUserRole] = useState("worker");
+  const [newUserRole, setNewUserRole] = useState("inspector");
   const [newUserPermissions, setNewUserPermissions] = useState<Record<string, boolean>>({ photos: true });
   const [creatingUser, setCreatingUser] = useState(false);
 
-  useEffect(() => { if (token) { loadProjects(); if (userRole === "admin" || userRole === "administrador") loadUsers(); } }, [token]);
-  useEffect(() => { if (selectedProject && token) loadTasks(selectedProject.id); }, [selectedProject]);
+  const isAdmin = userRole === "administrador" || userRole === "admin";
 
-  const isAdmin = userRole === "admin" || userRole === "administrador";
+  useEffect(() => { if (token) { loadProjects(); if (isAdmin) loadUsers(); } }, [token]);
+  useEffect(() => { if (selectedProject && token) loadTasks(selectedProject.id); }, [selectedProject]);
 
   async function handleLogin() {
     if (!email || !password) return;
@@ -177,6 +190,28 @@ export default function App() {
       alert(`✅ ${d.tasks?.length || 0} partidas importadas`);
     } catch { alert("Error importando archivo"); }
     finally { setUploadingGantt(false); }
+  }
+
+  async function saveTask() {
+    if (!editingTask || !selectedProject) return;
+    setSavingTask(true);
+    try {
+      const r = await fetch(`${API_URL}/tasks/${editingTask.id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ status: taskStatus, progressPercent: taskProgress, name: taskName }) });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { alert("Error guardando partida"); return; }
+      setEditingTask(null);
+      await loadTasks(selectedProject.id);
+    } catch { alert("Error guardando partida"); }
+    finally { setSavingTask(false); }
+  }
+
+  async function deleteTask(taskId: string) {
+    if (!confirm("¿Eliminar esta partida?")) return;
+    try {
+      await fetch(`${API_URL}/tasks/${taskId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      setEditingTask(null);
+      if (selectedProject) await loadTasks(selectedProject.id);
+    } catch { alert("Error eliminando partida"); }
   }
 
   async function openPhotos(task: Task) {
@@ -280,7 +315,7 @@ export default function App() {
       const r = await fetch(`${API_URL}/users`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ fullName: newUserName, email: newUserEmail, password: newUserPassword, role: newUserRole, permissions: newUserPermissions }) });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert(d.message || "Error creando usuario"); return; }
-      setNewUserName(""); setNewUserEmail(""); setNewUserPassword(""); setNewUserRole("worker"); setNewUserPermissions({ photos: true });
+      setNewUserName(""); setNewUserEmail(""); setNewUserPassword(""); setNewUserRole("inspector"); setNewUserPermissions({ photos: true });
       await loadUsers();
       setScreen("admin");
     } catch { alert("Error creando usuario"); }
@@ -326,6 +361,39 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: C.bg, color: C.text, fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif", paddingBottom: 70 }}>
+
+      {/* Modal editar partida */}
+      {editingTask && (
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ backgroundColor: C.card, borderRadius: "20px 20px 0 0", padding: 20, width: "100%" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <div style={{ fontSize: 16, fontWeight: 800 }}>Editar partida</div>
+              <button onClick={() => deleteTask(editingTask.id)} style={{ backgroundColor: C.dangerDim, border: "none", borderRadius: 8, padding: "5px 12px", color: C.danger, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+                Eliminar
+              </button>
+            </div>
+            <input value={taskName} onChange={e => setTaskName(e.target.value)} placeholder="Nombre de la partida" style={{ width: "100%", height: 44, backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, color: C.text, fontSize: 14, padding: "0 14px", marginBottom: 12, boxSizing: "border-box" }} />
+            <div style={{ color: C.muted, fontSize: 11, fontWeight: 700, marginBottom: 8 }}>ESTADO</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+              {STATUS_OPTIONS.map(s => (
+                <button key={s.value} onClick={() => setTaskStatus(s.value)} style={{ padding: 10, borderRadius: 10, border: `1px solid ${taskStatus === s.value ? C.orange : C.border}`, background: taskStatus === s.value ? C.orangeDim : C.bg, color: taskStatus === s.value ? C.orange : C.muted, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ color: C.muted, fontSize: 11, fontWeight: 700, marginBottom: 8 }}>AVANCE: {taskProgress}%</div>
+            <input type="range" min={0} max={100} value={taskProgress} onChange={e => setTaskProgress(Number(e.target.value))} style={{ width: "100%", marginBottom: 16 }} />
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setEditingTask(null)} style={{ flex: 1, height: 46, background: C.cardAlt, border: `1px solid ${C.border}`, borderRadius: 12, color: C.muted, fontWeight: 700, cursor: "pointer" }}>Cancelar</button>
+              <button onClick={saveTask} disabled={savingTask} style={{ flex: 2, height: 46, background: C.orange, border: "none", borderRadius: 12, color: "#fff", fontWeight: 800, cursor: "pointer" }}>
+                {savingTask ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
       <div style={{ position: "sticky", top: 0, zIndex: 100, backgroundColor: C.bg, borderBottom: `1px solid ${C.border}`, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {(screen === "fotos" || screen === "editarUsuario" || screen === "crearUsuario") && (
@@ -358,6 +426,7 @@ export default function App() {
 
       <div style={{ maxWidth: 600, margin: "0 auto", padding: 16 }}>
 
+        {/* Fotos */}
         {screen === "fotos" && selectedTask && (
           <div>
             <div style={{ marginBottom: 16 }}>
@@ -392,6 +461,7 @@ export default function App() {
           </div>
         )}
 
+        {/* Inicio */}
         {screen === "inicio" && (
           <>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
@@ -459,12 +529,17 @@ export default function App() {
                             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>{task.name}</div>
                             <span style={{ backgroundColor: st.bg, color: st.color, fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 6 }}>{st.label}</span>
                           </div>
-                          <button onClick={() => openPhotos(task)} style={{ width: 42, height: 42, backgroundColor: "#1A0D00", border: `1px solid ${C.orangeDim}`, borderRadius: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", flexShrink: 0, marginLeft: 10 }}>
-                            <Camera size={18} color={C.orange} />
-                            {(task.photo_count ?? 0) > 0 && (
-                              <span style={{ position: "absolute", top: -5, right: -5, backgroundColor: C.orange, color: "#fff", fontSize: 10, fontWeight: 800, width: 18, height: 18, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center" }}>{task.photo_count}</span>
-                            )}
-                          </button>
+                          <div style={{ display: "flex", gap: 6, marginLeft: 8 }}>
+                            <button onClick={() => openPhotos(task)} style={{ width: 40, height: 40, backgroundColor: "#1A0D00", border: `1px solid ${C.orangeDim}`, borderRadius: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", flexShrink: 0 }}>
+                              <Camera size={17} color={C.orange} />
+                              {(task.photo_count ?? 0) > 0 && (
+                                <span style={{ position: "absolute", top: -5, right: -5, backgroundColor: C.orange, color: "#fff", fontSize: 10, fontWeight: 800, width: 17, height: 17, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center" }}>{task.photo_count}</span>
+                              )}
+                            </button>
+                            <button onClick={() => { setEditingTask(task); setTaskStatus(task.status || "pendiente"); setTaskProgress(Number(task.progress_percent || 0)); setTaskName(task.name || ""); }} style={{ width: 40, height: 40, backgroundColor: C.cardAlt, border: `1px solid ${C.border}`, borderRadius: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 16 }}>
+                              ✏️
+                            </button>
+                          </div>
                         </div>
                         <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
                           {task.duration && <span style={{ fontSize: 11, color: C.muted }}>⏱ {task.duration}</span>}
@@ -490,6 +565,7 @@ export default function App() {
           </>
         )}
 
+        {/* Proyectos */}
         {screen === "proyectos" && (
           <div>
             <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 14 }}>Proyectos</div>
@@ -522,6 +598,7 @@ export default function App() {
           </div>
         )}
 
+        {/* Crear Proyecto */}
         {screen === "crearProyecto" && (
           <div style={{ backgroundColor: C.card, border: `1px solid ${C.border}`, borderRadius: 20, padding: 16 }}>
             <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 16 }}>Nuevo proyecto</div>
@@ -542,6 +619,7 @@ export default function App() {
           </div>
         )}
 
+        {/* Admin */}
         {screen === "admin" && isAdmin && (
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -588,6 +666,7 @@ export default function App() {
           </div>
         )}
 
+        {/* Editar Usuario */}
         {screen === "editarUsuario" && editingUser && (
           <div style={{ backgroundColor: C.card, border: `1px solid ${C.border}`, borderRadius: 20, padding: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -644,6 +723,7 @@ export default function App() {
           </div>
         )}
 
+        {/* Crear Usuario */}
         {screen === "crearUsuario" && (
           <div style={{ backgroundColor: C.card, border: `1px solid ${C.border}`, borderRadius: 20, padding: 16 }}>
             <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 16 }}>Nuevo usuario</div>
@@ -684,6 +764,7 @@ export default function App() {
 
       </div>
 
+      {/* Nav inferior */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: C.bg, borderTop: `1px solid ${C.border}`, display: "flex", padding: "8px 0 12px", zIndex: 100 }}>
         {([
           { sc: "inicio" as Screen, icon: <Home size={20} />, label: "Inicio" },
