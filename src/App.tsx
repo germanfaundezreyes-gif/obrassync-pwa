@@ -241,10 +241,20 @@ export default function App() {
     setGeneratingReport(true);
     try {
       const r = await fetch(`${API_URL}/projects/${selectedProject.id}/reports/generate-word`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
-      if (!r.ok) { const d = await r.json(); alert(d.message || "Error"); return; }
-      const d = await r.json();
-      if (d.ok) alert("✅ Informe guardado en OneDrive correctamente.");
-    } catch { alert("Error"); } finally { setGeneratingReport(false); }
+      if (!r.ok) {
+        try { const d = await r.json(); alert(d.message || "Error generando informe"); } catch { alert("Error generando informe"); }
+        return;
+      }
+      const blob = await r.blob();
+      const contentDisposition = r.headers.get("Content-Disposition") || "";
+      const match = contentDisposition.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : `Informe_${selectedProject.name}.docx`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+    } catch { alert("Error generando informe"); } finally { setGeneratingReport(false); }
   }
 
   async function uploadPhotoWithDesc(file: File, description: string) {
