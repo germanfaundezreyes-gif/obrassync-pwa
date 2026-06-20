@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Shield, Eye, EyeOff, Bell, Image } from "lucide-react";
+import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Shield, Eye, EyeOff, Bell, Image, MessageSquare } from "lucide-react";
 
 const API_URL = "https://obrassync-backend-production.up.railway.app";
 
@@ -14,7 +14,8 @@ const C = {
 type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion";
 type Project = { id: string; code: string; name: string; client_name?: string; start_date?: string; end_date?: string; progress_percent?: number };
 type Task = { id: string; name: string; duration?: string; start_date?: string; end_date?: string; progress_percent?: number; status?: string; photo_count?: number };
-type TaskPhoto = { id: string; filename: string; local_path?: string; onedrive_url?: string; created_at: string };
+type TaskPhoto = { id: string; filename: string; local_path?: string; onedrive_url?: string; created_at: string; description?: string };
+type QuoteItem = { tempId: string; name: string; codigo: string; quantity: string; unit: string; start_date: string; end_date: string; selected: boolean };
 type User = { id: string; full_name: string; email: string; role: string; is_active: boolean; permissions?: Record<string, boolean> };
 
 const PERMISSIONS = [
@@ -123,6 +124,24 @@ export default function App() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
+  // PDF Quote import
+  const [showQuoteImport, setShowQuoteImport] = useState(false);
+  const [quoteStep, setQuoteStep] = useState<1 | 2>(1);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [extractingPdf, setExtractingPdf] = useState(false);
+  const [quoteItems, setQuoteItems] = useState<QuoteItem[]>([]);
+  const [bulkCreating, setBulkCreating] = useState(false);
+  const [globalStartDate, setGlobalStartDate] = useState("");
+  const [globalEndDate, setGlobalEndDate] = useState("");
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+
+  // Photo description
+  const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
+  const [photoDescInput, setPhotoDescInput] = useState("");
+  const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
+  const [editingPhotoDesc, setEditingPhotoDesc] = useState("");
+  const [savingPhotoDesc, setSavingPhotoDesc] = useState(false);
+
   const isAdmin = userRole === "administrador" || userRole === "admin";
 
   useEffect(() => { if (token) { loadProjects(); if (isAdmin) loadUsers(); } }, [token]);
@@ -211,19 +230,6 @@ export default function App() {
     catch {} finally { setPhotosLoading(false); }
   }
 
-  async function uploadPhoto(file: File) {
-    if (!selectedTask) return;
-    setUploadingPhoto(true);
-    try {
-      const fd = new FormData(); fd.append("photo", file);
-      const r = await fetch(`${API_URL}/tasks/${selectedTask.id}/photos`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
-      const d = await r.json();
-      if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
-      const r2 = await fetch(`${API_URL}/tasks/${selectedTask.id}/photos`, { headers: { Authorization: `Bearer ${token}` } });
-      const d2 = await r2.json(); setPhotos(d2.items || []);
-    } catch { alert("Error"); } finally { setUploadingPhoto(false); }
-  }
-
   async function deletePhoto(id: string) {
     if (!confirm("¿Eliminar foto?")) return;
     try { await fetch(`${API_URL}/photos/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); setPhotos(p => p.filter(x => x.id !== id)); }
@@ -239,6 +245,58 @@ export default function App() {
       const d = await r.json();
       if (d.ok) alert("✅ Informe guardado en OneDrive correctamente.");
     } catch { alert("Error"); } finally { setGeneratingReport(false); }
+  }
+
+  async function uploadPhotoWithDesc(file: File, description: string) {
+    if (!selectedTask) return;
+    setUploadingPhoto(true);
+    try {
+      const fd = new FormData(); fd.append("photo", file); fd.append("description", description);
+      const r = await fetch(`${API_URL}/tasks/${selectedTask.id}/photos`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
+      const r2 = await fetch(`${API_URL}/tasks/${selectedTask.id}/photos`, { headers: { Authorization: `Bearer ${token}` } });
+      const d2 = await r2.json(); setPhotos(d2.items || []);
+    } catch { alert("Error"); } finally { setUploadingPhoto(false); }
+  }
+
+  async function savePhotoDesc(photoId: string, desc: string) {
+    setSavingPhotoDesc(true);
+    try {
+      const r = await fetch(`${API_URL}/photos/${photoId}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ description: desc }) });
+      const d = await r.json();
+      if (d.ok) setPhotos(ps => ps.map(p => p.id === photoId ? { ...p, description: desc } : p));
+      setEditingPhotoId(null);
+    } catch { alert("Error"); } finally { setSavingPhotoDesc(false); }
+  }
+
+  async function extractQuotePdf() {
+    if (!pdfFile || !selectedProject) return;
+    setExtractingPdf(true);
+    try {
+      const fd = new FormData(); fd.append("file", pdfFile);
+      const r = await fetch(`${API_URL}/projects/${selectedProject.id}/import-quote-pdf`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { alert(d.message || "Error extrayendo partidas"); return; }
+      const items: QuoteItem[] = (d.items || []).map((it: { name: string; codigo?: string; quantity?: string; unit?: string }, i: number) => ({ tempId: `q${i}`, name: it.name, codigo: it.codigo || "", quantity: it.quantity || "", unit: it.unit || "", start_date: "", end_date: "", selected: true }));
+      setQuoteItems(items); setQuoteStep(2);
+    } catch { alert("Error"); } finally { setExtractingPdf(false); }
+  }
+
+  async function bulkCreateTasks() {
+    if (!selectedProject) return;
+    const selected = quoteItems.filter(it => it.selected && it.name);
+    if (!selected.length) { alert("Selecciona al menos una partida"); return; }
+    setBulkCreating(true);
+    try {
+      const tasks = selected.map(it => ({ name: it.name, codigo: it.codigo, start_date: it.start_date || null, end_date: it.end_date || null }));
+      const r = await fetch(`${API_URL}/projects/${selectedProject.id}/tasks/bulk`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ tasks }) });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
+      await loadTasks(selectedProject.id);
+      setShowQuoteImport(false); setPdfFile(null); setQuoteItems([]); setQuoteStep(1);
+      alert(`✅ ${d.tasks?.length || selected.length} partidas creadas`);
+    } catch { alert("Error"); } finally { setBulkCreating(false); }
   }
 
   async function uploadLogo() {
@@ -379,13 +437,28 @@ export default function App() {
         {/* FOTOS */}
         {screen === "fotos" && selectedTask && (
           <div>
+            {/* Overlay: descripción antes de subir */}
+            {pendingPhotoFile && (
+              <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.9)", zIndex: 400, display: "flex", alignItems: "flex-end" }}>
+                <div style={{ backgroundColor: C.card, borderRadius: "20px 20px 0 0", padding: 20, width: "100%", maxWidth: 600, margin: "0 auto" }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Describir foto</div>
+                  <div style={{ fontSize: 12, color: C.muted, marginBottom: 14 }}>¿Qué trabajo muestra esta foto?</div>
+                  <textarea value={photoDescInput} onChange={e => setPhotoDescInput(e.target.value)} placeholder="Ej: Instalación de pilar metálico en eje A-3, nivel 1..." rows={3} style={{ width: "100%", backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 14, padding: 12, resize: "none", boxSizing: "border-box", outline: "none", marginBottom: 12 }} />
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button onClick={() => { setPendingPhotoFile(null); setPhotoDescInput(""); }} style={{ flex: 1, height: 46, background: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 12, color: C.muted, fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
+                    <button onClick={() => { uploadPhotoWithDesc(pendingPhotoFile, photoDescInput); setPendingPhotoFile(null); setPhotoDescInput(""); }} disabled={uploadingPhoto} style={{ flex: 2, height: 46, background: C.orange, border: "none", borderRadius: 12, color: "#fff", fontWeight: 700, cursor: "pointer" }}>{uploadingPhoto ? "Subiendo..." : "Subir foto"}</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 18, fontWeight: 700 }}>Fotos</div>
               <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{selectedTask.name}</div>
             </div>
             <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadPhoto(f); e.target.value = ""; }} />
-              <input ref={photoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadPhoto(f); e.target.value = ""; }} />
+              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { setPendingPhotoFile(f); setPhotoDescInput(""); } e.target.value = ""; }} />
+              <input ref={photoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { setPendingPhotoFile(f); setPhotoDescInput(""); } e.target.value = ""; }} />
               <button onClick={() => cameraInputRef.current?.click()} disabled={uploadingPhoto} style={{ flex: 1, height: 46, backgroundColor: C.orange, border: "none", borderRadius: 10, color: "#fff", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 14 }}>
                 <Camera size={16} /> {uploadingPhoto ? "Subiendo..." : "Tomar foto"}
               </button>
@@ -393,17 +466,45 @@ export default function App() {
             </div>
             {photosLoading ? <div style={{ color: C.muted, textAlign: "center", padding: 32 }}>Cargando...</div>
               : photos.length === 0 ? <div style={{ textAlign: "center", padding: 48, color: C.muted }}>Sin fotos todavía</div>
-                : photos.map(photo => (
-                  <div key={photo.id} style={{ display: "flex", alignItems: "center", gap: 12, backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 12, marginBottom: 8 }}>
-                    <img src={`${API_URL}${photo.local_path}`} alt={photo.filename} style={{ width: 60, height: 60, borderRadius: 8, objectFit: "cover", backgroundColor: C.border }} />
-                    <div style={{ flex: 1, overflow: "hidden" }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{photo.filename}</div>
-                      <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{new Date(photo.created_at).toLocaleString("es-CL")}</div>
-                      {photo.onedrive_url && <div style={{ fontSize: 11, color: C.info, marginTop: 2 }}>☁️ OneDrive</div>}
+                : photos.map((photo, idx) => (
+                  <div key={photo.id} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, marginBottom: 14, overflow: "hidden" }}>
+                    {/* Header sobre la foto */}
+                    <div style={{ padding: "10px 12px 8px", borderBottom: `0.5px solid ${C.border}` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 12, fontWeight: 800, color: C.text, lineHeight: 1.3 }}>{selectedTask.name}</div>
+                          <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+                            {new Date(photo.created_at).toLocaleString("es-CL")} · Foto {idx + 1}
+                            {selectedTask.progress_percent ? ` · ${selectedTask.progress_percent}% avance` : ""}
+                          </div>
+                          {photo.onedrive_url && <div style={{ fontSize: 11, color: C.info, marginTop: 2 }}>☁️ OneDrive</div>}
+                        </div>
+                        <button onClick={() => deletePhoto(photo.id)} style={{ width: 30, height: 30, backgroundColor: C.dangerDim, border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginLeft: 8 }}>
+                          <Trash2 size={12} color={C.danger} />
+                        </button>
+                      </div>
+                      {/* Descripción editable */}
+                      {editingPhotoId === photo.id ? (
+                        <div style={{ marginTop: 8 }}>
+                          <textarea value={editingPhotoDesc} onChange={e => setEditingPhotoDesc(e.target.value)} rows={2} style={{ width: "100%", backgroundColor: C.cardAlt, border: `0.5px solid ${C.orange}`, borderRadius: 8, color: C.text, fontSize: 12, padding: 8, resize: "none", boxSizing: "border-box", outline: "none", marginBottom: 6 }} />
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <button onClick={() => setEditingPhotoId(null)} style={{ flex: 1, height: 32, background: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, color: C.muted, fontSize: 11, cursor: "pointer" }}>Cancelar</button>
+                            <button onClick={() => savePhotoDesc(photo.id, editingPhotoDesc)} disabled={savingPhotoDesc} style={{ flex: 2, height: 32, background: C.orange, border: "none", borderRadius: 8, color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{savingPhotoDesc ? "Guardando..." : "Guardar"}</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div onClick={() => { setEditingPhotoId(photo.id); setEditingPhotoDesc(photo.description || ""); }} style={{ marginTop: 8, padding: "6px 10px", borderLeft: `3px solid ${C.orange}`, backgroundColor: C.cardAlt, borderRadius: "0 6px 6px 0", cursor: "pointer" }}>
+                          {photo.description ? (
+                            <div style={{ fontSize: 12, color: C.text, fontStyle: "italic", lineHeight: 1.4 }}>{photo.description}</div>
+                          ) : (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.muted }}>
+                              <MessageSquare size={12} /> Toca para agregar descripción...
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <button onClick={() => deletePhoto(photo.id)} style={{ width: 34, height: 34, backgroundColor: C.dangerDim, border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <Trash2 size={14} color={C.danger} />
-                    </button>
+                    <img src={`${API_URL}${photo.local_path}`} alt={photo.filename} style={{ width: "100%", maxHeight: 300, objectFit: "cover", display: "block", backgroundColor: C.border }} />
                   </div>
                 ))}
           </div>
@@ -480,14 +581,18 @@ export default function App() {
               <button onClick={generateReport} disabled={generatingReport} style={{ flex: 1, height: 44, backgroundColor: "#0D1A2E", border: `0.5px solid ${C.info}50`, borderRadius: 10, color: C.info, fontWeight: 600, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                 <FileText size={15} /> {generatingReport ? "Generando..." : "Informe Word"}
               </button>
+              <button onClick={() => setShowQuoteImport(true)} style={{ flex: 1, height: 44, backgroundColor: C.orangeDim, border: `0.5px solid ${C.orange}40`, borderRadius: 10, color: C.orange, fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
+                📄 Cotización PDF
+              </button>
               <button onClick={() => setShowGantt(!showGantt)} style={{ flex: 1, height: 44, backgroundColor: showGantt ? C.orangeDim : C.cardAlt, border: `0.5px solid ${showGantt ? C.orange : C.border}`, borderRadius: 10, color: showGantt ? C.orange : C.mutedSoft, fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
-                📊 Importar Gantt
+                📊 Excel
               </button>
             </div>
 
             {/* Panel Gantt colapsable */}
             {showGantt && (
               <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+                <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, fontWeight: 600 }}>Importar Carta Gantt Excel</div>
                 <input ref={fileInputRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={e => setGanttFile(e.target.files?.[0] || null)} />
                 <button onClick={() => fileInputRef.current?.click()} style={{ width: "100%", height: 42, backgroundColor: C.cardAlt, border: `0.5px solid ${ganttFile ? C.orange : C.border}`, borderRadius: 10, color: ganttFile ? C.orange : C.mutedSoft, cursor: "pointer", fontSize: 13, marginBottom: 8 }}>
                   {ganttFile ? `📎 ${ganttFile.name}` : "Seleccionar archivo .xlsx"}
@@ -734,6 +839,84 @@ export default function App() {
         )}
 
       </div>
+
+      {/* Modal importar cotización PDF */}
+      {showQuoteImport && (
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.92)", zIndex: 500, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ backgroundColor: C.card, borderRadius: "20px 20px 0 0", padding: 20, width: "100%", maxWidth: 600, margin: "0 auto", maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>Importar Cotización PDF</div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Paso {quoteStep} de 2 · {quoteStep === 1 ? "Subir PDF" : `${quoteItems.filter(i => i.selected).length} partidas seleccionadas`}</div>
+              </div>
+              <button onClick={() => { setShowQuoteImport(false); setQuoteStep(1); setPdfFile(null); setQuoteItems([]); }} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 22, lineHeight: 1 }}>✕</button>
+            </div>
+
+            {quoteStep === 1 && (
+              <>
+                <div style={{ backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, padding: 14, marginBottom: 14, fontSize: 12, color: C.mutedSoft, lineHeight: 1.6 }}>
+                  📋 Sube el PDF de cotización MATFAU SPA. La IA extraerá las partidas automáticamente <strong style={{ color: C.text }}>sin mostrar precios</strong>.
+                </div>
+                <input ref={pdfInputRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={e => setPdfFile(e.target.files?.[0] || null)} />
+                <button onClick={() => pdfInputRef.current?.click()} style={{ width: "100%", height: 48, backgroundColor: C.cardAlt, border: `0.5px solid ${pdfFile ? C.orange : C.border}`, borderRadius: 10, color: pdfFile ? C.orange : C.mutedSoft, cursor: "pointer", fontSize: 13, marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <FileText size={16} /> {pdfFile ? `📎 ${pdfFile.name}` : "Seleccionar PDF"}
+                </button>
+                <button onClick={extractQuotePdf} disabled={extractingPdf || !pdfFile} style={{ width: "100%", height: 48, backgroundColor: !pdfFile ? C.cardAlt : C.orange, border: "none", borderRadius: 12, color: !pdfFile ? C.muted : "#fff", fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
+                  {extractingPdf ? "⏳ Extrayendo con IA..." : "Extraer partidas con IA"}
+                </button>
+              </>
+            )}
+
+            {quoteStep === 2 && (
+              <>
+                {/* Fechas globales */}
+                <div style={{ backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, padding: 12, marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.orange, marginBottom: 10 }}>Aplicar fechas a todas las partidas</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Inicio</div>
+                      <input type="date" value={globalStartDate} onChange={e => { setGlobalStartDate(e.target.value); setQuoteItems(items => items.map(it => ({ ...it, start_date: e.target.value }))); }} style={{ width: "100%", height: 38, backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 12, padding: "0 8px", boxSizing: "border-box", outline: "none" }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Término</div>
+                      <input type="date" value={globalEndDate} onChange={e => { setGlobalEndDate(e.target.value); setQuoteItems(items => items.map(it => ({ ...it, end_date: e.target.value }))); }} style={{ width: "100%", height: 38, backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 12, padding: "0 8px", boxSizing: "border-box", outline: "none" }} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lista de partidas */}
+                {quoteItems.map((item, i) => (
+                  <div key={item.tempId} style={{ backgroundColor: item.selected ? C.orangeDim : C.cardAlt, border: `0.5px solid ${item.selected ? C.orange + "50" : C.border}`, borderRadius: 12, padding: 12, marginBottom: 8 }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                      <div onClick={() => setQuoteItems(items => items.map((it, j) => j === i ? { ...it, selected: !it.selected } : it))} style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${item.selected ? C.orange : C.border}`, backgroundColor: item.selected ? C.orange : "transparent", flexShrink: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2, fontSize: 13, color: "#fff" }}>
+                        {item.selected ? "✓" : ""}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, lineHeight: 1.3, marginBottom: 4 }}>{item.name}</div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                          {item.codigo && <span style={{ fontSize: 11, color: C.orange, backgroundColor: C.orangeDim, padding: "2px 8px", borderRadius: 4 }}>#{item.codigo}</span>}
+                          {item.quantity && <span style={{ fontSize: 11, color: C.muted }}>{item.quantity} {item.unit}</span>}
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <input type="date" value={item.start_date} onChange={e => setQuoteItems(items => items.map((it, j) => j === i ? { ...it, start_date: e.target.value } : it))} style={{ flex: 1, height: 32, backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 6, color: C.text, fontSize: 11, padding: "0 6px", outline: "none" }} />
+                          <input type="date" value={item.end_date} onChange={e => setQuoteItems(items => items.map((it, j) => j === i ? { ...it, end_date: e.target.value } : it))} style={{ flex: 1, height: 32, backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 6, color: C.text, fontSize: 11, padding: "0 6px", outline: "none" }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                  <button onClick={() => setQuoteStep(1)} style={{ flex: 1, height: 46, background: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 12, color: C.muted, fontWeight: 600, cursor: "pointer" }}>← Volver</button>
+                  <button onClick={bulkCreateTasks} disabled={bulkCreating} style={{ flex: 2, height: 46, background: C.orange, border: "none", borderRadius: 12, color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
+                    {bulkCreating ? "Creando partidas..." : `Crear ${quoteItems.filter(i => i.selected).length} partidas`}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Nav inferior */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: C.card, borderTop: `0.5px solid ${C.border}`, display: "flex", padding: "8px 0 16px", zIndex: 100 }}>
