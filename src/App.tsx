@@ -250,10 +250,17 @@ export default function App() {
       const match = contentDisposition.match(/filename="?([^"]+)"?/);
       const filename = match ? match[1] : `Informe_${selectedProject.name}.docx`;
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = filename;
-      document.body.appendChild(a); a.click();
-      document.body.removeChild(a); URL.revokeObjectURL(url);
+      // iOS Safari no permite a.click() en PWAs — window.open es el método que funciona
+      const newTab = window.open(url, "_blank");
+      if (!newTab) {
+        // Fallback para cuando el popup está bloqueado
+        const a = document.createElement("a");
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a);
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      alert(`✅ Informe "${filename}" generado. Si no se abrió automáticamente, revisa tus descargas.`);
     } catch { alert("Error generando informe"); } finally { setGeneratingReport(false); }
   }
 
