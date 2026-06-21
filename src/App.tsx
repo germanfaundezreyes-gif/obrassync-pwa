@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Shield, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, TrendingUp, BarChart2, PieChart, X, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
+import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Shield, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle } from "lucide-react";
 
 const API_URL = "https://obrassync-backend-production.up.railway.app";
 
@@ -456,7 +456,7 @@ export default function App() {
   }
 
   const progress = tasks.length > 0 ? tasks.reduce((a, t) => a + Number(t.progress_percent || 0), 0) / tasks.length : 0;
-  const totalPhotos = tasks.reduce((a, t) => a + (t.photo_count || 0), 0);
+  // const totalPhotos = tasks.reduce((a, t) => a + (t.photo_count || 0), 0);
   const filteredTasks = taskFilter === "todos" ? tasks : taskFilter === "en_curso" ? tasks.filter(t => t.status === "en_curso") : taskFilter === "completada" ? tasks.filter(t => t.status === "completada") : tasks.filter(t => t.status === "pendiente" || t.status === "atrasada");
 
   if (!token) return (
@@ -1137,7 +1137,7 @@ export default function App() {
           {/* TAB: RESUMEN */}
           {gastosTab === "resumen" && (
             <>
-              {!expenseSummary && <div style={{ textAlign: "center", color: C.muted, padding: 40 }} onClick={loadExpenses}>Toca para cargar →</div>}
+              {!expenseSummary && <div style={{ textAlign: "center", color: C.muted, padding: 40 }} onClick={() => loadExpenses()}>Toca para cargar →</div>}
               {expenseSummary && (
                 <>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
@@ -1154,7 +1154,7 @@ export default function App() {
                   </div>
                   {expenseSummary.byProject.length > 0 && (
                     <>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: C.mutedSoft, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5, fontSize: 11 }}>Por proyecto</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>Por proyecto</div>
                       {expenseSummary.byProject.map((row, i) => {
                         const maxTotal = Math.max(...expenseSummary.byProject.map(r => r.total));
                         return (
