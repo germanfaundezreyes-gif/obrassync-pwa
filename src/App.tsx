@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Shield, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle } from "lucide-react";
 
 const API_URL = "https://obrassync-backend-production.up.railway.app";
 
@@ -21,6 +21,8 @@ type Kpis = { proyectos: { total: number; avg_progress: number; atrasados: numbe
 type CostCenter = { id: string; name: string; code?: string; type: string; project_name?: string };
 type Expense = { id: string; cost_center_id?: string; project_id?: string; category: string; supplier_name?: string; supplier_rut?: string; document_number?: string; document_type: string; amount: number; net_amount: number; tax_amount: number; expense_date: string; description?: string; project_name?: string; cost_center_name?: string; created_by_name?: string };
 type ExpenseSummary = { month: string; totals: { total: number; neto: number; iva: number }; byProject: { project_name: string; total: number; count: number }[]; byCategory: { category: string; total: number; count: number }[] };
+
+type SiiFactura = { folio: number; rut_emisor: string; razon_social: string; fecha: string; monto_neto: number; monto_iva: number; monto_total: number; tipo_dte: number; expense_id?: string; cost_center_id?: string };
 
 const EXPENSE_CATEGORIES = [
   { value: "materiales", label: "Materiales", icon: "🧱" },
@@ -158,7 +160,7 @@ export default function App() {
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [expenseSummary, setExpenseSummary] = useState<ExpenseSummary | null>(null);
-  const [gastosTab, setGastosTab] = useState<"resumen" | "lista" | "centros">("resumen");
+  const [gastosTab, setGastosTab] = useState<"resumen" | "lista" | "centros" | "sii">("resumen");
   const [gastosMonth, setGastosMonth] = useState(new Date().toISOString().slice(0, 7));
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [expCategory, setExpCategory] = useState("materiales");
@@ -175,6 +177,16 @@ export default function App() {
   const [newCCName, setNewCCName] = useState("");
   const [newCCCode, setNewCCCode] = useState("");
   const [creatingCC, setCreatingCC] = useState(false);
+
+  // SII
+  const [siiP12File, setSiiP12File] = useState<File | null>(null);
+  const [siiPassword, setSiiPassword] = useState("");
+  const [siiRut, setSiiRut] = useState("76982672-6");
+  const [uploadingSii, setUploadingSii] = useState(false);
+  const [siiFacturas, setSiiFacturas] = useState<SiiFactura[]>([]);
+  const [loadingSiiFacturas, setLoadingSiiFacturas] = useState(false);
+  const [_siiConfigured, setSiiConfigured] = useState(false);
+  const siiP12Ref = useRef<HTMLInputElement>(null);
 
   // Photo description
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
@@ -418,6 +430,41 @@ export default function App() {
       if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
       setNewCCName(""); setNewCCCode(""); await loadCostCenters();
     } catch { alert("Error"); } finally { setCreatingCC(false); }
+  }
+
+  async function uploadSiiCert() {
+    if (!siiP12File || !siiPassword || !siiRut) { alert("Selecciona el certificado .p12, ingresa tu RUT y clave SII"); return; }
+    setUploadingSii(true);
+    try {
+      const fd = new FormData();
+      fd.append("cert", siiP12File);
+      fd.append("password", siiPassword);
+      fd.append("rut", siiRut);
+      const r = await fetch(`${API_URL}/sii/config`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { alert(d.message || "Error configurando SII"); return; }
+      setSiiConfigured(true); setSiiPassword(""); setSiiP12File(null);
+      alert("✅ Certificado SII configurado. Ahora puedes consultar facturas.");
+    } catch { alert("Error conectando con el servidor"); } finally { setUploadingSii(false); }
+  }
+
+  async function loadSiiFacturas() {
+    setLoadingSiiFacturas(true);
+    try {
+      const month = gastosMonth;
+      const r = await fetch(`${API_URL}/sii/facturas?month=${month}`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { alert(d.message || "Error consultando SII"); return; }
+      setSiiFacturas(d.facturas || []);
+    } catch { alert("Error"); } finally { setLoadingSiiFacturas(false); }
+  }
+
+  async function importSiiFactura(factura: SiiFactura, costCenterId: string, projectId: string) {
+    try {
+      const r = await fetch(`${API_URL}/expenses`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ category: "materiales", supplier_name: factura.razon_social, supplier_rut: factura.rut_emisor, document_number: String(factura.folio), document_type: "factura", amount: factura.monto_total, expense_date: factura.fecha, description: `DTE tipo ${factura.tipo_dte} folio ${factura.folio}`, project_id: projectId || undefined, cost_center_id: costCenterId || undefined }) });
+      const d = await r.json();
+      if (d.ok) { setSiiFacturas(fs => fs.map(f => f.folio === factura.folio ? { ...f, expense_id: d.item.id } : f)); await loadExpenses(); await loadKpis(); }
+    } catch { alert("Error"); }
   }
 
   function openEditUser(user: User) {
@@ -1126,10 +1173,10 @@ export default function App() {
           </div>
 
           {/* Tabs */}
-          <div style={{ display: "flex", backgroundColor: C.cardAlt, borderRadius: 10, padding: 4, marginBottom: 16, gap: 4 }}>
-            {(["resumen", "lista", "centros"] as const).map(t => (
-              <button key={t} onClick={() => { setGastosTab(t); if (t !== "centros") loadExpenses(); }} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", backgroundColor: gastosTab === t ? C.card : "transparent", color: gastosTab === t ? C.orange : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                {t === "resumen" ? "Resumen" : t === "lista" ? "Detalle" : "Centros C."}
+          <div style={{ display: "flex", backgroundColor: C.cardAlt, borderRadius: 10, padding: 4, marginBottom: 16, gap: 3 }}>
+            {(["resumen", "lista", "sii", "centros"] as const).map(t => (
+              <button key={t} onClick={() => { setGastosTab(t as typeof gastosTab); if (t === "lista" || t === "resumen") loadExpenses(); }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: gastosTab === t ? C.card : "transparent", color: gastosTab === t ? C.orange : C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
+                {t === "resumen" ? "Resumen" : t === "lista" ? "Detalle" : t === "sii" ? "SII" : "Centros"}
               </button>
             ))}
           </div>
@@ -1233,6 +1280,72 @@ export default function App() {
             </>
           )}
 
+          {/* TAB: SII FACTURAS */}
+          {gastosTab === "sii" && (
+            <>
+              {/* Config certificado */}
+              <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>🏛️ Configuración SII</div>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>Sube tu certificado digital (.p12) y clave SII para consultar facturas de compra recibidas automáticamente.</div>
+                <div style={{ fontSize: 11, color: C.mutedSoft, marginBottom: 6, fontWeight: 600 }}>RUT empresa</div>
+                <input value={siiRut} onChange={e => setSiiRut(e.target.value)} placeholder="76982672-6" style={{ ...inp }} />
+                <div style={{ fontSize: 11, color: C.mutedSoft, marginBottom: 6, fontWeight: 600 }}>Certificado digital (.p12)</div>
+                <input ref={siiP12Ref} type="file" accept=".p12,.pfx" style={{ display: "none" }} onChange={e => setSiiP12File(e.target.files?.[0] || null)} />
+                <button onClick={() => siiP12Ref.current?.click()} style={{ width: "100%", height: 44, backgroundColor: C.cardAlt, border: `0.5px solid ${siiP12File ? C.success : C.border}`, borderRadius: 10, color: siiP12File ? C.success : C.mutedSoft, fontSize: 13, cursor: "pointer", marginBottom: 10 }}>
+                  {siiP12File ? `✅ ${siiP12File.name}` : "📎 Seleccionar archivo .p12"}
+                </button>
+                <div style={{ fontSize: 11, color: C.mutedSoft, marginBottom: 6, fontWeight: 600 }}>Clave SII</div>
+                <input type="password" value={siiPassword} onChange={e => setSiiPassword(e.target.value)} placeholder="Clave del certificado" style={{ ...inp }} />
+                <button onClick={uploadSiiCert} disabled={uploadingSii} style={btnPrimary}>{uploadingSii ? "Configurando..." : "Configurar certificado SII"}</button>
+              </div>
+
+              {/* Consultar facturas */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                <button onClick={loadSiiFacturas} disabled={loadingSiiFacturas} style={{ flex: 1, height: 46, backgroundColor: C.orangeDim, border: `0.5px solid ${C.orange}`, borderRadius: 10, color: C.orange, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                  {loadingSiiFacturas ? "Consultando SII..." : "🔄 Consultar facturas recibidas"}
+                </button>
+              </div>
+
+              {/* Lista facturas SII */}
+              {siiFacturas.length === 0 && !loadingSiiFacturas && (
+                <div style={{ textAlign: "center", padding: "30px 0", color: C.muted }}>
+                  <div style={{ fontSize: 36, marginBottom: 12 }}>🏛️</div>
+                  <div style={{ fontSize: 14, marginBottom: 6 }}>Sin facturas cargadas</div>
+                  <div style={{ fontSize: 12 }}>Configura el certificado y consulta el SII</div>
+                </div>
+              )}
+              {siiFacturas.map((f, i) => (
+                <div key={i} style={{ backgroundColor: C.card, border: `0.5px solid ${f.expense_id ? C.success : C.border}`, borderRadius: 14, padding: 14, marginBottom: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{f.razon_social}</div>
+                      <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>RUT {f.rut_emisor} · Folio N°{f.folio}</div>
+                      <div style={{ fontSize: 11, color: C.muted }}>{new Date(f.fecha + "T12:00:00").toLocaleDateString("es-CL")} · DTE tipo {f.tipo_dte}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: C.orange }}>{fmtCLP(f.monto_total)}</div>
+                      <div style={{ fontSize: 10, color: C.muted }}>Neto: {fmtCLP(f.monto_neto)}</div>
+                    </div>
+                  </div>
+                  {f.expense_id ? (
+                    <div style={{ fontSize: 11, color: C.success, fontWeight: 600 }}>✅ Importada al módulo de gastos</div>
+                  ) : (
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <select defaultValue="" style={{ flex: 1, height: 36, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, color: C.mutedSoft, fontSize: 12, padding: "0 8px" }}
+                        onChange={async e => {
+                          const val = e.target.value;
+                          if (val) await importSiiFactura(f, val, expProjectId);
+                        }}>
+                        <option value="">Asignar a centro de costo...</option>
+                        {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.name} {cc.type === "project" ? "🏗️" : "📂"}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </>
+          )}
+
           {/* TAB: CENTROS DE COSTO */}
           {gastosTab === "centros" && (
             <>
@@ -1258,24 +1371,25 @@ export default function App() {
       )}
 
       {/* Nav inferior */}
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: C.card, borderTop: `0.5px solid ${C.border}`, display: "flex", padding: "8px 0 16px", zIndex: 100 }}>
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: C.card, borderTop: `0.5px solid ${C.border}`, display: "flex", padding: "6px 0 14px", zIndex: 100 }}>
         {([
-          { sc: "home" as Screen, icon: <Home size={20} />, label: "Inicio" },
-          { sc: "proyectos" as Screen, icon: <FolderOpen size={20} />, label: "Proyectos" },
+          { sc: "home" as Screen, icon: <Home size={19} />, label: "Inicio" },
+          { sc: "proyectos" as Screen, icon: <FolderOpen size={19} />, label: "Proyectos" },
           { sc: "crearProyecto" as Screen, icon: null, label: "Crear" },
-          ...(isAdmin ? [{ sc: "gastos" as Screen, icon: <DollarSign size={20} />, label: "Gastos" }] : []),
-          { sc: "configuracion" as Screen, icon: <Av name={userName} size={22} />, label: "Perfil" },
+          ...(isAdmin ? [{ sc: "gastos" as Screen, icon: <DollarSign size={19} />, label: "Gastos" }] : []),
+          ...(isAdmin ? [{ sc: "admin" as Screen, icon: <Shield size={19} />, label: "Admin" }] : []),
+          { sc: "configuracion" as Screen, icon: <Av name={userName} size={20} />, label: "Perfil" },
         ] as { sc: Screen; icon: React.ReactNode; label: string }[]).map(({ sc, icon, label }) => {
           const active = screen === sc || (sc === "home" && (screen === "partidas" || screen === "fotos"));
           const isCreate = sc === "crearProyecto";
           return (
-            <button key={sc} onClick={() => { setScreen(sc); if (sc === "gastos") { loadCostCenters(); loadExpenses(); } }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: "none", border: "none", cursor: "pointer", color: active ? C.orange : C.muted }}>
+            <button key={sc} onClick={() => { setScreen(sc); if (sc === "gastos") { loadCostCenters(); loadExpenses(); } }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", color: active ? C.orange : C.muted, padding: "2px 0" }}>
               {isCreate ? (
-                <div style={{ width: 46, height: 46, background: C.orange, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", marginTop: -20, boxShadow: `0 0 0 4px ${C.card}` }}>
-                  <Plus size={20} color="#fff" />
+                <div style={{ width: 42, height: 42, background: C.orange, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", marginTop: -18, boxShadow: `0 0 0 4px ${C.card}` }}>
+                  <Plus size={19} color="#fff" />
                 </div>
               ) : icon}
-              <span style={{ fontSize: 10, fontWeight: 600 }}>{label}</span>
+              <span style={{ fontSize: 9, fontWeight: 600 }}>{label}</span>
             </button>
           );
         })}
