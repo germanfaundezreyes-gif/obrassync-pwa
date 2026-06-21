@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Shield, Eye, EyeOff, Bell, Image, MessageSquare } from "lucide-react";
+import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Shield, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, TrendingUp, BarChart2, PieChart, X, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
 
 const API_URL = "https://obrassync-backend-production.up.railway.app";
 
@@ -11,12 +11,28 @@ const C = {
   info: "#3B82F6", infoDim: "#0D0D1A", purple: "#A855F7", purpleDim: "#150D1A",
 };
 
-type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion";
+type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos";
 type Project = { id: string; code: string; name: string; client_name?: string; start_date?: string; end_date?: string; progress_percent?: number };
 type Task = { id: string; name: string; duration?: string; start_date?: string; end_date?: string; progress_percent?: number; status?: string; photo_count?: number };
 type TaskPhoto = { id: string; filename: string; local_path?: string; onedrive_url?: string; created_at: string; description?: string };
 type QuoteItem = { tempId: string; name: string; codigo: string; quantity: string; unit: string; start_date: string; end_date: string; selected: boolean };
 type User = { id: string; full_name: string; email: string; role: string; is_active: boolean; permissions?: Record<string, boolean> };
+type Kpis = { proyectos: { total: number; avg_progress: number; atrasados: number }; tareas: { total: number; completadas: number; en_curso: number; atrasadas: number }; fotos: { total: number }; gastos: { total_mes: number } };
+type CostCenter = { id: string; name: string; code?: string; type: string; project_name?: string };
+type Expense = { id: string; cost_center_id?: string; project_id?: string; category: string; supplier_name?: string; supplier_rut?: string; document_number?: string; document_type: string; amount: number; net_amount: number; tax_amount: number; expense_date: string; description?: string; project_name?: string; cost_center_name?: string; created_by_name?: string };
+type ExpenseSummary = { month: string; totals: { total: number; neto: number; iva: number }; byProject: { project_name: string; total: number; count: number }[]; byCategory: { category: string; total: number; count: number }[] };
+
+const EXPENSE_CATEGORIES = [
+  { value: "materiales", label: "Materiales", icon: "🧱" },
+  { value: "mano_obra", label: "Mano de obra", icon: "👷" },
+  { value: "combustible", label: "Combustible", icon: "⛽" },
+  { value: "herramientas", label: "Herramientas", icon: "🔧" },
+  { value: "transporte", label: "Transporte", icon: "🚛" },
+  { value: "subcontrato", label: "Subcontrato", icon: "📋" },
+  { value: "admin", label: "Administración", icon: "🏢" },
+  { value: "otros", label: "Otros", icon: "📦" },
+];
+const fmtCLP = (n: number) => new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", minimumFractionDigits: 0 }).format(n);
 
 const PERMISSIONS = [
   { key: "photos", label: "Fotos", sub: "Subir y ver fotos", icon: "📷" },
@@ -135,6 +151,31 @@ export default function App() {
   const [globalEndDate, setGlobalEndDate] = useState("");
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
+  // KPIs
+  const [kpis, setKpis] = useState<Kpis | null>(null);
+
+  // Gastos
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenseSummary, setExpenseSummary] = useState<ExpenseSummary | null>(null);
+  const [gastosTab, setGastosTab] = useState<"resumen" | "lista" | "centros">("resumen");
+  const [gastosMonth, setGastosMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [showAddExpense, setShowAddExpense] = useState(false);
+  const [expCategory, setExpCategory] = useState("materiales");
+  const [expSupplier, setExpSupplier] = useState("");
+  const [expRut, setExpRut] = useState("");
+  const [expDocNum, setExpDocNum] = useState("");
+  const [expDocType, setExpDocType] = useState("factura");
+  const [expAmount, setExpAmount] = useState("");
+  const [expDate, setExpDate] = useState(new Date().toISOString().slice(0, 10));
+  const [expDesc, setExpDesc] = useState("");
+  const [expProjectId, setExpProjectId] = useState("");
+  const [expCostCenterId, setExpCostCenterId] = useState("");
+  const [savingExpense, setSavingExpense] = useState(false);
+  const [newCCName, setNewCCName] = useState("");
+  const [newCCCode, setNewCCCode] = useState("");
+  const [creatingCC, setCreatingCC] = useState(false);
+
   // Photo description
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [photoDescInput, setPhotoDescInput] = useState("");
@@ -144,7 +185,7 @@ export default function App() {
 
   const isAdmin = userRole === "administrador" || userRole === "admin";
 
-  useEffect(() => { if (token) { loadProjects(); if (isAdmin) loadUsers(); } }, [token]);
+  useEffect(() => { if (token) { loadProjects(); loadKpis(); if (isAdmin) { loadUsers(); loadCostCenters(); } } }, [token]);
   useEffect(() => { if (selectedProject && token) loadTasks(selectedProject.id); }, [selectedProject]);
 
   const inp: React.CSSProperties = { width: "100%", height: 48, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 14, padding: "0 14px", marginBottom: 10, boxSizing: "border-box", outline: "none" };
@@ -330,6 +371,53 @@ export default function App() {
 
   async function loadUsers() {
     try { const r = await fetch(`${API_URL}/users`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); setUsers(d.items || []); } catch {}
+  }
+
+  async function loadKpis() {
+    try { const r = await fetch(`${API_URL}/dashboard/kpis`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setKpis(d); } catch {}
+  }
+
+  async function loadCostCenters() {
+    try { const r = await fetch(`${API_URL}/cost-centers`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setCostCenters(d.items || []); } catch {}
+  }
+
+  async function loadExpenses(month?: string) {
+    try {
+      const m = month || gastosMonth;
+      const r = await fetch(`${API_URL}/expenses?month=${m}`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json(); if (d.ok) setExpenses(d.items || []);
+      const r2 = await fetch(`${API_URL}/expenses/summary?month=${m}`, { headers: { Authorization: `Bearer ${token}` } });
+      const d2 = await r2.json(); if (d2.ok) setExpenseSummary(d2);
+    } catch {}
+  }
+
+  async function createExpense() {
+    if (!expAmount || !expDate) { alert("Monto y fecha son obligatorios"); return; }
+    setSavingExpense(true);
+    try {
+      const r = await fetch(`${API_URL}/expenses`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ category: expCategory, supplier_name: expSupplier || undefined, supplier_rut: expRut || undefined, document_number: expDocNum || undefined, document_type: expDocType, amount: +expAmount, expense_date: expDate, description: expDesc || undefined, project_id: expProjectId || undefined, cost_center_id: expCostCenterId || undefined }) });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
+      setShowAddExpense(false);
+      setExpAmount(""); setExpSupplier(""); setExpRut(""); setExpDocNum(""); setExpDesc(""); setExpProjectId(""); setExpCostCenterId("");
+      await loadExpenses(); await loadKpis();
+    } catch { alert("Error"); } finally { setSavingExpense(false); }
+  }
+
+  async function deleteExpense(id: string) {
+    if (!confirm("¿Eliminar este gasto?")) return;
+    try { await fetch(`${API_URL}/expenses/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); await loadExpenses(); await loadKpis(); } catch { alert("Error"); }
+  }
+
+  async function createCostCenter() {
+    if (!newCCName) { alert("Ingresa un nombre"); return; }
+    setCreatingCC(true);
+    try {
+      const r = await fetch(`${API_URL}/cost-centers`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: newCCName, code: newCCCode }) });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
+      setNewCCName(""); setNewCCCode(""); await loadCostCenters();
+    } catch { alert("Error"); } finally { setCreatingCC(false); }
   }
 
   function openEditUser(user: User) {
@@ -530,41 +618,73 @@ export default function App() {
         {/* HOME */}
         {screen === "home" && (
           <>
+            {/* Header saludo */}
             <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.3 }}>Hola, {userName.split(" ")[0]} 👋</div>
-              <div style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>Aquí tienes el resumen de tus proyectos</div>
+              <div style={{ fontSize: 11, color: C.orange, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 4 }}>Panel de Control</div>
+              <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.5 }}>Hola, {userName.split(" ")[0]} 👋</div>
+              <div style={{ color: C.mutedSoft, fontSize: 13, marginTop: 2 }}>{new Date().toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}</div>
             </div>
+
+            {/* KPI Cards */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-              {[
-                { icon: "📁", label: "Proyectos activos", value: projects.length, color: C.orange, bg: C.orangeDim },
-                { icon: "📋", label: "Partidas pendientes", value: tasks.filter(t => t.status === "pendiente").length, color: C.info, bg: C.infoDim },
-                { icon: "👷", label: "Usuarios activos", value: users.filter(u => u.is_active).length, color: C.purple, bg: C.purpleDim },
-                { icon: "📷", label: "Fotos subidas", value: totalPhotos, color: C.success, bg: C.successDim },
-              ].map(({ icon, label, value, color, bg }) => (
-                <div key={label} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14 }}>
-                  <div style={{ width: 34, height: 34, background: bg, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, marginBottom: 10 }}>{icon}</div>
-                  <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>{label}</div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color }}>{value}</div>
-                  <div style={{ fontSize: 11, color: C.orange, marginTop: 4 }}>Ver todos →</div>
+              <div onClick={() => setScreen("proyectos")} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 16, padding: 16, cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ width: 36, height: 36, background: C.orangeDim, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}><FolderOpen size={18} color={C.orange} /></div>
+                  {(kpis?.proyectos.atrasados || 0) > 0 && <div style={{ background: C.dangerDim, border: `0.5px solid ${C.danger}`, borderRadius: 6, padding: "2px 7px", fontSize: 10, color: C.danger, fontWeight: 700 }}>{kpis?.proyectos.atrasados} atr.</div>}
                 </div>
-              ))}
+                <div style={{ fontSize: 28, fontWeight: 800, color: C.orange, marginTop: 10 }}>{kpis?.proyectos.total ?? projects.length}</div>
+                <div style={{ fontSize: 11, color: C.mutedSoft, marginTop: 2 }}>Proyectos activos</div>
+                <div style={{ height: 3, background: C.border, borderRadius: 99, marginTop: 8, overflow: "hidden" }}>
+                  <div style={{ width: `${kpis?.proyectos.avg_progress || 0}%`, height: "100%", background: C.orange, borderRadius: 99 }} />
+                </div>
+                <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>{kpis?.proyectos.avg_progress ?? 0}% avance prom.</div>
+              </div>
+
+              <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
+                <div style={{ width: 36, height: 36, background: C.infoDim, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}><BarChart2 size={18} color={C.info} /></div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: C.info, marginTop: 10 }}>{kpis?.tareas.en_curso ?? 0}</div>
+                <div style={{ fontSize: 11, color: C.mutedSoft, marginTop: 2 }}>Partidas en curso</div>
+                <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                  <div style={{ background: C.successDim, borderRadius: 5, padding: "2px 7px", fontSize: 10, color: C.success }}><CheckCircle2 size={9} style={{ marginRight: 3 }} />{kpis?.tareas.completadas ?? 0} ok</div>
+                  {(kpis?.tareas.atrasadas || 0) > 0 && <div style={{ background: C.dangerDim, borderRadius: 5, padding: "2px 7px", fontSize: 10, color: C.danger }}><AlertTriangle size={9} style={{ marginRight: 3 }} />{kpis?.tareas.atrasadas} atr.</div>}
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
+                <div style={{ width: 36, height: 36, background: C.successDim, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}><Image size={18} color={C.success} /></div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: C.success, marginTop: 10 }}>{kpis?.fotos.total ?? 0}</div>
+                <div style={{ fontSize: 11, color: C.mutedSoft, marginTop: 2 }}>Fotos registradas</div>
+                <div style={{ fontSize: 10, color: C.muted, marginTop: 6 }}>En todos los proyectos</div>
+              </div>
+
+              <div onClick={() => setScreen("gastos")} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 16, padding: 16, cursor: "pointer" }}>
+                <div style={{ width: 36, height: 36, background: C.purpleDim, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}><DollarSign size={18} color={C.purple} /></div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: C.purple, marginTop: 10 }}>{kpis ? fmtCLP(kpis.gastos.total_mes) : "$0"}</div>
+                <div style={{ fontSize: 11, color: C.mutedSoft, marginTop: 2 }}>Gastos este mes</div>
+                <div style={{ fontSize: 10, color: C.orange, marginTop: 6 }}>Ver detalle →</div>
+              </div>
             </div>
+
+            {/* Proyectos recientes */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={{ fontSize: 15, fontWeight: 700 }}>Proyectos activos</div>
               <div onClick={() => setScreen("proyectos")} style={{ fontSize: 12, color: C.orange, cursor: "pointer" }}>Ver todos →</div>
             </div>
+            {projects.length === 0 && <div style={{ color: C.muted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>Sin proyectos aún. Crea el primero ↓</div>}
             {projects.slice(0, 4).map(p => (
               <div key={p.id} onClick={() => { setSelectedProject(p); setScreen("partidas"); }} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 46, height: 46, background: C.cardAlt, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🏗️</div>
+                <div style={{ width: 44, height: 44, background: C.orangeDim, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <span style={{ fontSize: 20 }}>🏗️</span>
+                </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
-                  <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>#{p.code} · <span style={{ color: C.success }}>En ejecución</span></div>
-                  <div style={{ height: 3, background: C.border, borderRadius: 99, marginTop: 8, overflow: "hidden" }}>
-                    <div style={{ width: `${p.progress_percent || 0}%`, height: "100%", background: C.orange, borderRadius: 99 }} />
+                  <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>#{p.code}{p.client_name ? ` · ${p.client_name}` : ""}</div>
+                  <div style={{ height: 4, background: C.border, borderRadius: 99, marginTop: 7, overflow: "hidden" }}>
+                    <div style={{ width: `${p.progress_percent || 0}%`, height: "100%", background: `linear-gradient(90deg, ${C.orange}, #FFB347)`, borderRadius: 99, transition: "width 0.5s" }} />
                   </div>
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: C.orange }}>{Number(p.progress_percent || 0).toFixed(0)}%</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: C.orange }}>{Number(p.progress_percent || 0).toFixed(0)}%</div>
                   <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>avance</div>
                 </div>
               </div>
@@ -935,22 +1055,224 @@ export default function App() {
         </div>
       )}
 
+      {/* ── GASTOS ── */}
+      {screen === "gastos" && (
+        <>
+          {/* Modal agregar gasto */}
+          {showAddExpense && (
+            <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.9)", zIndex: 400, display: "flex", alignItems: "flex-end" }}>
+              <div style={{ backgroundColor: C.card, borderRadius: "20px 20px 0 0", padding: 20, width: "100%", maxWidth: 600, margin: "0 auto", maxHeight: "90vh", overflowY: "auto" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700 }}>Registrar gasto</div>
+                  <button onClick={() => setShowAddExpense(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={20} color={C.muted} /></button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+                  {EXPENSE_CATEGORIES.map(cat => (
+                    <button key={cat.value} onClick={() => setExpCategory(cat.value)} style={{ padding: "10px 8px", backgroundColor: expCategory === cat.value ? C.orangeDim : C.cardAlt, border: `0.5px solid ${expCategory === cat.value ? C.orange : C.border}`, borderRadius: 10, color: expCategory === cat.value ? C.orange : C.mutedSoft, fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span>{cat.icon}</span>{cat.label}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <input value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder="Monto total ($)" type="number" style={{ ...inp, marginBottom: 0 }} />
+                  <input value={expDate} onChange={e => setExpDate(e.target.value)} type="date" style={{ ...inp, marginBottom: 0 }} />
+                </div>
+                <div style={{ height: 8 }} />
+                <input value={expSupplier} onChange={e => setExpSupplier(e.target.value)} placeholder="Proveedor (opcional)" style={inp} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <input value={expRut} onChange={e => setExpRut(e.target.value)} placeholder="RUT proveedor" style={{ ...inp, marginBottom: 0 }} />
+                  <input value={expDocNum} onChange={e => setExpDocNum(e.target.value)} placeholder="N° documento" style={{ ...inp, marginBottom: 0 }} />
+                </div>
+                <div style={{ height: 8 }} />
+                <select value={expDocType} onChange={e => setExpDocType(e.target.value)} style={{ ...inp }}>
+                  <option value="factura">Factura</option>
+                  <option value="boleta">Boleta</option>
+                  <option value="nota_debito">Nota de débito</option>
+                  <option value="otro">Otro</option>
+                </select>
+                <select value={expProjectId} onChange={e => setExpProjectId(e.target.value)} style={{ ...inp }}>
+                  <option value="">Sin proyecto</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <select value={expCostCenterId} onChange={e => setExpCostCenterId(e.target.value)} style={{ ...inp }}>
+                  <option value="">Sin centro de costo</option>
+                  {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.name} {cc.type === "project" ? "🏗️" : "📂"}</option>)}
+                </select>
+                <input value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="Descripción (opcional)" style={inp} />
+                {expAmount && <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: "10px 14px", marginBottom: 12, display: "flex", justifyContent: "space-between", fontSize: 12, color: C.mutedSoft }}>
+                  <span>Neto: <b style={{ color: C.text }}>{fmtCLP(Math.round(+expAmount / 1.19))}</b></span>
+                  <span>IVA 19%: <b style={{ color: C.text }}>{fmtCLP(+expAmount - Math.round(+expAmount / 1.19))}</b></span>
+                  <span>Total: <b style={{ color: C.orange }}>{fmtCLP(+expAmount)}</b></span>
+                </div>}
+                <button onClick={createExpense} disabled={savingExpense} style={btnPrimary}>{savingExpense ? "Guardando..." : "Registrar gasto"}</button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div>
+              <div style={{ fontSize: 11, color: C.orange, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>Módulo</div>
+              <div style={{ fontSize: 22, fontWeight: 800 }}>Gastos</div>
+            </div>
+            <button onClick={() => { setShowAddExpense(true); loadCostCenters(); }} style={{ backgroundColor: C.orange, border: "none", borderRadius: 10, padding: "9px 16px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+              <Plus size={16} /> Agregar
+            </button>
+          </div>
+
+          {/* Selector de mes */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+            <input type="month" value={gastosMonth} onChange={e => { setGastosMonth(e.target.value); loadExpenses(e.target.value); }} style={{ ...inp, marginBottom: 0, flex: 1 }} />
+            <button onClick={() => loadExpenses()} style={{ height: 48, padding: "0 16px", backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.mutedSoft, cursor: "pointer", fontSize: 13 }}>↻</button>
+          </div>
+
+          {/* Tabs */}
+          <div style={{ display: "flex", backgroundColor: C.cardAlt, borderRadius: 10, padding: 4, marginBottom: 16, gap: 4 }}>
+            {(["resumen", "lista", "centros"] as const).map(t => (
+              <button key={t} onClick={() => { setGastosTab(t); if (t !== "centros") loadExpenses(); }} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", backgroundColor: gastosTab === t ? C.card : "transparent", color: gastosTab === t ? C.orange : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                {t === "resumen" ? "Resumen" : t === "lista" ? "Detalle" : "Centros C."}
+              </button>
+            ))}
+          </div>
+
+          {/* TAB: RESUMEN */}
+          {gastosTab === "resumen" && (
+            <>
+              {!expenseSummary && <div style={{ textAlign: "center", color: C.muted, padding: 40 }} onClick={loadExpenses}>Toca para cargar →</div>}
+              {expenseSummary && (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
+                    {[
+                      { label: "Total bruto", value: fmtCLP(expenseSummary.totals.total), color: C.orange },
+                      { label: "Neto", value: fmtCLP(expenseSummary.totals.neto), color: C.info },
+                      { label: "IVA", value: fmtCLP(expenseSummary.totals.iva), color: C.purple },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 12, textAlign: "center" }}>
+                        <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>{label}</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color }}>{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {expenseSummary.byProject.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.mutedSoft, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5, fontSize: 11 }}>Por proyecto</div>
+                      {expenseSummary.byProject.map((row, i) => {
+                        const maxTotal = Math.max(...expenseSummary.byProject.map(r => r.total));
+                        return (
+                          <div key={i} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 12, marginBottom: 8 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600 }}>{row.project_name || "Sin proyecto"}</div>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: C.orange }}>{fmtCLP(row.total)}</div>
+                            </div>
+                            <div style={{ height: 3, background: C.border, borderRadius: 99, overflow: "hidden" }}>
+                              <div style={{ width: `${(row.total / maxTotal) * 100}%`, height: "100%", background: `linear-gradient(90deg, ${C.orange}, #FFB347)`, borderRadius: 99 }} />
+                            </div>
+                            <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>{row.count} documento{row.count !== 1 ? "s" : ""}</div>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+                  {expenseSummary.byCategory.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 16 }}>Por categoría</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        {expenseSummary.byCategory.map((row, i) => {
+                          const cat = EXPENSE_CATEGORIES.find(c => c.value === row.category) || { icon: "📦", label: row.category };
+                          return (
+                            <div key={i} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 12 }}>
+                              <div style={{ fontSize: 18, marginBottom: 4 }}>{cat.icon}</div>
+                              <div style={{ fontSize: 11, color: C.muted }}>{cat.label}</div>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginTop: 2 }}>{fmtCLP(row.total)}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                  {expenseSummary.byProject.length === 0 && expenseSummary.byCategory.length === 0 && (
+                    <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin gastos en {gastosMonth}</div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {/* TAB: LISTA */}
+          {gastosTab === "lista" && (
+            <>
+              {expenses.length === 0 && (
+                <div style={{ textAlign: "center", padding: 40 }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>🧾</div>
+                  <div style={{ color: C.muted, fontSize: 14 }}>Sin gastos en {gastosMonth}</div>
+                  <button onClick={() => setShowAddExpense(true)} style={{ ...btnPrimary, marginTop: 16, width: "auto", padding: "10px 24px" }}>+ Agregar primer gasto</button>
+                </div>
+              )}
+              {expenses.map(exp => {
+                const cat = EXPENSE_CATEGORIES.find(c => c.value === exp.category) || { icon: "📦", label: exp.category };
+                return (
+                  <div key={exp.id} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ display: "flex", gap: 10, flex: 1, minWidth: 0 }}>
+                        <div style={{ width: 38, height: 38, background: C.cardAlt, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{cat.icon}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>{exp.supplier_name || cat.label}</div>
+                          <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{exp.project_name || exp.cost_center_name || "Sin asignación"}</div>
+                          <div style={{ fontSize: 11, color: C.muted }}>{new Date(exp.expense_date + "T12:00:00").toLocaleDateString("es-CL")} · {exp.document_type}{exp.document_number ? ` N°${exp.document_number}` : ""}</div>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: C.orange }}>{fmtCLP(exp.amount)}</div>
+                        <div style={{ fontSize: 10, color: C.muted }}>IVA: {fmtCLP(exp.tax_amount || 0)}</div>
+                        <button onClick={() => deleteExpense(exp.id)} style={{ backgroundColor: C.dangerDim, border: "none", borderRadius: 6, padding: "3px 8px", color: C.danger, fontSize: 11, cursor: "pointer", marginTop: 4 }}>Eliminar</button>
+                      </div>
+                    </div>
+                    {exp.description && <div style={{ fontSize: 11, color: C.muted, marginTop: 8, paddingTop: 8, borderTop: `0.5px solid ${C.border}` }}>{exp.description}</div>}
+                  </div>
+                );
+              })}
+            </>
+          )}
+
+          {/* TAB: CENTROS DE COSTO */}
+          {gastosTab === "centros" && (
+            <>
+              <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Nuevo centro de costo</div>
+                <input value={newCCName} onChange={e => setNewCCName(e.target.value)} placeholder="Nombre (ej: Bencina, Insumos)" style={inp} />
+                <input value={newCCCode} onChange={e => setNewCCCode(e.target.value)} placeholder="Código (opcional)" style={inp} />
+                <button onClick={createCostCenter} disabled={creatingCC} style={btnPrimary}>{creatingCC ? "Creando..." : "Crear centro de costo"}</button>
+              </div>
+              {costCenters.map(cc => (
+                <div key={cc.id} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 12, marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 36, height: 36, background: cc.type === "project" ? C.orangeDim : C.infoDim, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{cc.type === "project" ? "🏗️" : "📂"}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{cc.name}</div>
+                    <div style={{ fontSize: 11, color: C.muted }}>{cc.type === "project" ? `Proyecto · ${cc.project_name}` : "Manual"}{cc.code ? ` · #${cc.code}` : ""}</div>
+                  </div>
+                  {cc.type === "manual" && <button onClick={async () => { if (!confirm("¿Eliminar?")) return; await fetch(`${API_URL}/cost-centers/${cc.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); loadCostCenters(); }} style={{ backgroundColor: C.dangerDim, border: "none", borderRadius: 6, padding: "4px 10px", color: C.danger, fontSize: 11, cursor: "pointer" }}>✕</button>}
+                </div>
+              ))}
+            </>
+          )}
+        </>
+      )}
+
       {/* Nav inferior */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: C.card, borderTop: `0.5px solid ${C.border}`, display: "flex", padding: "8px 0 16px", zIndex: 100 }}>
         {([
-          { sc: "home" as Screen, icon: <Home size={22} />, label: "Inicio" },
-          { sc: "proyectos" as Screen, icon: <FolderOpen size={22} />, label: "Proyectos" },
+          { sc: "home" as Screen, icon: <Home size={20} />, label: "Inicio" },
+          { sc: "proyectos" as Screen, icon: <FolderOpen size={20} />, label: "Proyectos" },
           { sc: "crearProyecto" as Screen, icon: null, label: "Crear" },
-          ...(isAdmin ? [{ sc: "admin" as Screen, icon: <Shield size={22} />, label: "Admin" }] : []),
-          { sc: "configuracion" as Screen, icon: <Av name={userName} size={24} />, label: "Perfil" },
+          ...(isAdmin ? [{ sc: "gastos" as Screen, icon: <DollarSign size={20} />, label: "Gastos" }] : []),
+          { sc: "configuracion" as Screen, icon: <Av name={userName} size={22} />, label: "Perfil" },
         ] as { sc: Screen; icon: React.ReactNode; label: string }[]).map(({ sc, icon, label }) => {
-          const active = screen === sc || (sc === "home" && screen === "partidas");
+          const active = screen === sc || (sc === "home" && (screen === "partidas" || screen === "fotos"));
           const isCreate = sc === "crearProyecto";
           return (
-            <button key={sc} onClick={() => setScreen(sc)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: "none", border: "none", cursor: "pointer", color: active ? C.orange : C.muted }}>
+            <button key={sc} onClick={() => { setScreen(sc); if (sc === "gastos") { loadCostCenters(); loadExpenses(); } }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: "none", border: "none", cursor: "pointer", color: active ? C.orange : C.muted }}>
               {isCreate ? (
-                <div style={{ width: 48, height: 48, background: C.orange, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", marginTop: -20, boxShadow: `0 0 0 4px ${C.card}` }}>
-                  <Plus size={22} color="#fff" />
+                <div style={{ width: 46, height: 46, background: C.orange, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", marginTop: -20, boxShadow: `0 0 0 4px ${C.card}` }}>
+                  <Plus size={20} color="#fff" />
                 </div>
               ) : icon}
               <span style={{ fontSize: 10, fontWeight: 600 }}>{label}</span>
