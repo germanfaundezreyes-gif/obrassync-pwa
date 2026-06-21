@@ -321,7 +321,7 @@ export default function App() {
     setUploadingLogo(true);
     try {
       const fd = new FormData(); fd.append("logo", logoFile);
-      const r = await fetch(`${API_URL}/company/logo`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+      const r = await fetch(`${API_URL}/companies/logo`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
       alert("✅ Logo subido. Aparecerá en los informes Word."); setLogoFile(null);
