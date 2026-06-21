@@ -1326,8 +1326,18 @@ export default function App() {
 
               {/* Consultar facturas */}
               <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-                <button onClick={loadSiiFacturas} disabled={loadingSiiFacturas} style={{ flex: 1, height: 46, backgroundColor: C.orangeDim, border: `0.5px solid ${C.orange}`, borderRadius: 10, color: C.orange, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                  {loadingSiiFacturas ? "Consultando SII..." : "🔄 Consultar facturas recibidas"}
+                <button onClick={loadSiiFacturas} disabled={loadingSiiFacturas} style={{ flex: 2, height: 46, backgroundColor: C.orangeDim, border: `0.5px solid ${C.orange}`, borderRadius: 10, color: C.orange, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                  {loadingSiiFacturas ? "Consultando SII..." : "🔄 Consultar facturas"}
+                </button>
+                <button onClick={async () => {
+                  try {
+                    const r = await fetch(`${API_URL}/sii/diagnostico`, { headers: { Authorization: `Bearer ${token}` } });
+                    const d = await r.json();
+                    const msg = d.steps?.map((s: {paso: string; ok: boolean; detalle: string}) => `${s.ok ? "✅" : "❌"} ${s.paso}\n   ${s.detalle}`).join("\n") || d.error || JSON.stringify(d);
+                    alert(msg);
+                  } catch(e) { alert("Error de red"); }
+                }} style={{ flex: 1, height: 46, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.mutedSoft, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
+                  🔍 Diagnóstico
                 </button>
               </div>
 
