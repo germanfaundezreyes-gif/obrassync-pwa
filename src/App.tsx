@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Shield, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle } from "lucide-react";
 
 const API_URL = "https://obrassync-backend-production.up.railway.app";
 
