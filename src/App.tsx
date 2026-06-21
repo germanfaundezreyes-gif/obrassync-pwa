@@ -37,10 +37,13 @@ const EXPENSE_CATEGORIES = [
 const fmtCLP = (n: number) => new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", minimumFractionDigits: 0 }).format(n);
 
 const PERMISSIONS = [
-  { key: "photos", label: "Fotos", sub: "Subir y ver fotos", icon: "📷" },
+  { key: "photos", label: "Fotos", sub: "Subir y ver fotos de partidas", icon: "📷" },
   { key: "projects", label: "Proyectos", sub: "Ver lista de proyectos", icon: "📁" },
-  { key: "reports", label: "Informes", sub: "Generar Word", icon: "📄" },
-  { key: "admin", label: "Administración", sub: "Gestionar usuarios", icon: "👤" },
+  { key: "reports", label: "Informes Word", sub: "Generar y descargar informes", icon: "📄" },
+  { key: "kpis", label: "KPIs inicio", sub: "Ver métricas en el dashboard", icon: "📊" },
+  { key: "montos", label: "Ver montos", sub: "Ver cifras y montos de dinero", icon: "💰" },
+  { key: "gastos", label: "Módulo Gastos", sub: "Ver y registrar gastos", icon: "💳" },
+  { key: "admin", label: "Administración", sub: "Gestionar usuarios y permisos", icon: "👤" },
 ];
 
 const ROLES = [
@@ -83,6 +86,7 @@ export default function App() {
   const [token, setToken] = useState<string | null>(null);
   const [userName, setUserName] = useState("");
   const [userRole, setUserRole] = useState("");
+  const [userPerms, setUserPerms] = useState<Record<string, boolean>>({});
   const [email, setEmail] = useState("admin@obrassync.cl");
   const [password, setPassword] = useState("Admin1234*");
   const [showPass, setShowPass] = useState(false);
@@ -196,6 +200,12 @@ export default function App() {
   const [savingPhotoDesc, setSavingPhotoDesc] = useState(false);
 
   const isAdmin = userRole === "administrador" || userRole === "admin";
+  // Permisos: admin siempre tiene todo, otros según asignación
+  const canSee = (key: string) => isAdmin || userPerms[key] === true;
+  const canSeeKpis = canSee("kpis");
+  const canSeeMontos = canSee("montos");
+  const canSeeGastos = canSee("gastos");
+  const canSeeReports = canSee("reports");
 
   useEffect(() => { if (token) { loadProjects(); loadKpis(); if (isAdmin) { loadUsers(); loadCostCenters(); } } }, [token]);
   useEffect(() => { if (selectedProject && token) loadTasks(selectedProject.id); }, [selectedProject]);
@@ -210,7 +220,7 @@ export default function App() {
       const r = await fetch(`${API_URL}/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert(d.message || "Credenciales inválidas"); return; }
-      setToken(d.token); setUserName(d.user?.fullName || "Usuario"); setUserRole(d.user?.role || "");
+      setToken(d.token); setUserName(d.user?.fullName || "Usuario"); setUserRole(d.user?.role || ""); setUserPerms(d.user?.permissions || {});
     } catch { alert("No se pudo conectar al servidor"); } finally { setLoginLoading(false); }
   }
 
@@ -673,7 +683,7 @@ export default function App() {
             </div>
 
             {/* KPI Cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+            {canSeeKpis && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
               <div onClick={() => setScreen("proyectos")} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 16, padding: 16, cursor: "pointer" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div style={{ width: 36, height: 36, background: C.orangeDim, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}><FolderOpen size={18} color={C.orange} /></div>
@@ -706,11 +716,11 @@ export default function App() {
 
               <div onClick={() => setScreen("gastos")} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 16, padding: 16, cursor: "pointer" }}>
                 <div style={{ width: 36, height: 36, background: C.purpleDim, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}><DollarSign size={18} color={C.purple} /></div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: C.purple, marginTop: 10 }}>{kpis ? fmtCLP(kpis.gastos.total_mes) : "$0"}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: C.purple, marginTop: 10 }}>{canSeeMontos ? (kpis ? fmtCLP(kpis.gastos.total_mes) : "$0") : "••••••"}</div>
                 <div style={{ fontSize: 11, color: C.mutedSoft, marginTop: 2 }}>Gastos este mes</div>
                 <div style={{ fontSize: 10, color: C.orange, marginTop: 6 }}>Ver detalle →</div>
               </div>
-            </div>
+            </div>}
 
             {/* Proyectos recientes */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -762,9 +772,9 @@ export default function App() {
 
             {/* Acciones del proyecto */}
             <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-              <button onClick={generateReport} disabled={generatingReport} style={{ flex: 1, height: 44, backgroundColor: "#0D1A2E", border: `0.5px solid ${C.info}50`, borderRadius: 10, color: C.info, fontWeight: 600, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              {canSeeReports && <button onClick={generateReport} disabled={generatingReport} style={{ flex: 1, height: 44, backgroundColor: "#0D1A2E", border: `0.5px solid ${C.info}50`, borderRadius: 10, color: C.info, fontWeight: 600, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                 <FileText size={15} /> {generatingReport ? "Generando..." : "Informe Word"}
-              </button>
+              </button>}
               <button onClick={() => setShowQuoteImport(true)} style={{ flex: 1, height: 44, backgroundColor: C.orangeDim, border: `0.5px solid ${C.orange}40`, borderRadius: 10, color: C.orange, fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
                 📄 Cotización PDF
               </button>
@@ -1376,7 +1386,7 @@ export default function App() {
           { sc: "home" as Screen, icon: <Home size={19} />, label: "Inicio" },
           { sc: "proyectos" as Screen, icon: <FolderOpen size={19} />, label: "Proyectos" },
           { sc: "crearProyecto" as Screen, icon: null, label: "Crear" },
-          ...(isAdmin ? [{ sc: "gastos" as Screen, icon: <DollarSign size={19} />, label: "Gastos" }] : []),
+          ...(canSeeGastos ? [{ sc: "gastos" as Screen, icon: <DollarSign size={19} />, label: "Gastos" }] : []),
           ...(isAdmin ? [{ sc: "admin" as Screen, icon: <Shield size={19} />, label: "Admin" }] : []),
           { sc: "configuracion" as Screen, icon: <Av name={userName} size={20} />, label: "Perfil" },
         ] as { sc: Screen; icon: React.ReactNode; label: string }[]).map(({ sc, icon, label }) => {
