@@ -189,7 +189,8 @@ export default function App() {
   const [uploadingSii, setUploadingSii] = useState(false);
   const [siiFacturas, setSiiFacturas] = useState<SiiFactura[]>([]);
   const [loadingSiiFacturas, setLoadingSiiFacturas] = useState(false);
-  const [_siiConfigured, setSiiConfigured] = useState(false);
+  const [siiConfigured, setSiiConfigured] = useState(false);
+  const [siiConfigRut, setSiiConfigRut] = useState("");
   const siiP12Ref = useRef<HTMLInputElement>(null);
 
   // Photo description
@@ -442,6 +443,14 @@ export default function App() {
     } catch { alert("Error"); } finally { setCreatingCC(false); }
   }
 
+  async function checkSiiStatus() {
+    try {
+      const r = await fetch(`${API_URL}/sii/status`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      if (d.ok) { setSiiConfigured(d.configured); if (d.rut) setSiiConfigRut(d.rut); }
+    } catch {}
+  }
+
   async function uploadSiiCert() {
     if (!siiP12File || !siiPassword || !siiRut) { alert("Selecciona el certificado .p12, ingresa tu RUT y clave SII"); return; }
     setUploadingSii(true);
@@ -453,16 +462,15 @@ export default function App() {
       const r = await fetch(`${API_URL}/sii/config`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert(d.message || "Error configurando SII"); return; }
-      setSiiConfigured(true); setSiiPassword(""); setSiiP12File(null);
-      alert("✅ Certificado SII configurado. Ahora puedes consultar facturas.");
+      setSiiConfigured(true); setSiiConfigRut(siiRut); setSiiPassword(""); setSiiP12File(null);
+      alert("✅ Certificado SII configurado con cifrado AES-256. Ya puedes consultar facturas automáticamente.");
     } catch { alert("Error conectando con el servidor"); } finally { setUploadingSii(false); }
   }
 
   async function loadSiiFacturas() {
     setLoadingSiiFacturas(true);
     try {
-      const month = gastosMonth;
-      const r = await fetch(`${API_URL}/sii/facturas?month=${month}`, { headers: { Authorization: `Bearer ${token}` } });
+      const r = await fetch(`${API_URL}/sii/facturas?month=${gastosMonth}`, { headers: { Authorization: `Bearer ${token}` } });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert(d.message || "Error consultando SII"); return; }
       setSiiFacturas(d.facturas || []);
@@ -1185,7 +1193,7 @@ export default function App() {
           {/* Tabs */}
           <div style={{ display: "flex", backgroundColor: C.cardAlt, borderRadius: 10, padding: 4, marginBottom: 16, gap: 3 }}>
             {(["resumen", "lista", "sii", "centros"] as const).map(t => (
-              <button key={t} onClick={() => { setGastosTab(t as typeof gastosTab); if (t === "lista" || t === "resumen") loadExpenses(); }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: gastosTab === t ? C.card : "transparent", color: gastosTab === t ? C.orange : C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
+              <button key={t} onClick={() => { setGastosTab(t as typeof gastosTab); if (t === "lista" || t === "resumen") loadExpenses(); if (t === "sii") checkSiiStatus(); }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: gastosTab === t ? C.card : "transparent", color: gastosTab === t ? C.orange : C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
                 {t === "resumen" ? "Resumen" : t === "lista" ? "Detalle" : t === "sii" ? "SII" : "Centros"}
               </button>
             ))}
@@ -1294,19 +1302,26 @@ export default function App() {
           {gastosTab === "sii" && (
             <>
               {/* Config certificado */}
-              <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>🏛️ Configuración SII</div>
-                <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>Sube tu certificado digital (.p12) y clave SII para consultar facturas de compra recibidas automáticamente.</div>
-                <div style={{ fontSize: 11, color: C.mutedSoft, marginBottom: 6, fontWeight: 600 }}>RUT empresa</div>
-                <input value={siiRut} onChange={e => setSiiRut(e.target.value)} placeholder="76982672-6" style={{ ...inp }} />
-                <div style={{ fontSize: 11, color: C.mutedSoft, marginBottom: 6, fontWeight: 600 }}>Certificado digital (.p12)</div>
+              <div style={{ backgroundColor: C.card, border: `0.5px solid ${siiConfigured ? C.success : C.border}`, borderRadius: 14, padding: 14, marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>🏛️ Certificado SII</div>
+                  {siiConfigured && <div style={{ backgroundColor: C.successDim, border: `0.5px solid ${C.success}`, borderRadius: 6, padding: "3px 10px", fontSize: 11, color: C.success, fontWeight: 700 }}>✅ Configurado</div>}
+                </div>
+                {siiConfigured ? (
+                  <>
+                    <div style={{ fontSize: 12, color: C.mutedSoft, marginBottom: 12 }}>RUT {siiConfigRut} · Credenciales cifradas con AES-256</div>
+                    <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>Para actualizar el certificado, sube uno nuevo abajo.</div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>Configuración única. Tus credenciales se guardan cifradas — no necesitas volver a ingresarlas.</div>
+                )}
+                <input value={siiRut} onChange={e => setSiiRut(e.target.value)} placeholder="RUT empresa (ej: 76982672-6)" style={{ ...inp }} />
                 <input ref={siiP12Ref} type="file" accept=".p12,.pfx" style={{ display: "none" }} onChange={e => setSiiP12File(e.target.files?.[0] || null)} />
                 <button onClick={() => siiP12Ref.current?.click()} style={{ width: "100%", height: 44, backgroundColor: C.cardAlt, border: `0.5px solid ${siiP12File ? C.success : C.border}`, borderRadius: 10, color: siiP12File ? C.success : C.mutedSoft, fontSize: 13, cursor: "pointer", marginBottom: 10 }}>
-                  {siiP12File ? `✅ ${siiP12File.name}` : "📎 Seleccionar archivo .p12"}
+                  {siiP12File ? `✅ ${siiP12File.name}` : "📎 Seleccionar certificado .p12"}
                 </button>
-                <div style={{ fontSize: 11, color: C.mutedSoft, marginBottom: 6, fontWeight: 600 }}>Clave SII</div>
-                <input type="password" value={siiPassword} onChange={e => setSiiPassword(e.target.value)} placeholder="Clave del certificado" style={{ ...inp }} />
-                <button onClick={uploadSiiCert} disabled={uploadingSii} style={btnPrimary}>{uploadingSii ? "Configurando..." : "Configurar certificado SII"}</button>
+                <input type="password" value={siiPassword} onChange={e => setSiiPassword(e.target.value)} placeholder="Clave del certificado .p12" style={{ ...inp }} />
+                <button onClick={uploadSiiCert} disabled={uploadingSii} style={{ ...btnPrimary, backgroundColor: siiConfigured ? C.cardAlt : C.orange, color: siiConfigured ? C.muted : "#fff" }}>{uploadingSii ? "Guardando..." : siiConfigured ? "Actualizar certificado" : "Guardar certificado SII"}</button>
               </div>
 
               {/* Consultar facturas */}
