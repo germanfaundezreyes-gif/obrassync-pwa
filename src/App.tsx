@@ -423,11 +423,19 @@ export default function App() {
   async function loadExpenses(month?: string) {
     try {
       const m = month || gastosMonth;
-      const r = await fetch(`${API_URL}/expenses?month=${m}`, { headers: { Authorization: `Bearer ${token}` } });
+      const headers = { Authorization: `Bearer ${token}` };
+      const [r, r2] = await Promise.all([
+        fetch(`${API_URL}/expenses?month=${m}`, { headers }),
+        fetch(`${API_URL}/expenses/summary?month=${m}`, { headers }),
+      ]);
       const d = await r.json(); if (d.ok) setExpenses(d.items || []);
-      const r2 = await fetch(`${API_URL}/expenses/summary?month=${m}`, { headers: { Authorization: `Bearer ${token}` } });
       const d2 = await r2.json(); if (d2.ok) setExpenseSummary(d2);
-    } catch {}
+      else setExpenseSummary({ month: m, totals: { total: 0, neto: 0, iva: 0 }, byProject: [], byCategory: [] });
+    } catch (e) {
+      console.error("loadExpenses error:", e);
+      const m = month || gastosMonth;
+      setExpenseSummary({ month: m, totals: { total: 0, neto: 0, iva: 0 }, byProject: [], byCategory: [] });
+    }
   }
 
   async function createExpense() {
@@ -1283,7 +1291,7 @@ export default function App() {
           {/* TAB: RESUMEN */}
           {gastosTab === "resumen" && (
             <>
-              {!expenseSummary && <div style={{ textAlign: "center", color: C.muted, padding: 40, cursor: "pointer" }} onClick={() => loadExpenses()}>Cargando resumen...</div>}
+              {!expenseSummary && <div style={{ textAlign: "center", color: C.muted, padding: 40, cursor: "pointer" }} onClick={() => loadExpenses()}>Toca para cargar resumen</div>}
               {expenseSummary && (
                 <>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
