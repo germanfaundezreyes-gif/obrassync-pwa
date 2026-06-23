@@ -173,6 +173,7 @@ export default function App() {
   const [gastosTab, setGastosTab] = useState<"resumen" | "lista" | "centros" | "sii" | "nubox">("resumen");
   const [nuboxPurchases, setNuboxPurchases] = useState<any[]>([]);
   const [nuboxLoading, setNuboxLoading] = useState(false);
+  const [nuboxError, setNuboxError] = useState<string | null>(null);
   const [nuboxAssigning, setNuboxAssigning] = useState<string | null>(null);
   const [nuboxSelectedProject, setNuboxSelectedProject] = useState<Record<string, string>>({});
   const [gastosMonth, setGastosMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -502,12 +503,13 @@ export default function App() {
 
   async function loadNuboxPurchases() {
     setNuboxLoading(true);
+    setNuboxError(null);
     try {
       const r = await fetch(`${API_URL}/nubox/purchases?period=${gastosMonth}&size=100`, { headers: { Authorization: `Bearer ${token}` } });
       const d = await r.json();
-      if (!r.ok || !d.ok) { alert(d.message || "Error Nubox"); return; }
+      if (!r.ok || !d.ok) { setNuboxError(d.message || "Error consultando Nubox"); return; }
       setNuboxPurchases(d.items || []);
-    } catch { alert("Error conectando Nubox"); } finally { setNuboxLoading(false); }
+    } catch (e: any) { setNuboxError(e.message || "Error de conexión"); } finally { setNuboxLoading(false); }
   }
 
   async function assignNuboxPurchase(nuboxId: number | string, projectId: string) {
@@ -1265,7 +1267,7 @@ export default function App() {
           {/* Tabs */}
           <div style={{ display: "flex", backgroundColor: C.cardAlt, borderRadius: 10, padding: 4, marginBottom: 16, gap: 3 }}>
             {(["resumen", "lista", "nubox", "centros"] as const).map(t => (
-              <button key={t} onClick={() => { setGastosTab(t as typeof gastosTab); if (t === "lista" || t === "resumen") loadExpenses(); if (t === "nubox") { loadNuboxPurchases(); loadCostCenters(); } }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: gastosTab === t ? C.card : "transparent", color: gastosTab === t ? C.orange : C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
+              <button key={t} onClick={() => { setGastosTab(t as typeof gastosTab); if (t === "lista" || t === "resumen") loadExpenses(); if (t === "nubox") { loadNuboxPurchases(); loadCostCenters(); loadProjects(); } }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: gastosTab === t ? C.card : "transparent", color: gastosTab === t ? C.orange : C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
                 {t === "resumen" ? "Resumen" : t === "lista" ? "Detalle" : t === "nubox" ? "Nubox" : "Centros"}
               </button>
             ))}
@@ -1463,7 +1465,12 @@ export default function App() {
                 </button>
               </div>
               {nuboxLoading && <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Cargando facturas Nubox...</div>}
-              {!nuboxLoading && nuboxPurchases.length === 0 && (
+              {nuboxError && (
+                <div style={{ backgroundColor: C.dangerDim, border: `0.5px solid ${C.danger}`, borderRadius: 12, padding: 14, marginBottom: 12, color: C.danger, fontSize: 13 }}>
+                  ❌ {nuboxError}
+                </div>
+              )}
+              {!nuboxLoading && !nuboxError && nuboxPurchases.length === 0 && (
                 <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin facturas en {fmtMonth(gastosMonth)}</div>
               )}
               {nuboxPurchases.map(p => {
