@@ -127,6 +127,8 @@ export default function App() {
   const [taskStatus, setTaskStatus] = useState("pendiente");
   const [taskProgress, setTaskProgress] = useState(0);
   const [taskName, setTaskName] = useState("");
+  const [taskUnit, setTaskUnit] = useState("");
+  const [taskQuantity, setTaskQuantity] = useState("");
   const [savingTask, setSavingTask] = useState(false);
 
   const [users, setUsers] = useState<User[]>([]);
@@ -280,7 +282,8 @@ export default function App() {
     if (!editingTask || !selectedProject) return;
     setSavingTask(true);
     try {
-      const r = await fetch(`${API_URL}/tasks/${editingTask.id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ status: taskStatus, progressPercent: taskProgress, name: taskName }) });
+      const progress = taskStatus === "completada" ? 100 : taskStatus === "pendiente" ? 0 : taskProgress;
+      const r = await fetch(`${API_URL}/tasks/${editingTask.id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ status: taskStatus, progressPercent: progress, name: taskName, unit: taskUnit || null, quantity: taskQuantity || null }) });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert("Error"); return; }
       setEditingTask(null); await loadTasks(selectedProject.id);
@@ -565,17 +568,26 @@ export default function App() {
               <div style={{ fontSize: 16, fontWeight: 700 }}>Editar partida</div>
               <button onClick={() => deleteTask(editingTask.id)} style={{ backgroundColor: C.dangerDim, border: "none", borderRadius: 8, padding: "5px 12px", color: C.danger, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Eliminar</button>
             </div>
-            <input value={taskName} onChange={e => setTaskName(e.target.value)} placeholder="Nombre" style={inp} />
+            <input value={taskName} onChange={e => setTaskName(e.target.value)} placeholder="Nombre de la partida" style={inp} />
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <input value={taskQuantity} onChange={e => setTaskQuantity(e.target.value)} placeholder="Cantidad (ej: 150)" style={{ ...inp, flex: 1, marginBottom: 0 }} />
+              <input value={taskUnit} onChange={e => setTaskUnit(e.target.value)} placeholder="Unidad (m², ml, un...)" style={{ ...inp, flex: 1, marginBottom: 0 }} />
+            </div>
             <div style={{ color: C.muted, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Estado</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
               {STATUS_OPTIONS.map(s => (
-                <button key={s.value} onClick={() => setTaskStatus(s.value)} style={{ padding: "10px 8px", borderRadius: 10, border: `0.5px solid ${taskStatus === s.value ? C.orange : C.border}`, background: taskStatus === s.value ? C.orangeDim : C.cardAlt, color: taskStatus === s.value ? C.orange : C.muted, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                <button key={s.value} onClick={() => { setTaskStatus(s.value); if (s.value === "completada") setTaskProgress(100); else if (s.value === "pendiente") setTaskProgress(0); }} style={{ padding: "10px 8px", borderRadius: 10, border: `0.5px solid ${taskStatus === s.value ? C.orange : C.border}`, background: taskStatus === s.value ? C.orangeDim : C.cardAlt, color: taskStatus === s.value ? C.orange : C.muted, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
                   {s.label}
                 </button>
               ))}
             </div>
-            <div style={{ color: C.muted, fontSize: 11, fontWeight: 700, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Avance: {taskProgress}%</div>
-            <input type="range" min={0} max={100} value={taskProgress} onChange={e => setTaskProgress(Number(e.target.value))} style={{ width: "100%", marginBottom: 16, accentColor: C.orange }} />
+            {taskStatus !== "completada" && taskStatus !== "pendiente" && (
+              <>
+                <div style={{ color: C.muted, fontSize: 11, fontWeight: 700, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Avance: {taskProgress}%</div>
+                <input type="range" min={0} max={100} value={taskProgress} onChange={e => setTaskProgress(Number(e.target.value))} style={{ width: "100%", marginBottom: 16, accentColor: C.orange }} />
+              </>
+            )}
+            {taskStatus === "completada" && <div style={{ textAlign: "center", color: C.success, fontWeight: 700, fontSize: 13, marginBottom: 16 }}>✅ Avance automático: 100%</div>}
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setEditingTask(null)} style={{ flex: 1, height: 46, background: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 12, color: C.muted, fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
               <button onClick={saveTask} disabled={savingTask} style={{ flex: 2, height: 46, background: C.orange, border: "none", borderRadius: 12, color: "#fff", fontWeight: 700, cursor: "pointer" }}>{savingTask ? "Guardando..." : "Guardar"}</button>
@@ -862,7 +874,7 @@ export default function App() {
                             <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: C.orange, color: "#fff", fontSize: 9, fontWeight: 800, width: 16, height: 16, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center" }}>{task.photo_count}</span>
                           )}
                         </button>
-                        <button onClick={() => { setEditingTask(task); setTaskStatus(task.status || "pendiente"); setTaskProgress(Number(task.progress_percent || 0)); setTaskName(task.name || ""); }} style={{ width: 38, height: 38, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>✏️</button>
+                        <button onClick={() => { setEditingTask(task); setTaskStatus(task.status || "pendiente"); setTaskProgress(Number(task.progress_percent || 0)); setTaskName(task.name || ""); setTaskUnit(task.unit || ""); setTaskQuantity(task.quantity || ""); }} style={{ width: 38, height: 38, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>✏️</button>
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
