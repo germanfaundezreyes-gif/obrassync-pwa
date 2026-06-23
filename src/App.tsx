@@ -59,6 +59,9 @@ const STATUS_OPTIONS = [
   { value: "atrasada", label: "Atrasada", color: "#EF4444", bg: "#1A0D0D" },
 ];
 
+function fmtDate(iso?: string) { if (!iso) return ""; const d = new Date(iso.includes("T") ? iso : iso + "T12:00:00"); return d.toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" }); }
+function fmtMonth(ym: string) { const [y, m] = ym.split("-"); return new Date(+y, +m - 1).toLocaleDateString("es-CL", { month: "long", year: "numeric" }); }
+
 function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
     <div onClick={onToggle} style={{ width: 44, height: 24, borderRadius: 12, background: on ? C.success : "#333", position: "relative", cursor: "pointer", flexShrink: 0, transition: "background 0.2s" }}>
@@ -83,10 +86,11 @@ function Badge({ status }: { status?: string }) {
 }
 
 export default function App() {
-  const [token, setToken] = useState<string | null>(null);
-  const [userName, setUserName] = useState("");
-  const [userRole, setUserRole] = useState("");
-  const [userPerms, setUserPerms] = useState<Record<string, boolean>>({});
+  const [token, setTokenState] = useState<string | null>(() => localStorage.getItem("obs_token"));
+  const [userName, setUserName] = useState(() => localStorage.getItem("obs_name") || "");
+  const [userRole, setUserRole] = useState(() => localStorage.getItem("obs_role") || "");
+  const [userPerms, setUserPerms] = useState<Record<string, boolean>>(() => { try { return JSON.parse(localStorage.getItem("obs_perms") || "{}"); } catch { return {}; } });
+  function setToken(t: string | null) { if (t) localStorage.setItem("obs_token", t); else { localStorage.removeItem("obs_token"); localStorage.removeItem("obs_name"); localStorage.removeItem("obs_role"); localStorage.removeItem("obs_perms"); } setTokenState(t); }
   const [email, setEmail] = useState("admin@obrassync.cl");
   const [password, setPassword] = useState("Admin1234*");
   const [showPass, setShowPass] = useState(false);
@@ -221,7 +225,9 @@ export default function App() {
       const r = await fetch(`${API_URL}/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert(d.message || "Credenciales inválidas"); return; }
-      setToken(d.token); setUserName(d.user?.fullName || "Usuario"); setUserRole(d.user?.role || ""); setUserPerms(d.user?.permissions || {});
+      const name = d.user?.fullName || "Usuario"; const role = d.user?.role || ""; const perms = d.user?.permissions || {};
+      localStorage.setItem("obs_name", name); localStorage.setItem("obs_role", role); localStorage.setItem("obs_perms", JSON.stringify(perms));
+      setToken(d.token); setUserName(name); setUserRole(role); setUserPerms(perms);
     } catch { alert("No se pudo conectar al servidor"); } finally { setLoginLoading(false); }
   }
 
@@ -868,7 +874,7 @@ export default function App() {
                     <div style={{ fontSize: 11, color: C.orange, fontWeight: 700, marginBottom: 4 }}>#{p.code}</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{p.name}</div>
                     <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{p.client_name || "Sin cliente"}</div>
-                    {(p.start_date || p.end_date) && <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>{p.start_date && `▶ ${p.start_date}`}{p.end_date && ` · ⬛ ${p.end_date}`}</div>}
+                    {(p.start_date || p.end_date) && <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>{p.start_date && `▶ ${fmtDate(p.start_date)}`}{p.end_date && ` · 🏁 ${fmtDate(p.end_date)}`}</div>}
                     <div style={{ height: 3, background: C.border, borderRadius: 99, marginTop: 10, overflow: "hidden" }}>
                       <div style={{ width: `${p.progress_percent || 0}%`, height: "100%", background: C.orange, borderRadius: 99 }} />
                     </div>
@@ -1202,7 +1208,7 @@ export default function App() {
           {/* TAB: RESUMEN */}
           {gastosTab === "resumen" && (
             <>
-              {!expenseSummary && <div style={{ textAlign: "center", color: C.muted, padding: 40 }} onClick={() => loadExpenses()}>Toca para cargar →</div>}
+              {!expenseSummary && <div style={{ textAlign: "center", color: C.muted, padding: 40, cursor: "pointer" }} onClick={() => loadExpenses()}>Cargando resumen...</div>}
               {expenseSummary && (
                 <>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
@@ -1255,7 +1261,7 @@ export default function App() {
                     </>
                   )}
                   {expenseSummary.byProject.length === 0 && expenseSummary.byCategory.length === 0 && (
-                    <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin gastos en {gastosMonth}</div>
+                    <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin gastos en {fmtMonth(gastosMonth)}</div>
                   )}
                 </>
               )}
@@ -1268,7 +1274,7 @@ export default function App() {
               {expenses.length === 0 && (
                 <div style={{ textAlign: "center", padding: 40 }}>
                   <div style={{ fontSize: 40, marginBottom: 12 }}>🧾</div>
-                  <div style={{ color: C.muted, fontSize: 14 }}>Sin gastos en {gastosMonth}</div>
+                  <div style={{ color: C.muted, fontSize: 14 }}>Sin gastos en {fmtMonth(gastosMonth)}</div>
                   <button onClick={() => setShowAddExpense(true)} style={{ ...btnPrimary, marginTop: 16, width: "auto", padding: "10px 24px" }}>+ Agregar primer gasto</button>
                 </div>
               )}
@@ -1418,7 +1424,7 @@ export default function App() {
           const active = screen === sc || (sc === "home" && (screen === "partidas" || screen === "fotos"));
           const isCreate = sc === "crearProyecto";
           return (
-            <button key={sc} onClick={() => { setScreen(sc); if (sc === "gastos") { loadCostCenters(); loadExpenses(); } }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", color: active ? C.orange : C.muted, padding: "2px 0" }}>
+            <button key={sc} onClick={() => { setScreen(sc); if (sc === "gastos") { setGastosTab("resumen"); setExpenseSummary(null); loadCostCenters(); loadExpenses(); } }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", color: active ? C.orange : C.muted, padding: "2px 0" }}>
               {isCreate ? (
                 <div style={{ width: 42, height: 42, background: C.orange, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", marginTop: -18, boxShadow: `0 0 0 4px ${C.card}` }}>
                   <Plus size={19} color="#fff" />
