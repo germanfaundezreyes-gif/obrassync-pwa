@@ -177,6 +177,12 @@ export default function App() {
   const [nuboxAssigning, setNuboxAssigning] = useState<string | null>(null);
   const [nuboxSelectedProject, setNuboxSelectedProject] = useState<Record<string, string>>({});
   const [nuboxShowAll, setNuboxShowAll] = useState(false);
+  const [nuboxSummary, setNuboxSummary] = useState<any | null>(null);
+  const [payroll, setPayroll] = useState<any | null>(null);
+  const [showPayrollForm, setShowPayrollForm] = useState(false);
+  const [payrollAmount, setPayrollAmount] = useState("");
+  const [payrollNote, setPayrollNote] = useState("");
+  const [savingPayroll, setSavingPayroll] = useState(false);
   const [gastosMonth, setGastosMonth] = useState(new Date().toISOString().slice(0, 7));
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [expCategory, setExpCategory] = useState("materiales");
@@ -519,6 +525,35 @@ export default function App() {
       if (!r.ok || !d.ok) { setNuboxError(d.message || "Error consultando Nubox"); return; }
       setNuboxPurchases(d.items || []);
     } catch (e: any) { setNuboxError(e.message || "Error de conexión"); } finally { setNuboxLoading(false); }
+  }
+
+  async function loadNuboxSummary(month?: string) {
+    const m = month || gastosMonth;
+    try {
+      const [r1, r2] = await Promise.all([
+        fetch(`${API_URL}/nubox/summary?period=${m}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_URL}/payroll?month=${m}`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      const d1 = await r1.json(); if (d1.ok) setNuboxSummary(d1.nubox);
+      const d2 = await r2.json(); if (d2.ok) setPayroll(d2.current);
+    } catch {}
+  }
+
+  async function savePayroll() {
+    if (!payrollAmount) { alert("Ingresa el monto"); return; }
+    setSavingPayroll(true);
+    try {
+      const r = await fetch(`${API_URL}/payroll`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ year_month: gastosMonth, total_amount: +payrollAmount.replace(/\D/g, ""), note: payrollNote || null })
+      });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
+      setPayroll(d.item);
+      setShowPayrollForm(false);
+      setPayrollAmount(""); setPayrollNote("");
+    } catch { alert("Error"); } finally { setSavingPayroll(false); }
   }
 
   async function assignNuboxPurchase(nuboxId: number | string, selectedValue: string) {
@@ -1275,14 +1310,14 @@ export default function App() {
 
           {/* Selector de mes */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-            <input type="month" value={gastosMonth} onChange={e => { setGastosMonth(e.target.value); loadExpenses(e.target.value); }} style={{ ...inp, marginBottom: 0, flex: 1 }} />
+            <input type="month" value={gastosMonth} onChange={e => { setGastosMonth(e.target.value); loadExpenses(e.target.value); loadNuboxSummary(e.target.value); }} style={{ ...inp, marginBottom: 0, flex: 1 }} />
             <button onClick={() => loadExpenses()} style={{ height: 48, padding: "0 16px", backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.mutedSoft, cursor: "pointer", fontSize: 13 }}>↻</button>
           </div>
 
           {/* Tabs */}
           <div style={{ display: "flex", backgroundColor: C.cardAlt, borderRadius: 10, padding: 4, marginBottom: 16, gap: 3 }}>
             {(["resumen", "lista", "nubox", "centros"] as const).map(t => (
-              <button key={t} onClick={() => { setGastosTab(t as typeof gastosTab); if (t === "lista" || t === "resumen") loadExpenses(); if (t === "nubox") { loadNuboxPurchases(); loadCostCenters(); loadProjects(); } }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: gastosTab === t ? C.card : "transparent", color: gastosTab === t ? C.orange : C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
+              <button key={t} onClick={() => { setGastosTab(t as typeof gastosTab); if (t === "lista" || t === "resumen") { loadExpenses(); loadNuboxSummary(); } if (t === "nubox") { loadNuboxPurchases(); loadCostCenters(); loadProjects(); } }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: gastosTab === t ? C.card : "transparent", color: gastosTab === t ? C.orange : C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
                 {t === "resumen" ? "Resumen" : t === "lista" ? "Detalle" : t === "nubox" ? "Nubox" : "Centros"}
               </button>
             ))}
@@ -1291,9 +1326,87 @@ export default function App() {
           {/* TAB: RESUMEN */}
           {gastosTab === "resumen" && (
             <>
-              {!expenseSummary && <div style={{ textAlign: "center", color: C.muted, padding: 40, cursor: "pointer" }} onClick={() => loadExpenses()}>Toca para cargar resumen</div>}
+              {/* ── SECCIÓN NUBOX ── */}
+              <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>🧾 Facturas Nubox — {fmtMonth(gastosMonth)}</div>
+                  {!nuboxSummary && <div style={{ fontSize: 11, color: C.muted }}>Cargando...</div>}
+                </div>
+                {nuboxSummary && (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                      <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 10 }}>
+                        <div style={{ fontSize: 10, color: C.muted, marginBottom: 2 }}>Total facturas</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: C.orange }}>{fmtCLP(nuboxSummary.total_bruto)}</div>
+                        <div style={{ fontSize: 10, color: C.muted }}>{nuboxSummary.total_facturas} doc · Neto {fmtCLP(nuboxSummary.total_neto)}</div>
+                      </div>
+                      <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 10 }}>
+                        <div style={{ fontSize: 10, color: C.muted, marginBottom: 2 }}>Sin asignar</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: nuboxSummary.sin_asignar > 0 ? C.danger : C.success }}>
+                          {fmtCLP(nuboxSummary.total_sin_asignar)}
+                        </div>
+                        <div style={{ fontSize: 10, color: C.muted }}>{nuboxSummary.sin_asignar} factura{nuboxSummary.sin_asignar !== 1 ? "s" : ""} pendiente{nuboxSummary.sin_asignar !== 1 ? "s" : ""}</div>
+                      </div>
+                    </div>
+                    {nuboxSummary.asignadas > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderTop: `0.5px solid ${C.border}`, fontSize: 12 }}>
+                        <span style={{ color: C.muted }}>✅ Asignadas a centros de costo</span>
+                        <span style={{ fontWeight: 700, color: C.success }}>{fmtCLP(nuboxSummary.total_asignado)} ({nuboxSummary.asignadas})</span>
+                      </div>
+                    )}
+                    {nuboxSummary.sin_asignar > 0 && (
+                      <button onClick={() => setGastosTab("nubox")} style={{ width: "100%", marginTop: 8, padding: "8px 0", borderRadius: 8, border: "none", backgroundColor: C.orangeDim, color: C.orange, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                        Asignar {nuboxSummary.sin_asignar} factura{nuboxSummary.sin_asignar !== 1 ? "s" : ""} pendiente{nuboxSummary.sin_asignar !== 1 ? "s" : ""} →
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* ── SECCIÓN REMUNERACIONES ── */}
+              <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>👥 Remuneraciones — {fmtMonth(gastosMonth)}</div>
+                  <button onClick={() => { setShowPayrollForm(true); setPayrollAmount(payroll ? String(payroll.total_amount) : ""); setPayrollNote(payroll?.note || ""); }} style={{ backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "5px 12px", color: C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
+                    {payroll ? "Editar" : "+ Ingresar"}
+                  </button>
+                </div>
+                {payroll ? (
+                  <div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: C.purple }}>{fmtCLP(payroll.total_amount)}</div>
+                    {payroll.note && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{payroll.note}</div>}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: C.muted }}>Sin dato ingresado para {fmtMonth(gastosMonth)}</div>
+                )}
+                {showPayrollForm && (
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: `0.5px solid ${C.border}` }}>
+                    <input
+                      value={payrollAmount}
+                      onChange={e => setPayrollAmount(e.target.value)}
+                      placeholder="Monto total remuneraciones"
+                      type="number"
+                      style={{ ...inp, marginBottom: 8 }}
+                    />
+                    <input
+                      value={payrollNote}
+                      onChange={e => setPayrollNote(e.target.value)}
+                      placeholder="Nota (opcional, ej: 12 trabajadores)"
+                      style={{ ...inp, marginBottom: 8 }}
+                    />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => setShowPayrollForm(false)} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.muted, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
+                      <button onClick={savePayroll} disabled={savingPayroll} style={{ flex: 2, padding: "9px 0", borderRadius: 8, border: "none", backgroundColor: C.purple, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{savingPayroll ? "Guardando..." : "Guardar"}</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── SECCIÓN GASTOS MANUALES ── */}
+              {!expenseSummary && <div style={{ textAlign: "center", color: C.muted, padding: 20, cursor: "pointer" }} onClick={() => loadExpenses()}>Toca para cargar gastos</div>}
               {expenseSummary && (
                 <>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>Gastos manuales registrados</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
                     {[
                       { label: "Total bruto", value: fmtCLP(expenseSummary.totals.total), color: C.orange },
@@ -1599,7 +1712,7 @@ export default function App() {
           const active = screen === sc || (sc === "home" && (screen === "partidas" || screen === "fotos"));
           const isCreate = sc === "crearProyecto";
           return (
-            <button key={sc} onClick={() => { setScreen(sc); if (sc === "gastos") { setGastosTab("resumen"); setExpenseSummary(null); loadCostCenters(); loadExpenses(); } }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", color: active ? C.orange : C.muted, padding: "2px 0" }}>
+            <button key={sc} onClick={() => { setScreen(sc); if (sc === "gastos") { setGastosTab("resumen"); setExpenseSummary(null); setNuboxSummary(null); loadCostCenters(); loadExpenses(); loadNuboxSummary(); } }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", color: active ? C.orange : C.muted, padding: "2px 0" }}>
               {isCreate ? (
                 <div style={{ width: 42, height: 42, background: C.orange, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", marginTop: -18, boxShadow: `0 0 0 4px ${C.card}` }}>
                   <Plus size={19} color="#fff" />
