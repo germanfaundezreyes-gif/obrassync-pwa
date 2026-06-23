@@ -1387,12 +1387,12 @@ export default function App() {
 
               {/* ── SECCIÓN REMUNERACIONES ── */}
               <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 14 }}>
-                <input ref={payrollPdfRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={e => { if (e.target.files?.[0]) uploadPayrollPdf(e.target.files[0]); e.target.value = ""; }} />
+                <input ref={payrollPdfRef} type="file" accept=".xlsx,.xls,.pdf" style={{ display: "none" }} onChange={e => { if (e.target.files?.[0]) uploadPayrollPdf(e.target.files[0]); e.target.value = ""; }} />
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                   <div style={{ fontSize: 13, fontWeight: 700 }}>👥 Remuneraciones — {fmtMonth(gastosMonth)}</div>
                   <div style={{ display: "flex", gap: 6 }}>
                     <button onClick={() => payrollPdfRef.current?.click()} disabled={uploadingPayrollPdf} style={{ backgroundColor: C.infoDim, border: `0.5px solid ${C.info}`, borderRadius: 8, padding: "5px 10px", color: C.info, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
-                      {uploadingPayrollPdf ? "Leyendo..." : "📄 PDF"}
+                      {uploadingPayrollPdf ? "Leyendo..." : "📊 Excel/PDF"}
                     </button>
                     <button onClick={() => { setShowPayrollForm(true); setPayrollAmount(payroll ? String(payroll.total_amount) : ""); setPayrollNote(payroll?.note || ""); }} style={{ backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "5px 10px", color: C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
                       {payroll ? "Editar" : "+ Manual"}
