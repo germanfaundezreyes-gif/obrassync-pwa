@@ -1521,8 +1521,8 @@ export default function App() {
                 </div>
               )}
 
-              {/* ── SECCIÓN VENTAS NUBOX ── */}
-              <div onClick={() => { setGastosTab("nubox"); setNuboxView("ventas"); loadProjects(); if (!nuboxSalesSummary) loadNuboxSummary(); }} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 14, cursor: "pointer" }}>
+              {/* ── SECCIÓN VENTAS NUBOX (solo admin) ── */}
+              {isAdmin && <div onClick={() => { setGastosTab("nubox"); setNuboxView("ventas"); loadProjects(); if (!nuboxSalesSummary) loadNuboxSummary(); }} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 14, cursor: "pointer" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                   <div style={{ fontSize: 13, fontWeight: 700 }}>📤 Ventas emitidas — {fmtMonth(gastosMonth)}</div>
                   <div style={{ fontSize: 12, color: C.orange, fontWeight: 700 }}>Ver facturas →</div>
@@ -1542,7 +1542,7 @@ export default function App() {
                     </div>
                   </div>
                 )}
-              </div>
+              </div>}
 
               {/* ── SECCIÓN GASTOS MANUALES ── */}
               {!expenseSummary && <div style={{ textAlign: "center", color: C.muted, padding: 20, cursor: "pointer" }} onClick={() => loadExpenses()}>Toca para cargar gastos</div>}
@@ -1733,9 +1733,9 @@ export default function App() {
                 <button onClick={() => { setNuboxView("compras"); loadNuboxPurchases(); }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: nuboxView === "compras" ? C.card : "transparent", color: nuboxView === "compras" ? C.orange : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
                   🧾 Compras
                 </button>
-                <button onClick={() => { setNuboxView("ventas"); loadNuboxSummary(); loadProjects(); }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: nuboxView === "ventas" ? C.card : "transparent", color: nuboxView === "ventas" ? C.orange : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                {isAdmin && <button onClick={() => { setNuboxView("ventas"); loadNuboxSummary(); loadProjects(); }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: nuboxView === "ventas" ? C.card : "transparent", color: nuboxView === "ventas" ? C.orange : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
                   📤 Ventas
-                </button>
+                </button>}
               </div>
 
               {/* ── VISTA COMPRAS ── */}
@@ -1817,7 +1817,7 @@ export default function App() {
             </>}
 
               {/* ── VISTA VENTAS ── */}
-              {nuboxView === "ventas" && (
+              {nuboxView === "ventas" && isAdmin && (
                 <>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                     <div style={{ fontSize: 12, color: C.muted }}>Facturas emitidas a clientes</div>
