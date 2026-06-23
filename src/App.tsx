@@ -572,9 +572,12 @@ export default function App() {
         body: fd
       });
       const d = await r.json();
-      if (!r.ok || !d.ok) { alert(d.message || "Error leyendo PDF"); return; }
+      if (!r.ok || !d.ok) { alert(d.message || "Error leyendo archivo"); return; }
       setPayrollPdfResult(d.data);
       setPayroll({ total_amount: d.total_guardado, note: `${d.data.cantidad_trabajadores || "?"} trabajadores · ${d.data.resumen || ""}` });
+      if (d.mes_guardado && d.mes_guardado !== gastosMonth) {
+        alert(`✅ Libro guardado en ${fmtMonth(d.mes_guardado)} (período detectado del archivo).\n\nCambia el filtro de mes a ${fmtMonth(d.mes_guardado)} para verlo.`);
+      }
     } catch { alert("Error subiendo PDF"); } finally { setUploadingPayrollPdf(false); }
   }
 
