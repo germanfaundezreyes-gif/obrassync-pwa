@@ -177,6 +177,7 @@ export default function App() {
   const [nuboxAssigning, setNuboxAssigning] = useState<string | null>(null);
   const [nuboxSelectedProject, setNuboxSelectedProject] = useState<Record<string, string>>({});
   const [nuboxShowAll, setNuboxShowAll] = useState(false);
+  const [nuboxView, setNuboxView] = useState<"compras" | "ventas">("compras");
   const [nuboxSummary, setNuboxSummary] = useState<any | null>(null);
   const [nuboxSalesSummary, setNuboxSalesSummary] = useState<any | null>(null);
   const [nuboxSalesAssigning, setNuboxSalesAssigning] = useState<string | null>(null);
@@ -1521,60 +1522,25 @@ export default function App() {
               )}
 
               {/* ── SECCIÓN VENTAS NUBOX ── */}
-              <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 14 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>📤 Ventas emitidas — {fmtMonth(gastosMonth)}</div>
+              <div onClick={() => { setGastosTab("nubox"); setNuboxView("ventas"); loadProjects(); if (!nuboxSalesSummary) loadNuboxSummary(); }} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 14, cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>📤 Ventas emitidas — {fmtMonth(gastosMonth)}</div>
+                  <div style={{ fontSize: 12, color: C.orange, fontWeight: 700 }}>Ver facturas →</div>
+                </div>
                 {!nuboxSalesSummary && <div style={{ fontSize: 12, color: C.muted }}>Cargando...</div>}
                 {nuboxSalesSummary && (
-                  <>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: nuboxSalesSummary.items?.length > 0 && isAdmin ? 12 : 0 }}>
-                      <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 10 }}>
-                        <div style={{ fontSize: 10, color: C.muted, marginBottom: 2 }}>Total ventas</div>
-                        <div style={{ fontSize: 17, fontWeight: 800, color: C.success }}>{fmtCLP(nuboxSalesSummary.sales?.total_ventas || 0)}</div>
-                        <div style={{ fontSize: 10, color: C.muted }}>{nuboxSalesSummary.sales?.total_facturas || 0} facturas · Neto {fmtCLP(nuboxSalesSummary.sales?.total_neto || 0)}</div>
-                      </div>
-                      <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 10 }}>
-                        <div style={{ fontSize: 10, color: C.muted, marginBottom: 2 }}>IVA débito</div>
-                        <div style={{ fontSize: 17, fontWeight: 800, color: C.orange }}>{fmtCLP(nuboxSalesSummary.sales?.iva_debito || 0)}</div>
-                        <div style={{ fontSize: 10, color: C.muted }}>IVA cobrado a clientes</div>
-                      </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 10 }}>
+                      <div style={{ fontSize: 10, color: C.muted, marginBottom: 2 }}>Total ventas</div>
+                      <div style={{ fontSize: 17, fontWeight: 800, color: C.success }}>{fmtCLP(nuboxSalesSummary.sales?.total_ventas || 0)}</div>
+                      <div style={{ fontSize: 10, color: C.muted }}>{nuboxSalesSummary.sales?.total_facturas || 0} facturas</div>
                     </div>
-                    {isAdmin && nuboxSalesSummary.items?.length > 0 && (
-                      <>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginBottom: 8, marginTop: 4 }}>Asignar a proyecto</div>
-                        {nuboxSalesSummary.items.filter((s: any) => !s.annulled).map((sale: any) => (
-                          <div key={sale.id} style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 10, marginBottom: 8 }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                              <div>
-                                <div style={{ fontSize: 12, fontWeight: 700 }}>{sale.client_name || "Cliente"}</div>
-                                <div style={{ fontSize: 10, color: C.muted }}>{sale.client_rut} · N°{sale.number} · {sale.emission_date?.slice(0,10)}</div>
-                              </div>
-                              <div style={{ textAlign: "right" }}>
-                                <div style={{ fontSize: 13, fontWeight: 800, color: C.success }}>{fmtCLP(sale.total_amount)}</div>
-                                {sale.assigned_project && <div style={{ fontSize: 10, color: C.success }}>✅ Asignado</div>}
-                              </div>
-                            </div>
-                            <div style={{ display: "flex", gap: 6 }}>
-                              <select
-                                value={nuboxSalesProject[sale.id] || ""}
-                                onChange={e => setNuboxSalesProject(prev => ({ ...prev, [sale.id]: e.target.value }))}
-                                style={{ flex: 1, height: 32, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.card, color: C.text, fontSize: 11, padding: "0 6px" }}
-                              >
-                                <option value="">— Proyecto —</option>
-                                {projects.map(pr => <option key={pr.id} value={pr.id}>{pr.code ? `[${pr.code}] ` : ""}{pr.name}</option>)}
-                              </select>
-                              <button
-                                onClick={() => { const pid = nuboxSalesProject[sale.id]; if (!pid) return; assignNuboxSale(sale.id, pid, sale); }}
-                                disabled={nuboxSalesAssigning === String(sale.id) || !nuboxSalesProject[sale.id]}
-                                style={{ height: 32, padding: "0 12px", borderRadius: 8, border: "none", backgroundColor: nuboxSalesProject[sale.id] ? C.success : C.cardAlt, color: nuboxSalesProject[sale.id] ? "#fff" : C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}
-                              >
-                                {nuboxSalesAssigning === String(sale.id) ? "..." : sale.assigned_project ? "Reasignar" : "Asignar"}
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </>
-                    )}
-                  </>
+                    <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 10 }}>
+                      <div style={{ fontSize: 10, color: C.muted, marginBottom: 2 }}>IVA débito</div>
+                      <div style={{ fontSize: 17, fontWeight: 800, color: C.orange }}>{fmtCLP(nuboxSalesSummary.sales?.iva_debito || 0)}</div>
+                      <div style={{ fontSize: 10, color: C.muted }}>IVA cobrado</div>
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -1762,22 +1728,22 @@ export default function App() {
           {/* TAB: NUBOX */}
           {gastosTab === "nubox" && (
             <>
+              {/* Toggle Compras / Ventas */}
+              <div style={{ display: "flex", backgroundColor: C.cardAlt, borderRadius: 10, padding: 4, marginBottom: 12, gap: 3 }}>
+                <button onClick={() => { setNuboxView("compras"); loadNuboxPurchases(); }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: nuboxView === "compras" ? C.card : "transparent", color: nuboxView === "compras" ? C.orange : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                  🧾 Compras
+                </button>
+                <button onClick={() => { setNuboxView("ventas"); loadNuboxSummary(); loadProjects(); }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: nuboxView === "ventas" ? C.card : "transparent", color: nuboxView === "ventas" ? C.orange : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                  📤 Ventas
+                </button>
+              </div>
+
+              {/* ── VISTA COMPRAS ── */}
+              {nuboxView === "compras" && <>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                <button
-                  onClick={() => setNuboxShowAll(false)}
-                  style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: !nuboxShowAll ? C.orange : C.cardAlt, color: !nuboxShowAll ? "#fff" : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}
-                >
-                  Sin asignar
-                </button>
-                <button
-                  onClick={() => setNuboxShowAll(true)}
-                  style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: nuboxShowAll ? C.orange : C.cardAlt, color: nuboxShowAll ? "#fff" : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}
-                >
-                  Todas
-                </button>
-                <button onClick={loadNuboxPurchases} disabled={nuboxLoading} style={{ backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "7px 12px", color: C.muted, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                  ↻
-                </button>
+                <button onClick={() => setNuboxShowAll(false)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: !nuboxShowAll ? C.orange : C.cardAlt, color: !nuboxShowAll ? "#fff" : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Sin asignar</button>
+                <button onClick={() => setNuboxShowAll(true)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: nuboxShowAll ? C.orange : C.cardAlt, color: nuboxShowAll ? "#fff" : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Todas</button>
+                <button onClick={loadNuboxPurchases} disabled={nuboxLoading} style={{ backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "7px 12px", color: C.muted, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>↻</button>
               </div>
               {nuboxLoading && <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Cargando facturas Nubox...</div>}
               {nuboxError && (
@@ -1848,6 +1814,56 @@ export default function App() {
                   );
                 });
               })()}
+            </>}
+
+              {/* ── VISTA VENTAS ── */}
+              {nuboxView === "ventas" && (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, color: C.muted }}>Facturas emitidas a clientes</div>
+                    <button onClick={() => loadNuboxSummary()} style={{ backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", color: C.muted, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>↻</button>
+                  </div>
+                  {!nuboxSalesSummary && <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Cargando...</div>}
+                  {nuboxSalesSummary?.items?.filter((s: any) => !s.annulled).map((sale: any) => (
+                    <div key={sale.id} style={{ backgroundColor: C.card, border: `0.5px solid ${sale.assigned_project ? C.success : C.border}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700 }}>{sale.client_name || "Cliente"}</div>
+                          <div style={{ fontSize: 11, color: C.muted }}>{sale.client_rut} · N°{sale.number} · {sale.emission_date?.slice(0,10)}</div>
+                          <div style={{ fontSize: 11, color: C.muted }}>{sale.doc_type}</div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: C.success }}>{fmtCLP(sale.total_amount)}</div>
+                          <div style={{ fontSize: 10, color: C.muted }}>Neto {fmtCLP(sale.total_net)}</div>
+                        </div>
+                      </div>
+                      {sale.assigned_project && <div style={{ fontSize: 11, color: C.success, fontWeight: 600, marginBottom: 6 }}>✅ Asignado</div>}
+                      {isAdmin && (
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <select
+                            value={nuboxSalesProject[sale.id] || ""}
+                            onChange={e => setNuboxSalesProject(prev => ({ ...prev, [sale.id]: e.target.value }))}
+                            style={{ flex: 1, height: 36, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 12, padding: "0 8px" }}
+                          >
+                            <option value="">— Seleccionar proyecto —</option>
+                            {projects.map(pr => <option key={pr.id} value={pr.id}>{pr.code ? `[${pr.code}] ` : ""}{pr.name}</option>)}
+                          </select>
+                          <button
+                            onClick={() => { const pid = nuboxSalesProject[sale.id]; if (!pid) return; assignNuboxSale(sale.id, pid, sale); }}
+                            disabled={nuboxSalesAssigning === String(sale.id) || !nuboxSalesProject[sale.id]}
+                            style={{ height: 36, padding: "0 14px", borderRadius: 8, border: "none", backgroundColor: nuboxSalesProject[sale.id] ? C.success : C.cardAlt, color: nuboxSalesProject[sale.id] ? "#fff" : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                          >
+                            {nuboxSalesAssigning === String(sale.id) ? "..." : sale.assigned_project ? "Cambiar" : "Asignar"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {nuboxSalesSummary?.items?.length === 0 && (
+                    <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin ventas en {fmtMonth(gastosMonth)}</div>
+                  )}
+                </>
+              )}
             </>
           )}
 
