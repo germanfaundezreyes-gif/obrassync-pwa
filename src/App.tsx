@@ -13,8 +13,8 @@ const C = {
 
 type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos";
 type Project = { id: string; code: string; name: string; client_name?: string; start_date?: string; end_date?: string; progress_percent?: number };
-type Task = { id: string; name: string; duration?: string; start_date?: string; end_date?: string; progress_percent?: number; status?: string; photo_count?: number };
-type TaskPhoto = { id: string; filename: string; local_path?: string; onedrive_url?: string; created_at: string; description?: string };
+type Task = { id: string; name: string; duration?: string; start_date?: string; end_date?: string; progress_percent?: number; status?: string; photo_count?: number; unit?: string; quantity?: string; codigo?: string; esquema?: string };
+type TaskPhoto = { id: string; filename: string; local_path?: string; onedrive_url?: string; created_at: string; description?: string; photo_type?: string };
 type QuoteItem = { tempId: string; name: string; codigo: string; quantity: string; unit: string; start_date: string; end_date: string; selected: boolean };
 type User = { id: string; full_name: string; email: string; role: string; is_active: boolean; permissions?: Record<string, boolean> };
 type Kpis = { proyectos: { total: number; avg_progress: number; atrasados: number }; tareas: { total: number; completadas: number; en_curso: number; atrasadas: number }; fotos: { total: number }; gastos: { total_mes: number } };
@@ -200,6 +200,7 @@ export default function App() {
   // Photo description
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [photoDescInput, setPhotoDescInput] = useState("");
+  const [photoTypeInput, setPhotoTypeInput] = useState<"previa" | "trabajo">("trabajo");
   const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
   const [editingPhotoDesc, setEditingPhotoDesc] = useState("");
   const [savingPhotoDesc, setSavingPhotoDesc] = useState(false);
@@ -338,7 +339,7 @@ export default function App() {
     if (!selectedTask) return;
     setUploadingPhoto(true);
     try {
-      const fd = new FormData(); fd.append("photo", file); fd.append("description", description);
+      const fd = new FormData(); fd.append("photo", file); fd.append("description", description); fd.append("photo_type", photoTypeInput);
       const r = await fetch(`${API_URL}/tasks/${selectedTask.id}/photos`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
@@ -617,12 +618,20 @@ export default function App() {
             {pendingPhotoFile && (
               <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.9)", zIndex: 400, display: "flex", alignItems: "flex-end" }}>
                 <div style={{ backgroundColor: C.card, borderRadius: "20px 20px 0 0", padding: 20, width: "100%", maxWidth: 600, margin: "0 auto" }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Describir foto</div>
-                  <div style={{ fontSize: 12, color: C.muted, marginBottom: 14 }}>¿Qué trabajo muestra esta foto?</div>
-                  <textarea value={photoDescInput} onChange={e => setPhotoDescInput(e.target.value)} placeholder="Ej: Instalación de pilar metálico en eje A-3, nivel 1..." rows={3} style={{ width: "100%", backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 14, padding: 12, resize: "none", boxSizing: "border-box", outline: "none", marginBottom: 12 }} />
+                  <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Subir foto</div>
+                  {/* Selector tipo de foto */}
+                  <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                    {(["previa", "trabajo"] as const).map(t => (
+                      <button key={t} onClick={() => setPhotoTypeInput(t)} style={{ flex: 1, height: 38, borderRadius: 10, border: `1.5px solid ${photoTypeInput === t ? C.orange : C.border}`, backgroundColor: photoTypeInput === t ? C.orangeDim : C.cardAlt, color: photoTypeInput === t ? C.orange : C.muted, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                        {t === "previa" ? "📷 Foto Previa" : "🔨 En Ejecución"}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>{photoTypeInput === "previa" ? "Foto del estado inicial antes de los trabajos" : "¿Qué trabajo muestra esta foto?"}</div>
+                  <textarea value={photoDescInput} onChange={e => setPhotoDescInput(e.target.value)} placeholder={photoTypeInput === "previa" ? "Ej: Estado inicial de la zona de trabajo..." : "Ej: Instalación de pilar metálico en eje A-3..."} rows={3} style={{ width: "100%", backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 14, padding: 12, resize: "none", boxSizing: "border-box", outline: "none", marginBottom: 12 }} />
                   <div style={{ display: "flex", gap: 10 }}>
-                    <button onClick={() => { setPendingPhotoFile(null); setPhotoDescInput(""); }} style={{ flex: 1, height: 46, background: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 12, color: C.muted, fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
-                    <button onClick={() => { uploadPhotoWithDesc(pendingPhotoFile, photoDescInput); setPendingPhotoFile(null); setPhotoDescInput(""); }} disabled={uploadingPhoto} style={{ flex: 2, height: 46, background: C.orange, border: "none", borderRadius: 12, color: "#fff", fontWeight: 700, cursor: "pointer" }}>{uploadingPhoto ? "Subiendo..." : "Subir foto"}</button>
+                    <button onClick={() => { setPendingPhotoFile(null); setPhotoDescInput(""); setPhotoTypeInput("trabajo"); }} style={{ flex: 1, height: 46, background: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 12, color: C.muted, fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
+                    <button onClick={() => { uploadPhotoWithDesc(pendingPhotoFile!, photoDescInput); setPendingPhotoFile(null); setPhotoDescInput(""); }} disabled={uploadingPhoto} style={{ flex: 2, height: 46, background: C.orange, border: "none", borderRadius: 12, color: "#fff", fontWeight: 700, cursor: "pointer" }}>{uploadingPhoto ? "Subiendo..." : "Subir foto"}</button>
                   </div>
                 </div>
               </div>
@@ -642,7 +651,14 @@ export default function App() {
             </div>
             {photosLoading ? <div style={{ color: C.muted, textAlign: "center", padding: 32 }}>Cargando...</div>
               : photos.length === 0 ? <div style={{ textAlign: "center", padding: 48, color: C.muted }}>Sin fotos todavía</div>
-                : photos.map((photo, idx) => (
+                : (["previa", "trabajo"] as const).map(tipo => {
+                  const fotosTipo = photos.filter(p => (p.photo_type || "trabajo") === tipo);
+                  if (fotosTipo.length === 0) return null;
+                  return <div key={tipo}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: tipo === "previa" ? "#60a5fa" : C.orange, marginBottom: 8, marginTop: tipo === "trabajo" ? 16 : 0, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                      {tipo === "previa" ? "📷 Fotos Previas" : "🔨 En Ejecución"}
+                    </div>
+                    {fotosTipo.map((photo, idx) => (
                   <div key={photo.id} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, marginBottom: 14, overflow: "hidden" }}>
                     {/* Header sobre la foto */}
                     <div style={{ padding: "10px 12px 8px", borderBottom: `0.5px solid ${C.border}` }}>
@@ -683,6 +699,8 @@ export default function App() {
                     <img src={`${API_URL}${photo.local_path}`} alt={photo.filename} style={{ width: "100%", maxHeight: 300, objectFit: "cover", display: "block", backgroundColor: C.border }} />
                   </div>
                 ))}
+                  </div>;
+                })}
           </div>
         )}
 
@@ -828,7 +846,13 @@ export default function App() {
                   <div key={task.id || i} style={{ backgroundColor: C.card, border: `0.5px solid ${isLate ? "#3A0D0D" : C.border}`, borderRadius: 14, padding: 14, marginBottom: 8 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                       <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3, marginBottom: 6 }}>{task.name}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3, marginBottom: 4 }}>{task.esquema ? <span style={{ color: C.muted, fontSize: 11 }}>{task.esquema} · </span> : null}{task.name}</div>
+                        {(task.quantity || task.unit) && (
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 4, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 6, padding: "2px 8px", marginBottom: 6, fontSize: 11, color: C.mutedSoft }}>
+                            <span style={{ fontWeight: 700, color: C.text }}>{task.quantity}</span>
+                            {task.unit && <span style={{ color: C.muted }}>{task.unit}</span>}
+                          </div>
+                        )}
                         <Badge status={task.status} />
                       </div>
                       <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
