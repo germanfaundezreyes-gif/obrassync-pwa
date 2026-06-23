@@ -170,7 +170,11 @@ export default function App() {
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [expenseSummary, setExpenseSummary] = useState<ExpenseSummary | null>(null);
-  const [gastosTab, setGastosTab] = useState<"resumen" | "lista" | "centros" | "sii">("resumen");
+  const [gastosTab, setGastosTab] = useState<"resumen" | "lista" | "centros" | "sii" | "nubox">("resumen");
+  const [nuboxPurchases, setNuboxPurchases] = useState<any[]>([]);
+  const [nuboxLoading, setNuboxLoading] = useState(false);
+  const [nuboxAssigning, setNuboxAssigning] = useState<string | null>(null);
+  const [nuboxSelectedProject, setNuboxSelectedProject] = useState<Record<string, string>>({});
   const [gastosMonth, setGastosMonth] = useState(new Date().toISOString().slice(0, 7));
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [expCategory, setExpCategory] = useState("materiales");
@@ -453,13 +457,14 @@ export default function App() {
     } catch { alert("Error"); } finally { setCreatingCC(false); }
   }
 
-  async function checkSiiStatus() {
+  const checkSiiStatus = async () => {
     try {
       const r = await fetch(`${API_URL}/sii/status`, { headers: { Authorization: `Bearer ${token}` } });
       const d = await r.json();
       if (d.ok) { setSiiConfigured(d.configured); if (d.rut) setSiiConfigRut(d.rut); }
     } catch {}
-  }
+  };
+  void checkSiiStatus;
 
   async function uploadSiiCert() {
     if (!siiP12File || !siiPassword || !siiRut) { alert("Selecciona el certificado .p12, ingresa tu RUT y clave SII"); return; }
@@ -493,6 +498,31 @@ export default function App() {
       const d = await r.json();
       if (d.ok) { setSiiFacturas(fs => fs.map(f => f.folio === factura.folio ? { ...f, expense_id: d.item.id } : f)); await loadExpenses(); await loadKpis(); }
     } catch { alert("Error"); }
+  }
+
+  async function loadNuboxPurchases() {
+    setNuboxLoading(true);
+    try {
+      const r = await fetch(`${API_URL}/nubox/purchases?period=${gastosMonth}&size=100`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { alert(d.message || "Error Nubox"); return; }
+      setNuboxPurchases(d.items || []);
+    } catch { alert("Error conectando Nubox"); } finally { setNuboxLoading(false); }
+  }
+
+  async function assignNuboxPurchase(nuboxId: number | string, projectId: string) {
+    setNuboxAssigning(String(nuboxId));
+    try {
+      const r = await fetch(`${API_URL}/nubox/purchases/${nuboxId}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ project_id: projectId })
+      });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
+      setNuboxPurchases(prev => prev.map(p => p.id === nuboxId ? { ...p, assigned: { project_id: projectId, project_name: projects.find(pr => pr.id === projectId)?.name } } : p));
+      await loadKpis();
+    } catch { alert("Error"); } finally { setNuboxAssigning(null); }
   }
 
   function openEditUser(user: User) {
@@ -1234,9 +1264,9 @@ export default function App() {
 
           {/* Tabs */}
           <div style={{ display: "flex", backgroundColor: C.cardAlt, borderRadius: 10, padding: 4, marginBottom: 16, gap: 3 }}>
-            {(["resumen", "lista", "sii", "centros"] as const).map(t => (
-              <button key={t} onClick={() => { setGastosTab(t as typeof gastosTab); if (t === "lista" || t === "resumen") loadExpenses(); if (t === "sii") checkSiiStatus(); }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: gastosTab === t ? C.card : "transparent", color: gastosTab === t ? C.orange : C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
-                {t === "resumen" ? "Resumen" : t === "lista" ? "Detalle" : t === "sii" ? "SII" : "Centros"}
+            {(["resumen", "lista", "nubox", "centros"] as const).map(t => (
+              <button key={t} onClick={() => { setGastosTab(t as typeof gastosTab); if (t === "lista" || t === "resumen") loadExpenses(); if (t === "nubox") { loadNuboxPurchases(); loadCostCenters(); } }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: gastosTab === t ? C.card : "transparent", color: gastosTab === t ? C.orange : C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
+                {t === "resumen" ? "Resumen" : t === "lista" ? "Detalle" : t === "nubox" ? "Nubox" : "Centros"}
               </button>
             ))}
           </div>
@@ -1420,6 +1450,63 @@ export default function App() {
                   )}
                 </div>
               ))}
+            </>
+          )}
+
+          {/* TAB: NUBOX */}
+          {gastosTab === "nubox" && (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <div style={{ flex: 1, fontSize: 13, color: C.muted }}>Facturas de proveedores desde Nubox</div>
+                <button onClick={loadNuboxPurchases} disabled={nuboxLoading} style={{ backgroundColor: C.orangeDim, border: "none", borderRadius: 8, padding: "6px 14px", color: C.orange, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                  {nuboxLoading ? "Cargando..." : "↻ Actualizar"}
+                </button>
+              </div>
+              {nuboxLoading && <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Cargando facturas Nubox...</div>}
+              {!nuboxLoading && nuboxPurchases.length === 0 && (
+                <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin facturas en {fmtMonth(gastosMonth)}</div>
+              )}
+              {nuboxPurchases.map(p => {
+                const isAssigned = !!p.assigned?.project_id;
+                const selectedProj = nuboxSelectedProject[p.id] || (isAssigned ? p.assigned.project_id : "");
+                return (
+                  <div key={p.id} style={{ backgroundColor: C.card, border: `0.5px solid ${isAssigned ? C.success : C.border}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{p.supplier?.tradeName || "Proveedor"}</div>
+                        <div style={{ fontSize: 11, color: C.muted }}>{p.supplier?.identification?.value} · N°{p.number} · {p.emissionDate?.slice(0, 10)}</div>
+                        <div style={{ fontSize: 11, color: C.muted }}>{p.type?.abbreviation}</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{fmtCLP(p.totalAmount)}</div>
+                        <div style={{ fontSize: 10, color: C.muted }}>Neto {fmtCLP(p.totalNetAmount)}</div>
+                      </div>
+                    </div>
+                    {isAssigned && (
+                      <div style={{ fontSize: 11, color: C.success, fontWeight: 600, marginBottom: 6 }}>✅ Asignado a: {p.assigned.project_name || projects.find(pr => pr.id === p.assigned.project_id)?.name}</div>
+                    )}
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <select
+                        value={selectedProj}
+                        onChange={e => setNuboxSelectedProject(prev => ({ ...prev, [p.id]: e.target.value }))}
+                        style={{ flex: 1, height: 36, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 12, padding: "0 8px" }}
+                      >
+                        <option value="">— Seleccionar proyecto —</option>
+                        {projects.map(pr => (
+                          <option key={pr.id} value={pr.id}>{pr.code ? `[${pr.code}] ` : ""}{pr.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => { if (!selectedProj) { alert("Selecciona un proyecto"); return; } assignNuboxPurchase(p.id, selectedProj); }}
+                        disabled={nuboxAssigning === String(p.id) || !selectedProj}
+                        style={{ height: 36, padding: "0 14px", borderRadius: 8, border: "none", backgroundColor: selectedProj ? C.orange : C.cardAlt, color: selectedProj ? "#fff" : C.muted, fontWeight: 700, fontSize: 12, cursor: selectedProj ? "pointer" : "default" }}
+                      >
+                        {nuboxAssigning === String(p.id) ? "..." : isAssigned ? "Reasignar" : "Asignar"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </>
           )}
 
