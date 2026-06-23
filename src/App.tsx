@@ -183,6 +183,9 @@ export default function App() {
   const [payrollAmount, setPayrollAmount] = useState("");
   const [payrollNote, setPayrollNote] = useState("");
   const [savingPayroll, setSavingPayroll] = useState(false);
+  const [uploadingPayrollPdf, setUploadingPayrollPdf] = useState(false);
+  const [payrollPdfResult, setPayrollPdfResult] = useState<any | null>(null);
+  const payrollPdfRef = useRef<HTMLInputElement>(null);
   const [gastosMonth, setGastosMonth] = useState(new Date().toISOString().slice(0, 7));
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [expCategory, setExpCategory] = useState("materiales");
@@ -554,6 +557,25 @@ export default function App() {
       setShowPayrollForm(false);
       setPayrollAmount(""); setPayrollNote("");
     } catch { alert("Error"); } finally { setSavingPayroll(false); }
+  }
+
+  async function uploadPayrollPdf(file: File) {
+    setUploadingPayrollPdf(true);
+    setPayrollPdfResult(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("year_month", gastosMonth);
+      const r = await fetch(`${API_URL}/payroll/upload-pdf`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd
+      });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { alert(d.message || "Error leyendo PDF"); return; }
+      setPayrollPdfResult(d.data);
+      setPayroll({ total_amount: d.total_guardado, note: `${d.data.cantidad_trabajadores || "?"} trabajadores · ${d.data.resumen || ""}` });
+    } catch { alert("Error subiendo PDF"); } finally { setUploadingPayrollPdf(false); }
   }
 
   async function assignNuboxPurchase(nuboxId: number | string, selectedValue: string) {
@@ -1365,19 +1387,44 @@ export default function App() {
 
               {/* ── SECCIÓN REMUNERACIONES ── */}
               <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 14 }}>
+                <input ref={payrollPdfRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={e => { if (e.target.files?.[0]) uploadPayrollPdf(e.target.files[0]); e.target.value = ""; }} />
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                   <div style={{ fontSize: 13, fontWeight: 700 }}>👥 Remuneraciones — {fmtMonth(gastosMonth)}</div>
-                  <button onClick={() => { setShowPayrollForm(true); setPayrollAmount(payroll ? String(payroll.total_amount) : ""); setPayrollNote(payroll?.note || ""); }} style={{ backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "5px 12px", color: C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
-                    {payroll ? "Editar" : "+ Ingresar"}
-                  </button>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => payrollPdfRef.current?.click()} disabled={uploadingPayrollPdf} style={{ backgroundColor: C.infoDim, border: `0.5px solid ${C.info}`, borderRadius: 8, padding: "5px 10px", color: C.info, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
+                      {uploadingPayrollPdf ? "Leyendo..." : "📄 PDF"}
+                    </button>
+                    <button onClick={() => { setShowPayrollForm(true); setPayrollAmount(payroll ? String(payroll.total_amount) : ""); setPayrollNote(payroll?.note || ""); }} style={{ backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "5px 10px", color: C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
+                      {payroll ? "Editar" : "+ Manual"}
+                    </button>
+                  </div>
                 </div>
+                {uploadingPayrollPdf && <div style={{ fontSize: 12, color: C.info, padding: "8px 0" }}>🤖 Leyendo PDF con IA...</div>}
                 {payroll ? (
                   <div>
                     <div style={{ fontSize: 22, fontWeight: 800, color: C.purple }}>{fmtCLP(payroll.total_amount)}</div>
                     {payroll.note && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{payroll.note}</div>}
                   </div>
                 ) : (
-                  <div style={{ fontSize: 12, color: C.muted }}>Sin dato ingresado para {fmtMonth(gastosMonth)}</div>
+                  <div style={{ fontSize: 12, color: C.muted }}>Sin dato — sube el PDF del libro de remuneraciones o ingresa manual</div>
+                )}
+                {payrollPdfResult && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: `0.5px solid ${C.border}` }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginBottom: 6 }}>Detalle extraído del PDF</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+                      {[
+                        { label: "Haberes", value: fmtCLP(payrollPdfResult.total_haberes) },
+                        { label: "Descuentos", value: fmtCLP(payrollPdfResult.total_descuentos) },
+                        { label: "Líquido", value: fmtCLP(payrollPdfResult.total_liquido) },
+                      ].map(({ label, value }) => (
+                        <div key={label} style={{ backgroundColor: C.cardAlt, borderRadius: 8, padding: 8, textAlign: "center" }}>
+                          <div style={{ fontSize: 9, color: C.muted }}>{label}</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: C.text }}>{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {payrollPdfResult.cantidad_trabajadores > 0 && <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>👥 {payrollPdfResult.cantidad_trabajadores} trabajadores · {payrollPdfResult.periodo}</div>}
+                  </div>
                 )}
                 {showPayrollForm && (
                   <div style={{ marginTop: 12, paddingTop: 12, borderTop: `0.5px solid ${C.border}` }}>
