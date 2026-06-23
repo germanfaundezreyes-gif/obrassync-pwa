@@ -581,10 +581,20 @@ export default function App() {
   async function assignNuboxPurchase(nuboxId: number | string, selectedValue: string) {
     setNuboxAssigning(String(nuboxId));
     try {
-      // selectedValue es project_id (si viene de costCenter con project_id) o cost_center_id (si es centro manual)
       const cc = costCenters.find(c => c.project_id === selectedValue);
       const isProject = !!cc;
-      const body = isProject ? { project_id: selectedValue } : { cost_center_id: selectedValue };
+      const purchase = nuboxPurchases.find(p => p.id === nuboxId);
+      const body = {
+        ...(isProject ? { project_id: selectedValue } : { cost_center_id: selectedValue }),
+        supplier_name: purchase?.supplier?.tradeName || null,
+        supplier_rut: purchase?.supplier?.identification?.value || null,
+        number: purchase?.number || null,
+        doc_type: purchase?.type?.abbreviation || "factura",
+        emission_date: purchase?.emissionDate || null,
+        total_amount: purchase?.totalAmount || 0,
+        total_net: purchase?.totalNetAmount || 0,
+        total_tax: purchase?.totalTaxVatAmount || 0,
+      };
       const r = await fetch(`${API_URL}/nubox/purchases/${nuboxId}/assign`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
