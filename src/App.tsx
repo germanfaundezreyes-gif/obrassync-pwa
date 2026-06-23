@@ -178,6 +178,9 @@ export default function App() {
   const [nuboxSelectedProject, setNuboxSelectedProject] = useState<Record<string, string>>({});
   const [nuboxShowAll, setNuboxShowAll] = useState(false);
   const [nuboxSummary, setNuboxSummary] = useState<any | null>(null);
+  const [nuboxSalesSummary, setNuboxSalesSummary] = useState<any | null>(null);
+  const [nuboxSalesAssigning, setNuboxSalesAssigning] = useState<string | null>(null);
+  const [nuboxSalesProject, setNuboxSalesProject] = useState<Record<string, string>>({});
   const [payroll, setPayroll] = useState<any | null>(null);
   const [showPayrollForm, setShowPayrollForm] = useState(false);
   const [payrollAmount, setPayrollAmount] = useState("");
@@ -533,13 +536,43 @@ export default function App() {
   async function loadNuboxSummary(month?: string) {
     const m = month || gastosMonth;
     try {
-      const [r1, r2] = await Promise.all([
+      const [r1, r2, r3] = await Promise.all([
         fetch(`${API_URL}/nubox/summary?period=${m}`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${API_URL}/payroll?month=${m}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_URL}/nubox/sales-summary?period=${m}`, { headers: { Authorization: `Bearer ${token}` } }),
       ]);
       const d1 = await r1.json(); if (d1.ok) setNuboxSummary(d1.nubox);
       const d2 = await r2.json(); if (d2.ok) setPayroll(d2.current);
+      const d3 = await r3.json(); if (d3.ok) setNuboxSalesSummary(d3);
     } catch {}
+  }
+
+  async function assignNuboxSale(nuboxId: number | string, projectId: string, sale: any) {
+    setNuboxSalesAssigning(String(nuboxId));
+    try {
+      const r = await fetch(`${API_URL}/nubox/sales/${nuboxId}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          project_id: projectId,
+          client_name: sale.client_name,
+          client_rut: sale.client_rut,
+          number: sale.number,
+          doc_type: sale.doc_type,
+          emission_date: sale.emission_date,
+          total_amount: sale.total_amount,
+          total_net: sale.total_net,
+          total_tax: sale.total_tax,
+        })
+      });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
+      setNuboxSalesSummary((prev: any) => prev ? {
+        ...prev,
+        items: prev.items.map((s: any) => s.id === nuboxId ? { ...s, assigned_project: projectId } : s)
+      } : prev);
+      setNuboxSalesProject(prev => { const n = { ...prev }; delete n[String(nuboxId)]; return n; });
+    } catch { alert("Error"); } finally { setNuboxSalesAssigning(null); }
   }
 
   async function savePayroll() {
@@ -1459,6 +1492,89 @@ export default function App() {
                       <button onClick={savePayroll} disabled={savingPayroll} style={{ flex: 2, padding: "9px 0", borderRadius: 8, border: "none", backgroundColor: C.purple, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{savingPayroll ? "Guardando..." : "Guardar"}</button>
                     </div>
                   </div>
+                )}
+              </div>
+
+              {/* ── SECCIÓN IVA ── */}
+              {nuboxSalesSummary?.iva && (
+                <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>🏛️ Estimación IVA — {fmtMonth(gastosMonth)}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
+                    <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 10, textAlign: "center" }}>
+                      <div style={{ fontSize: 9, color: C.muted, marginBottom: 2 }}>Débito fiscal</div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: C.orange }}>{fmtCLP(nuboxSalesSummary.iva.debito_fiscal)}</div>
+                      <div style={{ fontSize: 9, color: C.muted }}>IVA ventas</div>
+                    </div>
+                    <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 10, textAlign: "center" }}>
+                      <div style={{ fontSize: 9, color: C.muted, marginBottom: 2 }}>Crédito fiscal</div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: C.info }}>{fmtCLP(nuboxSalesSummary.iva.credito_fiscal)}</div>
+                      <div style={{ fontSize: 9, color: C.muted }}>IVA compras</div>
+                    </div>
+                    <div style={{ backgroundColor: nuboxSalesSummary.iva.saldo > 0 ? C.dangerDim : C.successDim, borderRadius: 10, padding: 10, textAlign: "center", border: `0.5px solid ${nuboxSalesSummary.iva.saldo > 0 ? C.danger : C.success}` }}>
+                      <div style={{ fontSize: 9, color: C.muted, marginBottom: 2 }}>Saldo IVA</div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: nuboxSalesSummary.iva.saldo > 0 ? C.danger : C.success }}>{fmtCLP(Math.abs(nuboxSalesSummary.iva.saldo))}</div>
+                      <div style={{ fontSize: 9, color: C.muted }}>{nuboxSalesSummary.iva.saldo > 0 ? "A pagar SII" : "A favor"}</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 10, color: C.muted, textAlign: "center" }}>* Estimación basada en facturas Nubox. Verificar en SII.</div>
+                </div>
+              )}
+
+              {/* ── SECCIÓN VENTAS NUBOX ── */}
+              <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>📤 Ventas emitidas — {fmtMonth(gastosMonth)}</div>
+                {!nuboxSalesSummary && <div style={{ fontSize: 12, color: C.muted }}>Cargando...</div>}
+                {nuboxSalesSummary && (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: nuboxSalesSummary.items?.length > 0 && isAdmin ? 12 : 0 }}>
+                      <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 10 }}>
+                        <div style={{ fontSize: 10, color: C.muted, marginBottom: 2 }}>Total ventas</div>
+                        <div style={{ fontSize: 17, fontWeight: 800, color: C.success }}>{fmtCLP(nuboxSalesSummary.sales?.total_ventas || 0)}</div>
+                        <div style={{ fontSize: 10, color: C.muted }}>{nuboxSalesSummary.sales?.total_facturas || 0} facturas · Neto {fmtCLP(nuboxSalesSummary.sales?.total_neto || 0)}</div>
+                      </div>
+                      <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 10 }}>
+                        <div style={{ fontSize: 10, color: C.muted, marginBottom: 2 }}>IVA débito</div>
+                        <div style={{ fontSize: 17, fontWeight: 800, color: C.orange }}>{fmtCLP(nuboxSalesSummary.sales?.iva_debito || 0)}</div>
+                        <div style={{ fontSize: 10, color: C.muted }}>IVA cobrado a clientes</div>
+                      </div>
+                    </div>
+                    {isAdmin && nuboxSalesSummary.items?.length > 0 && (
+                      <>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginBottom: 8, marginTop: 4 }}>Asignar a proyecto</div>
+                        {nuboxSalesSummary.items.filter((s: any) => !s.annulled).map((sale: any) => (
+                          <div key={sale.id} style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 10, marginBottom: 8 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                              <div>
+                                <div style={{ fontSize: 12, fontWeight: 700 }}>{sale.client_name || "Cliente"}</div>
+                                <div style={{ fontSize: 10, color: C.muted }}>{sale.client_rut} · N°{sale.number} · {sale.emission_date?.slice(0,10)}</div>
+                              </div>
+                              <div style={{ textAlign: "right" }}>
+                                <div style={{ fontSize: 13, fontWeight: 800, color: C.success }}>{fmtCLP(sale.total_amount)}</div>
+                                {sale.assigned_project && <div style={{ fontSize: 10, color: C.success }}>✅ Asignado</div>}
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <select
+                                value={nuboxSalesProject[sale.id] || ""}
+                                onChange={e => setNuboxSalesProject(prev => ({ ...prev, [sale.id]: e.target.value }))}
+                                style={{ flex: 1, height: 32, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.card, color: C.text, fontSize: 11, padding: "0 6px" }}
+                              >
+                                <option value="">— Proyecto —</option>
+                                {projects.map(pr => <option key={pr.id} value={pr.id}>{pr.code ? `[${pr.code}] ` : ""}{pr.name}</option>)}
+                              </select>
+                              <button
+                                onClick={() => { const pid = nuboxSalesProject[sale.id]; if (!pid) return; assignNuboxSale(sale.id, pid, sale); }}
+                                disabled={nuboxSalesAssigning === String(sale.id) || !nuboxSalesProject[sale.id]}
+                                style={{ height: 32, padding: "0 12px", borderRadius: 8, border: "none", backgroundColor: nuboxSalesProject[sale.id] ? C.success : C.cardAlt, color: nuboxSalesProject[sale.id] ? "#fff" : C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}
+                              >
+                                {nuboxSalesAssigning === String(sale.id) ? "..." : sale.assigned_project ? "Reasignar" : "Asignar"}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </>
                 )}
               </div>
 
