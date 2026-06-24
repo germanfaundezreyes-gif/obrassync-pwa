@@ -1562,39 +1562,70 @@ export default function App() {
 
               {/* ── MARGEN ── */}
               {(() => {
-                const ventas = nuboxSalesSummary?.sales?.total_ventas || 0;
-                const compras = nuboxSummary?.total_bruto || 0;
+                const ventasNeto = nuboxSalesSummary?.sales?.total_neto || 0;
+                const comprasNeto = nuboxSummary?.total_neto || 0;
                 const remuneraciones = payroll?.total_amount || 0;
-                const totalGastos = compras + remuneraciones;
-                const margen = ventas - totalGastos;
-                const margenPct = ventas > 0 ? (margen / ventas) * 100 : 0;
-                if (ventas === 0 && totalGastos === 0) return null;
+                const totalGastos = comprasNeto + remuneraciones;
+                const margen = ventasNeto - totalGastos;
+                const margenPct = ventasNeto > 0 ? (margen / ventasNeto) * 100 : 0;
+                const ivaDebito = nuboxSalesSummary?.iva?.debito_fiscal || 0;
+                const ivaCredito = nuboxSalesSummary?.iva?.credito_fiscal || 0;
+                const ivaNet = ivaDebito - ivaCredito;
+                if (ventasNeto === 0 && totalGastos === 0) return null;
+                const mc = margen >= 0 ? C.success : C.danger;
+                const md = margen >= 0 ? C.successDim : C.dangerDim;
                 return (
-                  <div style={{ backgroundColor: C.card, border: `2px solid ${margen >= 0 ? C.success : C.danger}`, borderRadius: 14, padding: 16, marginBottom: 14 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Margen estimado del mes</div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                      <div>
-                        <div style={{ fontSize: 28, fontWeight: 800, color: margen >= 0 ? C.success : C.danger }}>{fmtCLP(Math.abs(margen))}</div>
-                        <div style={{ fontSize: 11, color: C.muted }}>{margen >= 0 ? "Resultado positivo" : "Resultado negativo"}</div>
-                      </div>
-                      <div style={{ width: 64, height: 64, borderRadius: "50%", backgroundColor: margen >= 0 ? C.successDim : C.dangerDim, border: `2px solid ${margen >= 0 ? C.success : C.danger}`, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
-                        <div style={{ fontSize: 16, fontWeight: 800, color: margen >= 0 ? C.success : C.danger }}>{margenPct >= 0 ? "+" : ""}{margenPct.toFixed(1)}%</div>
-                        <div style={{ fontSize: 9, color: C.muted }}>margen</div>
-                      </div>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                      {[
-                        { label: "Ventas", value: fmtCLP(ventas), color: C.success },
-                        { label: "Compras", value: fmtCLP(compras), color: C.danger },
-                        { label: "Remuner.", value: fmtCLP(remuneraciones), color: C.purple },
-                      ].map(({ label, value, color }) => (
-                        <div key={label} style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
-                          <div style={{ fontSize: 9, color: C.muted, marginBottom: 3 }}>{label}</div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color }}>{value}</div>
+                  <>
+                    {/* Margen operacional */}
+                    <div style={{ backgroundColor: C.card, border: `1.5px solid ${mc}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: C.mutedSoft, marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>Margen operacional neto</div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 20, fontWeight: 800, color: mc, lineHeight: 1.1 }}>{margen < 0 ? "-" : ""}{fmtCLP(Math.abs(margen))}</div>
+                          <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>{margen >= 0 ? "Resultado positivo" : "Resultado negativo"}</div>
                         </div>
-                      ))}
+                        <div style={{ width: 58, height: 58, flexShrink: 0, borderRadius: "50%", backgroundColor: md, border: `2px solid ${mc}`, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", marginLeft: 10 }}>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: mc }}>{margenPct >= 0 ? "+" : ""}{margenPct.toFixed(1)}%</div>
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+                        {[
+                          { label: "Ventas neto", value: fmtCLP(ventasNeto), color: C.success },
+                          { label: "Compras neto", value: fmtCLP(comprasNeto), color: C.danger },
+                          { label: "Remuner.", value: fmtCLP(remuneraciones), color: C.purple },
+                        ].map(({ label, value, color }) => (
+                          <div key={label} style={{ backgroundColor: C.cardAlt, borderRadius: 8, padding: "7px 6px", textAlign: "center" }}>
+                            <div style={{ fontSize: 9, color: C.muted, marginBottom: 2 }}>{label}</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color }}>{value}</div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+
+                    {/* IVA a compensar */}
+                    {(ivaDebito > 0 || ivaCredito > 0) && (
+                      <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: C.mutedSoft, marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>IVA a compensar</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+                          <div style={{ backgroundColor: C.dangerDim, borderRadius: 8, padding: "7px 6px", textAlign: "center" }}>
+                            <div style={{ fontSize: 9, color: C.muted, marginBottom: 2 }}>Débito fiscal</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: C.danger }}>{fmtCLP(ivaDebito)}</div>
+                            <div style={{ fontSize: 8, color: C.muted }}>IVA ventas</div>
+                          </div>
+                          <div style={{ backgroundColor: C.successDim, borderRadius: 8, padding: "7px 6px", textAlign: "center" }}>
+                            <div style={{ fontSize: 9, color: C.muted, marginBottom: 2 }}>Crédito fiscal</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: C.success }}>{fmtCLP(ivaCredito)}</div>
+                            <div style={{ fontSize: 8, color: C.muted }}>IVA compras</div>
+                          </div>
+                          <div style={{ backgroundColor: ivaNet > 0 ? C.dangerDim : C.successDim, border: `1px solid ${ivaNet > 0 ? C.danger : C.success}`, borderRadius: 8, padding: "7px 6px", textAlign: "center" }}>
+                            <div style={{ fontSize: 9, color: C.muted, marginBottom: 2 }}>Saldo IVA</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: ivaNet > 0 ? C.danger : C.success }}>{fmtCLP(Math.abs(ivaNet))}</div>
+                            <div style={{ fontSize: 8, color: C.muted }}>{ivaNet > 0 ? "A pagar SII" : "A favor"}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 );
               })()}
 
