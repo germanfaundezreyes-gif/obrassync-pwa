@@ -1909,17 +1909,23 @@ export default function App() {
                     <button onClick={() => loadNuboxSummary()} style={{ backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", color: C.muted, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>↻</button>
                   </div>
                   {!nuboxSalesSummary && <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Cargando...</div>}
-                  {nuboxSalesSummary?.items?.filter((s: any) => !s.annulled).map((sale: any) => (
-                    <div key={sale.id} style={{ backgroundColor: C.card, border: `0.5px solid ${sale.assigned_project ? C.success : C.border}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
+                  {nuboxSalesSummary?.items?.filter((s: any) => !s.annulled).map((sale: any) => {
+                    const isNC = sale.total_amount < 0;
+                    const amtColor = isNC ? C.danger : C.success;
+                    return (
+                    <div key={sale.id} style={{ backgroundColor: C.card, border: `0.5px solid ${isNC ? C.danger : sale.assigned_project ? C.success : C.border}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700 }}>{sale.client_name || "Cliente"}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700 }}>{sale.client_name || "Cliente"}</div>
+                            {isNC && <span style={{ fontSize: 10, backgroundColor: C.dangerDim, color: C.danger, borderRadius: 6, padding: "1px 6px", fontWeight: 700 }}>N/C</span>}
+                          </div>
                           <div style={{ fontSize: 11, color: C.muted }}>{sale.client_rut} · N°{sale.number} · {sale.emission_date?.slice(0,10)}</div>
                           <div style={{ fontSize: 11, color: C.muted }}>{sale.doc_type}</div>
                         </div>
                         <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: 15, fontWeight: 800, color: C.success }}>{fmtCLP(sale.total_amount)}</div>
-                          <div style={{ fontSize: 10, color: C.muted }}>Neto {fmtCLP(sale.total_net)}</div>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: amtColor }}>{isNC ? "-" : ""}{fmtCLP(Math.abs(sale.total_amount))}</div>
+                          <div style={{ fontSize: 10, color: C.muted }}>Neto {isNC ? "-" : ""}{fmtCLP(Math.abs(sale.total_net))}</div>
                         </div>
                       </div>
                       {sale.assigned_project && <div style={{ fontSize: 11, color: C.success, fontWeight: 600, marginBottom: 6 }}>✅ Asignado</div>}
@@ -1943,7 +1949,7 @@ export default function App() {
                         </div>
                       )}
                     </div>
-                  ))}
+                  );})}
                   {nuboxSalesSummary?.items?.length === 0 && (
                     <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin ventas en {fmtMonth(gastosMonth)}</div>
                   )}
