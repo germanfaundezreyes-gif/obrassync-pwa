@@ -91,8 +91,9 @@ export default function App() {
   const [userRole, setUserRole] = useState(() => localStorage.getItem("obs_role") || "");
   const [userPerms, setUserPerms] = useState<Record<string, boolean>>(() => { try { return JSON.parse(localStorage.getItem("obs_perms") || "{}"); } catch { return {}; } });
   function setToken(t: string | null) { if (t) localStorage.setItem("obs_token", t); else { localStorage.removeItem("obs_token"); localStorage.removeItem("obs_name"); localStorage.removeItem("obs_role"); localStorage.removeItem("obs_perms"); } setTokenState(t); }
-  const [email, setEmail] = useState("admin@obrassync.cl");
-  const [password, setPassword] = useState("Admin1234*");
+  const [email, setEmail] = useState(() => localStorage.getItem("remembered_email") || "");
+  const [password, setPassword] = useState(() => localStorage.getItem("remembered_password") || "");
+  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem("remembered_email"));
   const [showPass, setShowPass] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [screen, setScreen] = useState<Screen>("home");
@@ -247,6 +248,13 @@ export default function App() {
       const r = await fetch(`${API_URL}/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert(d.message || "Credenciales inválidas"); return; }
+      if (rememberMe) {
+        localStorage.setItem("remembered_email", email);
+        localStorage.setItem("remembered_password", password);
+      } else {
+        localStorage.removeItem("remembered_email");
+        localStorage.removeItem("remembered_password");
+      }
       const name = d.user?.fullName || "Usuario"; const role = d.user?.role || ""; const perms = d.user?.permissions || {};
       localStorage.setItem("obs_name", name); localStorage.setItem("obs_role", role); localStorage.setItem("obs_perms", JSON.stringify(perms));
       setToken(d.token); setUserName(name); setUserRole(role); setUserPerms(perms);
@@ -708,6 +716,12 @@ export default function App() {
           <Lock size={16} color={C.orange} />
           <input type={showPass ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña" onKeyDown={e => e.key === "Enter" && handleLogin()} style={{ flex: 1, background: "none", border: "none", outline: "none", color: C.text, fontSize: 14 }} />
           <div onClick={() => setShowPass(!showPass)} style={{ cursor: "pointer" }}>{showPass ? <EyeOff size={15} color={C.muted} /> : <Eye size={15} color={C.muted} />}</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+          <div onClick={() => setRememberMe(!rememberMe)} style={{ width: 20, height: 20, borderRadius: 6, border: `2px solid ${rememberMe ? C.orange : C.border}`, backgroundColor: rememberMe ? C.orange : C.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
+            {rememberMe && <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6 L5 9 L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+          </div>
+          <span onClick={() => setRememberMe(!rememberMe)} style={{ fontSize: 13, color: C.muted, cursor: "pointer" }}>Recordar usuario y contraseña</span>
         </div>
         <button onClick={handleLogin} disabled={loginLoading} style={btnPrimary}>{loginLoading ? "Ingresando..." : "Ingresar"}</button>
         <div style={{ textAlign: "center", marginTop: 32, color: C.mutedSoft, fontSize: 12 }}>Desarrollado por <span style={{ color: C.muted }}>Matfau SPA</span> · v2.0</div>
