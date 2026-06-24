@@ -698,11 +698,9 @@ export default function App() {
     <div style={{ minHeight: "100vh", backgroundColor: C.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ width: "100%", maxWidth: 380 }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 48 }}>
-          <div style={{ width: 72, height: 72, background: C.orange, borderRadius: 20, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20, boxShadow: "0 4px 14px rgba(249,115,22,0.3)" }}>
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-              <path d="M8 28 C8 16 32 16 32 28 L32 33 L8 33 Z" fill="white"/>
-              <rect x="5" y="31" width="30" height="4" rx="2" fill="rgba(255,255,255,0.6)"/>
-              <path d="M15 22 L19 26 L26 18" stroke="#F97316" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+          <div style={{ width: 80, height: 80, background: C.orange, borderRadius: 24, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20, boxShadow: "0 6px 20px rgba(249,115,22,0.35)" }}>
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+              <path d="M32 14C32 14 28 11 22 12C16 13 12 17 12 22C12 27 16 29 20 30C24 31 28 32 28 36C28 40 24 42 18 41C14 40 12 38 12 38" stroke="white" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
           <div style={{ color: C.text, fontSize: 28, fontWeight: 700, letterSpacing: -0.5 }}>Obras<span style={{ color: C.orange }}>Sync</span></div>
