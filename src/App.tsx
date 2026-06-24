@@ -640,7 +640,8 @@ export default function App() {
       const d = await r.json();
       if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
       const ccName = cc?.name || costCenters.find(c => c.id === selectedValue)?.name || "";
-      setNuboxPurchases(prev => prev.map(p => p.id === nuboxId ? { ...p, assigned: { project_id: selectedValue, project_name: ccName } } : p));
+      const assignedData = cc ? { project_id: cc.project_id, cost_center_id: cc.id, project_name: ccName, cc_name: ccName } : { cost_center_id: selectedValue, cc_name: ccName };
+      setNuboxPurchases(prev => prev.map(p => p.id === nuboxId ? { ...p, assigned: assignedData } : p));
       setNuboxSelectedProject(prev => { const n = { ...prev }; delete n[String(nuboxId)]; return n; });
       await loadKpis();
     } catch { alert("Error"); } finally { setNuboxAssigning(null); }
@@ -1752,15 +1753,15 @@ export default function App() {
                 </div>
               )}
               {!nuboxLoading && !nuboxError && (() => {
-                const filtered = nuboxShowAll ? nuboxPurchases : nuboxPurchases.filter(p => !p.assigned?.project_id);
+                const filtered = nuboxShowAll ? nuboxPurchases : nuboxPurchases.filter(p => !p.assigned);
                 if (filtered.length === 0) return (
                   <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>
                     {nuboxShowAll ? `Sin facturas en ${fmtMonth(gastosMonth)}` : "✅ Todas las facturas están asignadas"}
                   </div>
                 );
                 return filtered.map(p => {
-                  const isAssigned = !!p.assigned?.project_id;
-                  const assignedCC = costCenters.find(cc => cc.project_id === p.assigned?.project_id);
+                  const isAssigned = !!p.assigned;
+                  const assignedCC = costCenters.find(cc => cc.id === p.assigned?.cost_center_id || cc.project_id === p.assigned?.project_id);
                   const selectedCC = nuboxSelectedProject[p.id] || "";
                   return (
                     <div key={p.id} style={{ backgroundColor: C.card, border: `0.5px solid ${isAssigned ? C.success : C.border}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
@@ -1777,7 +1778,7 @@ export default function App() {
                       </div>
                       {isAssigned && (
                         <div style={{ fontSize: 11, color: C.success, fontWeight: 600, marginBottom: 6 }}>
-                          ✅ {assignedCC?.name || p.assigned.project_name || "Asignado"}
+                          ✅ {assignedCC?.name || p.assigned.project_name || p.assigned.cc_name || "Asignado"}
                         </div>
                       )}
                       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
