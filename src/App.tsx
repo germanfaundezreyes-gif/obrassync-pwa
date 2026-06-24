@@ -1560,6 +1560,44 @@ export default function App() {
                 )}
               </div>}
 
+              {/* ── MARGEN ── */}
+              {(() => {
+                const ventas = nuboxSalesSummary?.sales?.total_ventas || 0;
+                const compras = nuboxSummary?.total_bruto || 0;
+                const remuneraciones = payroll?.total_amount || 0;
+                const totalGastos = compras + remuneraciones;
+                const margen = ventas - totalGastos;
+                const margenPct = ventas > 0 ? (margen / ventas) * 100 : 0;
+                if (ventas === 0 && totalGastos === 0) return null;
+                return (
+                  <div style={{ backgroundColor: C.card, border: `2px solid ${margen >= 0 ? C.success : C.danger}`, borderRadius: 14, padding: 16, marginBottom: 14 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Margen estimado del mes</div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                      <div>
+                        <div style={{ fontSize: 28, fontWeight: 800, color: margen >= 0 ? C.success : C.danger }}>{fmtCLP(Math.abs(margen))}</div>
+                        <div style={{ fontSize: 11, color: C.muted }}>{margen >= 0 ? "Resultado positivo" : "Resultado negativo"}</div>
+                      </div>
+                      <div style={{ width: 64, height: 64, borderRadius: "50%", backgroundColor: margen >= 0 ? C.successDim : C.dangerDim, border: `2px solid ${margen >= 0 ? C.success : C.danger}`, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: margen >= 0 ? C.success : C.danger }}>{margenPct >= 0 ? "+" : ""}{margenPct.toFixed(1)}%</div>
+                        <div style={{ fontSize: 9, color: C.muted }}>margen</div>
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                      {[
+                        { label: "Ventas", value: fmtCLP(ventas), color: C.success },
+                        { label: "Compras", value: fmtCLP(compras), color: C.danger },
+                        { label: "Remuner.", value: fmtCLP(remuneraciones), color: C.purple },
+                      ].map(({ label, value, color }) => (
+                        <div key={label} style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
+                          <div style={{ fontSize: 9, color: C.muted, marginBottom: 3 }}>{label}</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color }}>{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* ── SECCIÓN GASTOS MANUALES ── */}
               {!expenseSummary && <div style={{ textAlign: "center", color: C.muted, padding: 20, cursor: "pointer" }} onClick={() => loadExpenses()}>Toca para cargar gastos</div>}
               {expenseSummary && (
