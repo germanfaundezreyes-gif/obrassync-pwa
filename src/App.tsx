@@ -1562,9 +1562,9 @@ export default function App() {
 
               {/* ── MARGEN ── */}
               {(() => {
-                const ventasNeto = nuboxSalesSummary?.sales?.total_neto || 0;
-                const comprasNeto = nuboxSummary?.total_neto || 0;
-                const remuneraciones = payroll?.total_amount || 0;
+                const ventasNeto = Number(nuboxSalesSummary?.sales?.total_neto) || 0;
+                const comprasNeto = Number(nuboxSummary?.total_neto) || 0;
+                const remuneraciones = Number(payroll?.total_amount) || 0;
                 const totalGastos = comprasNeto + remuneraciones;
                 const margen = ventasNeto - totalGastos;
                 const margenPct = ventasNeto > 0 ? (margen / ventasNeto) * 100 : 0;
