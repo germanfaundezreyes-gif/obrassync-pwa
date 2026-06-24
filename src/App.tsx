@@ -96,6 +96,18 @@ export default function App() {
   const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem("remembered_email"));
   const [showPass, setShowPass] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [loginView, setLoginView] = useState<"login" | "forgot" | "reset">(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("reset") ? "reset" : "login";
+  });
+  const [resetToken] = useState(() => new URLSearchParams(window.location.search).get("reset") || "");
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [newPassword2, setNewPassword2] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetDone, setResetDone] = useState(false);
   const [screen, setScreen] = useState<Screen>("home");
   const [taskFilter, setTaskFilter] = useState("todos");
 
@@ -259,6 +271,28 @@ export default function App() {
       localStorage.setItem("obs_name", name); localStorage.setItem("obs_role", role); localStorage.setItem("obs_perms", JSON.stringify(perms));
       setToken(d.token); setUserName(name); setUserRole(role); setUserPerms(perms);
     } catch { alert("No se pudo conectar al servidor"); } finally { setLoginLoading(false); }
+  }
+
+  async function handleForgotPassword() {
+    if (!forgotEmail) return;
+    setForgotLoading(true);
+    try {
+      await fetch(`${API_URL}/auth/forgot-password`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: forgotEmail }) });
+      setForgotSent(true);
+    } catch { alert("No se pudo conectar al servidor"); } finally { setForgotLoading(false); }
+  }
+
+  async function handleResetPassword() {
+    if (!newPassword || newPassword.length < 6) { alert("La contraseña debe tener al menos 6 caracteres"); return; }
+    if (newPassword !== newPassword2) { alert("Las contraseñas no coinciden"); return; }
+    setResetLoading(true);
+    try {
+      const r = await fetch(`${API_URL}/auth/reset-password`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: resetToken, password: newPassword }) });
+      const d = await r.json();
+      if (!d.ok) { alert(d.message || "Link inválido o expirado"); return; }
+      setResetDone(true);
+      window.history.replaceState({}, "", window.location.pathname);
+    } catch { alert("No se pudo conectar al servidor"); } finally { setResetLoading(false); }
   }
 
   async function loadProjects() {
@@ -706,22 +740,79 @@ export default function App() {
           <div style={{ color: C.text, fontSize: 28, fontWeight: 700, letterSpacing: -0.5 }}>Obras<span style={{ color: C.orange }}>Sync</span></div>
           <div style={{ color: C.muted, fontSize: 13, marginTop: 6 }}>Control de obra inteligente</div>
         </div>
+
+        {/* ── VISTA RESET PASSWORD ── */}
+        {loginView === "reset" && (
+          resetDone ? (
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 8 }}>Contraseña actualizada</div>
+              <div style={{ fontSize: 13, color: C.muted, marginBottom: 24 }}>Ya puedes ingresar con tu nueva contraseña</div>
+              <button onClick={() => setLoginView("login")} style={btnPrimary}>Ir al inicio de sesión</button>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>Crear nueva contraseña</div>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 20 }}>Ingresa tu nueva contraseña (mínimo 6 caracteres)</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: "0 14px", marginBottom: 10, height: 50 }}>
+                <Lock size={16} color={C.orange} />
+                <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Nueva contraseña" style={{ flex: 1, background: "none", border: "none", outline: "none", color: C.text, fontSize: 14 }} />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: "0 14px", marginBottom: 20, height: 50 }}>
+                <Lock size={16} color={C.orange} />
+                <input type="password" value={newPassword2} onChange={e => setNewPassword2(e.target.value)} placeholder="Repetir contraseña" onKeyDown={e => e.key === "Enter" && handleResetPassword()} style={{ flex: 1, background: "none", border: "none", outline: "none", color: C.text, fontSize: 14 }} />
+              </div>
+              <button onClick={handleResetPassword} disabled={resetLoading} style={btnPrimary}>{resetLoading ? "Guardando..." : "Guardar contraseña"}</button>
+              <button onClick={() => setLoginView("login")} style={{ width: "100%", marginTop: 10, background: "none", border: "none", color: C.muted, fontSize: 13, cursor: "pointer" }}>← Volver</button>
+            </>
+          )
+        )}
+
+        {/* ── VISTA FORGOT PASSWORD ── */}
+        {loginView === "forgot" && (
+          forgotSent ? (
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>📧</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 8 }}>Revisa tu correo</div>
+              <div style={{ fontSize: 13, color: C.muted, marginBottom: 24 }}>Si el correo está registrado, recibirás un link para crear una nueva contraseña. El link expira en 1 hora.</div>
+              <button onClick={() => { setLoginView("login"); setForgotSent(false); setForgotEmail(""); }} style={btnPrimary}>Volver al inicio</button>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>Recuperar contraseña</div>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 20 }}>Ingresa tu correo y te enviaremos un link para crear una nueva contraseña</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: "0 14px", marginBottom: 20, height: 50 }}>
+                <Mail size={16} color={C.orange} />
+                <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder="Tu correo electrónico" onKeyDown={e => e.key === "Enter" && handleForgotPassword()} style={{ flex: 1, background: "none", border: "none", outline: "none", color: C.text, fontSize: 14 }} />
+              </div>
+              <button onClick={handleForgotPassword} disabled={forgotLoading} style={btnPrimary}>{forgotLoading ? "Enviando..." : "Enviar link"}</button>
+              <button onClick={() => setLoginView("login")} style={{ width: "100%", marginTop: 10, background: "none", border: "none", color: C.muted, fontSize: 13, cursor: "pointer" }}>← Volver</button>
+            </>
+          )
+        )}
+
+        {/* ── VISTA LOGIN NORMAL ── */}
+        {loginView === "login" && (<>
         <div style={{ display: "flex", alignItems: "center", gap: 10, backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: "0 14px", marginBottom: 10, height: 50 }}>
           <Mail size={16} color={C.orange} />
           <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Correo electrónico" style={{ flex: 1, background: "none", border: "none", outline: "none", color: C.text, fontSize: 14 }} />
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: "0 14px", marginBottom: 24, height: 50 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: "0 14px", marginBottom: 16, height: 50 }}>
           <Lock size={16} color={C.orange} />
           <input type={showPass ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña" onKeyDown={e => e.key === "Enter" && handleLogin()} style={{ flex: 1, background: "none", border: "none", outline: "none", color: C.text, fontSize: 14 }} />
           <div onClick={() => setShowPass(!showPass)} style={{ cursor: "pointer" }}>{showPass ? <EyeOff size={15} color={C.muted} /> : <Eye size={15} color={C.muted} />}</div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-          <div onClick={() => setRememberMe(!rememberMe)} style={{ width: 20, height: 20, borderRadius: 6, border: `2px solid ${rememberMe ? C.orange : C.border}`, backgroundColor: rememberMe ? C.orange : C.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
-            {rememberMe && <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6 L5 9 L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div onClick={() => setRememberMe(!rememberMe)} style={{ width: 20, height: 20, borderRadius: 6, border: `2px solid ${rememberMe ? C.orange : C.border}`, backgroundColor: rememberMe ? C.orange : C.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+              {rememberMe && <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6 L5 9 L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+            </div>
+            <span onClick={() => setRememberMe(!rememberMe)} style={{ fontSize: 12, color: C.muted, cursor: "pointer" }}>Recordar sesión</span>
           </div>
-          <span onClick={() => setRememberMe(!rememberMe)} style={{ fontSize: 13, color: C.muted, cursor: "pointer" }}>Recordar usuario y contraseña</span>
+          <button onClick={() => setLoginView("forgot")} style={{ background: "none", border: "none", color: C.orange, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>¿Olvidaste tu contraseña?</button>
         </div>
         <button onClick={handleLogin} disabled={loginLoading} style={btnPrimary}>{loginLoading ? "Ingresando..." : "Ingresar"}</button>
+        </>)}
         <div style={{ textAlign: "center", marginTop: 32, color: C.mutedSoft, fontSize: 12 }}>Desarrollado por <span style={{ color: C.muted }}>Matfau SPA</span> · v2.0</div>
       </div>
     </div>
