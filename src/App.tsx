@@ -4,7 +4,7 @@ import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, Folder
 const API_URL = "https://obrassync-backend-production.up.railway.app";
 
 const C = {
-  bg: "#F9FAFB", card: "#FFFFFF", cardAlt: "#F3F4F6", border: "#E5E7EB",
+  bg: "#F3F4F6", card: "#FFFFFF", cardAlt: "#E9EAEC", border: "#D1D5DB",
   text: "#111827", muted: "#6B7280", mutedSoft: "#9CA3AF",
   orange: "#F97316", orangeSoft: "#FDBA74", orangeDim: "#FFF7ED",
   success: "#16A34A", successDim: "#F0FDF4", danger: "#DC2626", dangerDim: "#FEF2F2",
