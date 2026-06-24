@@ -4,11 +4,11 @@ import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, Folder
 const API_URL = "https://obrassync-backend-production.up.railway.app";
 
 const C = {
-  bg: "#0F0F10", card: "#171717", cardAlt: "#1D1D1D", border: "#2A2A2A",
-  text: "#FFFFFF", muted: "#555555", mutedSoft: "#888888",
-  orange: "#FF8A00", orangeSoft: "#FDBA74", orangeDim: "#1A0F00",
-  success: "#22C55E", successDim: "#0D1A0D", danger: "#EF4444", dangerDim: "#1A0D0D",
-  info: "#3B82F6", infoDim: "#0D0D1A", purple: "#A855F7", purpleDim: "#150D1A",
+  bg: "#F9FAFB", card: "#FFFFFF", cardAlt: "#F3F4F6", border: "#E5E7EB",
+  text: "#111827", muted: "#6B7280", mutedSoft: "#9CA3AF",
+  orange: "#F97316", orangeSoft: "#FDBA74", orangeDim: "#FFF7ED",
+  success: "#16A34A", successDim: "#F0FDF4", danger: "#DC2626", dangerDim: "#FEF2F2",
+  info: "#2563EB", infoDim: "#EFF6FF", purple: "#7C3AED", purpleDim: "#F5F3FF",
 };
 
 type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos";
@@ -47,9 +47,9 @@ const PERMISSIONS = [
 ];
 
 const ROLES = [
-  { value: "administrador", label: "Admin", icon: "👑", color: "#FF8A00", bg: "#1A0F00", border: "#3A1F00" },
-  { value: "jefe_obra", label: "Jefe obra", icon: "🦺", color: "#3B82F6", bg: "#0D0D1A", border: "#0D1A3A" },
-  { value: "inspector", label: "Trabajador", icon: "👷", color: "#22C55E", bg: "#0D1A0D", border: "#0D3A0D" },
+  { value: "administrador", label: "Admin", icon: "👑", color: "#EA580C", bg: "#FFF7ED", border: "#FDBA74" },
+  { value: "jefe_obra", label: "Jefe obra", icon: "🦺", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE" },
+  { value: "inspector", label: "Trabajador", icon: "👷", color: "#16A34A", bg: "#F0FDF4", border: "#BBF7D0" },
 ];
 
 const STATUS_OPTIONS = [
@@ -690,7 +690,13 @@ export default function App() {
     <div style={{ minHeight: "100vh", backgroundColor: C.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ width: "100%", maxWidth: 380 }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 48 }}>
-          <div style={{ width: 72, height: 72, background: C.orangeDim, border: `1.5px solid ${C.orange}`, borderRadius: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, marginBottom: 20 }}>🏗️</div>
+          <div style={{ width: 72, height: 72, background: C.orange, borderRadius: 20, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20, boxShadow: "0 4px 14px rgba(249,115,22,0.3)" }}>
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+              <path d="M8 28 C8 16 32 16 32 28 L32 33 L8 33 Z" fill="white"/>
+              <rect x="5" y="31" width="30" height="4" rx="2" fill="rgba(255,255,255,0.6)"/>
+              <path d="M15 22 L19 26 L26 18" stroke="#F97316" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
           <div style={{ color: C.text, fontSize: 28, fontWeight: 700, letterSpacing: -0.5 }}>Obras<span style={{ color: C.orange }}>Sync</span></div>
           <div style={{ color: C.muted, fontSize: 13, marginTop: 6 }}>Control de obra inteligente</div>
         </div>
@@ -704,7 +710,7 @@ export default function App() {
           <div onClick={() => setShowPass(!showPass)} style={{ cursor: "pointer" }}>{showPass ? <EyeOff size={15} color={C.muted} /> : <Eye size={15} color={C.muted} />}</div>
         </div>
         <button onClick={handleLogin} disabled={loginLoading} style={btnPrimary}>{loginLoading ? "Ingresando..." : "Ingresar"}</button>
-        <div style={{ textAlign: "center", marginTop: 32, color: "#333", fontSize: 12 }}>Desarrollado por <span style={{ color: "#444" }}>Matfau SPA</span> · v2.0</div>
+        <div style={{ textAlign: "center", marginTop: 32, color: C.mutedSoft, fontSize: 12 }}>Desarrollado por <span style={{ color: C.muted }}>Matfau SPA</span> · v2.0</div>
       </div>
     </div>
   );
@@ -749,22 +755,31 @@ export default function App() {
       )}
 
       {/* Header */}
-      <div style={{ position: "sticky", top: 0, zIndex: 100, backgroundColor: C.bg, borderBottom: `0.5px solid ${C.border}`, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ position: "sticky", top: 0, zIndex: 100, backgroundColor: C.card, borderBottom: `0.5px solid ${C.border}`, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {(screen === "fotos" || screen === "editarUsuario" || screen === "crearUsuario" || screen === "partidas" || screen === "crearProyecto") && (
             <button onClick={() => { if (screen === "fotos") setScreen("partidas"); else if (screen === "partidas") setScreen("home"); else if (screen === "crearProyecto") setScreen("proyectos"); else setScreen("admin"); }} style={{ background: "none", border: "none", color: C.orange, cursor: "pointer", padding: 0, display: "flex" }}>
               <ChevronLeft size={24} />
             </button>
           )}
-          <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 30, height: 30, background: C.orange, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="18" height="18" viewBox="0 0 40 40" fill="none">
+                <path d="M8 28 C8 16 32 16 32 28 L32 33 L8 33 Z" fill="white"/>
+                <rect x="5" y="31" width="30" height="4" rx="2" fill="rgba(255,255,255,0.6)"/>
+                <path d="M15 22 L19 26 L26 18" stroke="#F97316" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <div>
             <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: -0.3 }}>Obras<span style={{ color: C.orange }}>Sync</span></div>
             {selectedProject && ["partidas", "fotos"].includes(screen) && (
               <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{selectedProject.name}</div>
             )}
           </div>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <div style={{ width: 34, height: 34, background: C.card, border: `0.5px solid ${C.border}`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 34, height: 34, background: C.bg, border: `0.5px solid ${C.border}`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Bell size={16} color={C.muted} />
           </div>
           <div onClick={() => setScreen("configuracion")} style={{ cursor: "pointer" }}>
