@@ -2202,6 +2202,9 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
   const [newClientRut, setNewClientRut] = useState("");
   const [newClientName, setNewClientName] = useState("");
   const [newClientNuboxId, setNewClientNuboxId] = useState("");
+  const [projectProducts, setProjectProducts] = useState<{ id: string; nubox_code: string; name: string; unit: string; price_neto: number; category: string }[]>([]);
+  const [newPP, setNewPP] = useState({ nubox_code: "", name: "", unit: "UND", price_neto: "", category: "materiales" });
+  const [configSubTab, setConfigSubTab] = useState<"nubox" | "productos">("nubox");
   // Nueva cotización con IA
   const [uploadText, setUploadText] = useState("");
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
@@ -2218,16 +2221,18 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
   async function loadAll() {
     setLoading(true);
     try {
-      const [qRes, statusRes, prodRes, clientsRes] = await Promise.all([
+      const [qRes, statusRes, prodRes, clientsRes, ppRes] = await Promise.all([
         fetch(`${API_URL}/quotations`, { headers: h }).then(r => r.json()),
         fetch(`${API_URL}/nubox/session-status`, { headers: h }).then(r => r.json()),
         fetch(`${API_URL}/nubox/products`, { headers: h }).then(r => r.json()),
         fetch(`${API_URL}/nubox/clients`, { headers: h }).then(r => r.json()),
+        fetch(`${API_URL}/project-products`, { headers: h }).then(r => r.json()),
       ]);
       if (qRes.ok) setQuotations(qRes.quotations || []);
       if (statusRes.ok) setNuboxStatus(statusRes);
       if (prodRes.ok) setProductCount(prodRes.products?.length || 0);
       if (clientsRes.ok) setNuboxClients(clientsRes.clients || []);
+      if (ppRes.ok) setProjectProducts(ppRes.products || []);
     } catch (_) {}
     setLoading(false);
   }
@@ -2533,6 +2538,59 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
                 {syncing ? "Sincronizando..." : "🔄 Sincronizar productos desde Nubox"}
               </button>
 
+              {/* Sub-tabs config */}
+              <div style={{ display: "flex", gap: 8, marginTop: 24, marginBottom: 16 }}>
+                {(["nubox", "productos"] as const).map(t => (
+                  <button key={t} onClick={() => setConfigSubTab(t)} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: `2px solid ${configSubTab === t ? C.orange : C.border}`, backgroundColor: configSubTab === t ? C.orange : "transparent", color: configSubTab === t ? "#fff" : C.text, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                    {t === "nubox" ? "👤 Clientes Nubox" : "📦 Catálogo Proyecto"}
+                  </button>
+                ))}
+              </div>
+
+              {configSubTab === "productos" && (
+                <div>
+                  <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>
+                    Productos con código Nubox usados en este proyecto. La IA los usará primero al cubicar, y el payload enviará el código para que Nubox complete precio y nombre automáticamente.
+                  </div>
+                  {projectProducts.length === 0 && <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>Sin productos en el catálogo todavía.</div>}
+                  {projectProducts.map(p => (
+                    <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", backgroundColor: C.bg, borderRadius: 8, marginBottom: 6, fontSize: 12 }}>
+                      <div style={{ flex: 1 }}>
+                        <b>{p.nubox_code}</b> · {p.name} · {p.unit} · ${p.price_neto.toLocaleString("es-CL")}
+                        <span style={{ marginLeft: 6, fontSize: 10, padding: "2px 6px", borderRadius: 4, backgroundColor: p.category === "servicios" ? "#e3f2fd" : "#f3e5f5", color: p.category === "servicios" ? "#1565c0" : "#6a1b9a" }}>{p.category}</span>
+                      </div>
+                      <button onClick={async () => {
+                        await fetch(`${API_URL}/project-products/${p.id}`, { method: "DELETE", headers: h });
+                        loadAll();
+                      }} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 16 }}>✕</button>
+                    </div>
+                  ))}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <input value={newPP.nubox_code} onChange={e => setNewPP(p => ({ ...p, nubox_code: e.target.value }))} placeholder="Código Nubox (ej: MAT001)" style={{ flex: 1, padding: "9px 10px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, backgroundColor: C.bg, color: C.text }} />
+                      <input value={newPP.unit} onChange={e => setNewPP(p => ({ ...p, unit: e.target.value }))} placeholder="UN" style={{ width: 60, padding: "9px 8px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, backgroundColor: C.bg, color: C.text }} />
+                    </div>
+                    <input value={newPP.name} onChange={e => setNewPP(p => ({ ...p, name: e.target.value }))} placeholder="Nombre del producto" style={{ padding: "9px 10px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, backgroundColor: C.bg, color: C.text }} />
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <input value={newPP.price_neto} onChange={e => setNewPP(p => ({ ...p, price_neto: e.target.value }))} placeholder="Precio neto ($)" type="number" style={{ flex: 1, padding: "9px 10px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, backgroundColor: C.bg, color: C.text }} />
+                      <select value={newPP.category} onChange={e => setNewPP(p => ({ ...p, category: e.target.value }))} style={{ width: 120, padding: "9px 8px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, backgroundColor: C.bg, color: C.text }}>
+                        <option value="materiales">Materiales</option>
+                        <option value="servicios">Servicios</option>
+                      </select>
+                    </div>
+                    <button onClick={async () => {
+                      if (!newPP.name || !newPP.price_neto) return setMsg("Nombre y precio son obligatorios");
+                      const r = await fetch(`${API_URL}/project-products`, { method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify({ ...newPP, price_neto: parseInt(newPP.price_neto) }) }).then(r => r.json());
+                      if (r.ok) { setMsg("✅ Producto agregado al catálogo"); setNewPP({ nubox_code: "", name: "", unit: "UND", price_neto: "", category: "materiales" }); loadAll(); }
+                      else setMsg("❌ " + r.message);
+                    }} style={{ padding: "10px 0", backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                      + Agregar al catálogo
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {configSubTab === "nubox" && (<>
               {/* Clientes Nubox */}
               <div style={{ marginTop: 24, fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 8 }}>Clientes Nubox registrados</div>
               <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>
@@ -2560,6 +2618,7 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
                   + Agregar cliente
                 </button>
               </div>
+              </>)}
             </div>
           </div>
         )}
