@@ -2205,6 +2205,8 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
   const [projectProducts, setProjectProducts] = useState<{ id: string; nubox_code: string; name: string; unit: string; price_neto: number; category: string }[]>([]);
   const [newPP, setNewPP] = useState({ nubox_code: "", name: "", unit: "UND", price_neto: "", category: "materiales" });
   const [configSubTab, setConfigSubTab] = useState<"nubox" | "productos">("nubox");
+  const [importingExcel, setImportingExcel] = useState(false);
+  const importRef = useRef<HTMLInputElement>(null);
   // Nueva cotización con IA
   const [uploadText, setUploadText] = useState("");
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
@@ -2550,8 +2552,22 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
               {configSubTab === "productos" && (
                 <div>
                   <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>
-                    Productos con código Nubox usados en este proyecto. La IA los usará primero al cubicar, y el payload enviará el código para que Nubox complete precio y nombre automáticamente.
+                    Productos con código Nubox del contrato vigente. La IA los usará primero al cubicar. Al importar un Excel nuevo, reemplaza el catálogo completo.
                   </div>
+                  <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={async e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setImportingExcel(true); setMsg("");
+                    const fd = new FormData(); fd.append("file", file);
+                    const r = await fetch(`${API_URL}/project-products/import-excel`, { method: "POST", headers: h, body: fd }).then(r => r.json());
+                    if (r.ok) { setMsg(`✅ ${r.imported} productos importados desde ${file.name}`); loadAll(); }
+                    else setMsg("❌ " + r.message);
+                    setImportingExcel(false);
+                    if (importRef.current) importRef.current.value = "";
+                  }} />
+                  <button onClick={() => importRef.current?.click()} disabled={importingExcel} style={{ width: "100%", padding: "11px 0", backgroundColor: C.info, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: importingExcel ? "not-allowed" : "pointer", opacity: importingExcel ? 0.6 : 1, marginBottom: 16 }}>
+                    {importingExcel ? "Importando..." : "📥 Importar Excel del contrato"}
+                  </button>
                   {projectProducts.length === 0 && <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>Sin productos en el catálogo todavía.</div>}
                   {projectProducts.map(p => (
                     <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", backgroundColor: C.bg, borderRadius: 8, marginBottom: 6, fontSize: 12 }}>
