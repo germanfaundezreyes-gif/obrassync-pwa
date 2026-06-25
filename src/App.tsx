@@ -2135,7 +2135,7 @@ function BookmarkletRenewer({ apiUrl, token, onRenewed }: { apiUrl: string; toke
     const r = await fetch(`${apiUrl}/nubox/renew-code`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }).then(r => r.json());
     if (!r.ok) return;
     setCode(r.code);
-    const script = `javascript:(function(){var t=localStorage.getItem('token');var c=localStorage.getItem('company');if(!t){alert('Inicia sesión en Nubox primero');return;}fetch('${apiUrl}/nubox/renew',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:'${r.code}',jwtToken:t,nuboxCompanyId:c||undefined})}).then(r=>r.json()).then(d=>{if(d.ok){alert('✅ Token Nubox renovado en ObrasSync');}else{alert('❌ '+d.message);}}).catch(()=>alert('❌ Error de conexión'));})();`;
+    const script = `javascript:(function(){var t=localStorage.getItem('token')||localStorage.getItem('pyme_token');var c=localStorage.getItem('companyId')||localStorage.getItem('company');if(!t){alert('No se encontró token. Asegúrate de estar en pyme.nubox.com con sesión activa.');return;}fetch('${apiUrl}/nubox/renew',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:'${r.code}',jwtToken:t,nuboxCompanyId:c||undefined})}).then(r=>r.json()).then(d=>{if(d.ok){alert('✅ Token Nubox renovado en ObrasSync');}else{alert('❌ '+d.message);}}).catch(()=>alert('❌ Error de conexión'));})();`;
     setBookmarklet(script);
     setStep("ready");
     // Polling: esperar que el backend confirme renovación
