@@ -2298,12 +2298,12 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
       let cotServices = null, cotMaterials = null;
       if (bp.payloadServices) {
         const rs = await fetch(bp.nuboxUrl, { method: "POST", headers: nuboxHdrs, body: JSON.stringify(bp.payloadServices) }).then(r => r.json());
-        if (!rs.id && !rs.folio) throw new Error("Error al crear COT servicios: " + JSON.stringify(rs).slice(0, 150));
+        if (!rs.id && !rs.folio) throw new Error("Error COT servicios: " + JSON.stringify(rs?.errors || rs, null, 0));
         cotServices = rs;
       }
       if (bp.payloadMaterials) {
         const rm = await fetch(bp.nuboxUrl, { method: "POST", headers: nuboxHdrs, body: JSON.stringify(bp.payloadMaterials) }).then(r => r.json());
-        if (!rm.id && !rm.folio) throw new Error("Error al crear COT materiales: " + JSON.stringify(rm).slice(0, 150));
+        if (!rm.id && !rm.folio) throw new Error("Error COT materiales: " + JSON.stringify(rm?.errors || rm, null, 0));
         cotMaterials = rm;
       }
 
