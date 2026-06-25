@@ -13,7 +13,6 @@ const C = {
 
 type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones";
 type Quotation = { id: string; client_name?: string; client_rut?: string; reference?: string; status: string; nubox_doc_number_services?: string; nubox_doc_number_materials?: string; total_services: number; total_materials: number; source_type: string; created_at: string; created_by_name?: string };
-type NuboxProduct = { id: string; nubox_id: number; name: string; unit: string; price_neto: number; product_type: string };
 type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
 type AIItem = { nubox_id: number | null; name: string; unit: string; quantity: number; price_neto: number; is_new: boolean };
 type Project = { id: string; code: string; name: string; client_name?: string; start_date?: string; end_date?: string; progress_percent?: number };
@@ -2237,7 +2236,7 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
 
       {/* Tabs */}
       <div style={{ display: "flex", backgroundColor: C.card, borderBottom: `1px solid ${C.border}` }}>
-        {(["lista", "nueva", ...(isAdmin ? ["config"] : [])] as const).map(t => (
+        {(["lista", "nueva", ...(isAdmin ? ["config"] : [])] as ("lista" | "nueva" | "config")[]).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "12px 0", border: "none", background: "none", cursor: "pointer", fontSize: 13, fontWeight: tab === t ? 700 : 400, color: tab === t ? C.orange : C.muted, borderBottom: tab === t ? `2px solid ${C.orange}` : "2px solid transparent" }}>
             {t === "lista" ? "Historial" : t === "nueva" ? "+ Nueva" : "⚙️ Config"}
           </button>
