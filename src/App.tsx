@@ -2125,6 +2125,65 @@ export default function App() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // COTIZACIONES SCREEN
 // ═══════════════════════════════════════════════════════════════════════════════
+function BookmarkletRenewer({ apiUrl, token, onRenewed }: { apiUrl: string; token: string; onRenewed: () => void }) {
+  const [step, setStep] = useState<"idle" | "ready" | "waiting" | "done">("idle");
+  const [, setCode] = useState("");
+  const [bookmarklet, setBookmarklet] = useState("");
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  async function startRenewal() {
+    const r = await fetch(`${apiUrl}/nubox/renew-code`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }).then(r => r.json());
+    if (!r.ok) return;
+    setCode(r.code);
+    const script = `javascript:(function(){var t=localStorage.getItem('token');var c=localStorage.getItem('company');if(!t){alert('Inicia sesión en Nubox primero');return;}fetch('${apiUrl}/nubox/renew',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:'${r.code}',jwtToken:t,nuboxCompanyId:c||undefined})}).then(r=>r.json()).then(d=>{if(d.ok){alert('✅ Token Nubox renovado en ObrasSync');}else{alert('❌ '+d.message);}}).catch(()=>alert('❌ Error de conexión'));})();`;
+    setBookmarklet(script);
+    setStep("ready");
+    // Polling: esperar que el backend confirme renovación
+    pollRef.current = setInterval(async () => {
+      const s = await fetch(`${apiUrl}/nubox/session-status`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).catch(() => null);
+      if (s?.connected && s?.tokenValid) {
+        clearInterval(pollRef.current!);
+        setStep("done");
+        onRenewed();
+      }
+    }, 3000);
+    setTimeout(() => { clearInterval(pollRef.current!); if (step === "waiting") setStep("idle"); }, 10 * 60 * 1000);
+  }
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      {step === "idle" && (
+        <button onClick={startRenewal} style={{ width: "100%", backgroundColor: "#22c55e", color: "#fff", border: "none", borderRadius: 10, padding: "14px 0", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+          🔄 Renovar token Nubox automáticamente
+        </button>
+      )}
+      {step === "ready" && (
+        <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: "#15803d" }}>2 pasos para renovar:</div>
+          <div style={{ fontSize: 13, color: "#166534", marginBottom: 10 }}>
+            <b>1.</b> Arrastra este botón a tu barra de favoritos:
+          </div>
+          <a href={bookmarklet} style={{ display: "inline-block", backgroundColor: "#f97316", color: "#fff", padding: "8px 16px", borderRadius: 8, fontWeight: 700, fontSize: 13, textDecoration: "none", marginBottom: 12 }}
+            onClick={e => { e.preventDefault(); alert("Arrastra este botón a tu barra de favoritos (no hagas clic aquí)"); }}>
+            🔑 Renovar Nubox
+          </a>
+          <div style={{ fontSize: 13, color: "#166534", marginBottom: 10 }}>
+            <b>2.</b> Ve a <a href="https://pyme.nubox.com" target="_blank" rel="noreferrer" style={{ color: "#f97316" }}>pyme.nubox.com</a>, inicia sesión, y haz clic en ese favorito.
+          </div>
+          <div style={{ fontSize: 11, color: "#166534", opacity: 0.7 }}>Esperando renovación... (válido 10 min)</div>
+          <button onClick={() => { clearInterval(pollRef.current!); setStep("idle"); }} style={{ marginTop: 8, background: "none", border: "none", color: "#6b7280", fontSize: 12, cursor: "pointer" }}>Cancelar</button>
+        </div>
+      )}
+      {step === "done" && (
+        <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: 14, textAlign: "center" }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#15803d" }}>✅ Token Nubox renovado exitosamente</div>
+          <button onClick={() => setStep("idle")} style={{ marginTop: 8, background: "none", border: "none", color: "#6b7280", fontSize: 12, cursor: "pointer" }}>Renovar de nuevo</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolean }) {
   const [tab, setTab] = useState<"lista" | "nueva" | "config">("lista");
   const [quotations, setQuotations] = useState<Quotation[]>([]);
@@ -2417,24 +2476,22 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
                   No conectado
                 </div>
               )}
-              <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>
-                El token JWT dura ~23h. Cuando expire, ObrasSync te avisará para que lo renueves copiando uno nuevo desde pyme.nubox.com.
-              </div>
-              <div style={{ backgroundColor: C.infoDim, borderRadius: 8, padding: 12, marginBottom: 12, fontSize: 12, color: C.info }}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>Cómo obtener los datos (una vez):</div>
-                <div>1. Entra a <b>pyme.nubox.com</b> en Chrome y loguéate</div>
-                <div>2. Abre DevTools → Consola (F12)</div>
-                <div>3. Token: <code style={{ background: "#fff", padding: "1px 4px", borderRadius: 3 }}>localStorage.getItem('token')</code></div>
-                <div style={{ marginTop: 4 }}>4. Company ID: <code style={{ background: "#fff", padding: "1px 4px", borderRadius: 3 }}>localStorage.getItem('company')</code></div>
-                <div style={{ marginTop: 4, color: C.muted }}>Copia cada valor (sin las comillas) y pégalo abajo</div>
-              </div>
-              <textarea value={nuboxJwt} onChange={e => setNuboxJwt(e.target.value)} placeholder="Token JWT (empieza con eyJ...)"
-                rows={4} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 11, marginBottom: 8, boxSizing: "border-box", fontFamily: "monospace", resize: "none" }} />
-              <input value={nuboxCompanyId} onChange={e => setNuboxCompanyId(e.target.value)} placeholder="Company ID de Nubox (requerido)"
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, marginBottom: 10, boxSizing: "border-box" }} />
-              <button onClick={connectNubox} disabled={connecting} style={{ width: "100%", backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 10, padding: "12px 0", fontSize: 14, fontWeight: 700, cursor: connecting ? "not-allowed" : "pointer", opacity: connecting ? 0.7 : 1 }}>
-                {connecting ? "Conectando..." : nuboxStatus?.connected ? "Actualizar credenciales" : "Conectar Nubox"}
-              </button>
+              {/* Renovación automática con bookmarklet */}
+              <BookmarkletRenewer apiUrl={API_URL} token={token} onRenewed={() => { setMsg("✅ Token Nubox renovado"); loadAll(); }} />
+
+              {/* Conexión manual como respaldo */}
+              <details style={{ marginTop: 12 }}>
+                <summary style={{ fontSize: 13, color: C.muted, cursor: "pointer" }}>Conectar manualmente (alternativa)</summary>
+                <div style={{ marginTop: 10 }}>
+                  <textarea value={nuboxJwt} onChange={e => setNuboxJwt(e.target.value)} placeholder="Token JWT (empieza con eyJ...)"
+                    rows={3} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 11, marginBottom: 8, boxSizing: "border-box", fontFamily: "monospace", resize: "none" }} />
+                  <input value={nuboxCompanyId} onChange={e => setNuboxCompanyId(e.target.value)} placeholder="Company ID (900f9337-...)"
+                    style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, marginBottom: 10, boxSizing: "border-box" }} />
+                  <button onClick={connectNubox} disabled={connecting} style={{ width: "100%", backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 10, padding: "12px 0", fontSize: 14, fontWeight: 700, cursor: connecting ? "not-allowed" : "pointer", opacity: connecting ? 0.7 : 1 }}>
+                    {connecting ? "Conectando..." : nuboxStatus?.connected ? "Actualizar token" : "Conectar Nubox"}
+                  </button>
+                </div>
+              </details>
             </div>
 
             <div style={{ backgroundColor: C.card, borderRadius: 10, padding: 16, border: `1px solid ${C.border}` }}>
