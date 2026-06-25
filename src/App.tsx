@@ -2415,7 +2415,7 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
               <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>
                 Ingresa las mismas credenciales que usas para entrar a pyme.nubox.com. ObrasSync las guarda de forma segura y renueva el token automáticamente cada 23 horas.
               </div>
-              <input value={nuboxEmail} onChange={e => setNuboxEmail(e.target.value)} placeholder="Email de Nubox" type="email"
+              <input value={nuboxEmail} onChange={e => setNuboxEmail(e.target.value)} placeholder="RUT o email de Nubox (ej: 12345678-9)" type="text"
                 style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 14, marginBottom: 8, boxSizing: "border-box" }} />
               <input value={nuboxPassword} onChange={e => setNuboxPassword(e.target.value)} placeholder="Contraseña de Nubox" type="password"
                 style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 14, marginBottom: 8, boxSizing: "border-box" }} />
