@@ -2136,6 +2136,10 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
   const [syncing, setSyncing] = useState(false);
   const [productCount, setProductCount] = useState(0);
   const [msg, setMsg] = useState("");
+  const [nuboxClients, setNuboxClients] = useState<{ id: string; rut: string; name: string; nubox_id: number }[]>([]);
+  const [newClientRut, setNewClientRut] = useState("");
+  const [newClientName, setNewClientName] = useState("");
+  const [newClientNuboxId, setNewClientNuboxId] = useState("");
   // Nueva cotización con IA
   const [uploadText, setUploadText] = useState("");
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
@@ -2152,14 +2156,16 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
   async function loadAll() {
     setLoading(true);
     try {
-      const [qRes, statusRes, prodRes] = await Promise.all([
+      const [qRes, statusRes, prodRes, clientsRes] = await Promise.all([
         fetch(`${API_URL}/quotations`, { headers: h }).then(r => r.json()),
         fetch(`${API_URL}/nubox/session-status`, { headers: h }).then(r => r.json()),
         fetch(`${API_URL}/nubox/products`, { headers: h }).then(r => r.json()),
+        fetch(`${API_URL}/nubox/clients`, { headers: h }).then(r => r.json()),
       ]);
       if (qRes.ok) setQuotations(qRes.quotations || []);
       if (statusRes.ok) setNuboxStatus(statusRes);
       if (prodRes.ok) setProductCount(prodRes.products?.length || 0);
+      if (clientsRes.ok) setNuboxClients(clientsRes.clients || []);
     } catch (_) {}
     setLoading(false);
   }
@@ -2439,6 +2445,34 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
               <button onClick={syncProducts} disabled={syncing || !nuboxStatus?.connected} style={{ width: "100%", backgroundColor: C.info, color: "#fff", border: "none", borderRadius: 10, padding: "12px 0", fontSize: 14, fontWeight: 700, cursor: syncing ? "not-allowed" : "pointer", opacity: (syncing || !nuboxStatus?.connected) ? 0.6 : 1 }}>
                 {syncing ? "Sincronizando..." : "🔄 Sincronizar productos desde Nubox"}
               </button>
+
+              {/* Clientes Nubox */}
+              <div style={{ marginTop: 24, fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 8 }}>Clientes Nubox registrados</div>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>
+                Para crear cotizaciones, el cliente debe estar registrado en Nubox. Agrega su RUT y el ID de Nubox (URL: pyme.nubox.com/clientes/ver/<b>ID</b>).
+              </div>
+              {nuboxClients.map(c => (
+                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", backgroundColor: C.bg, borderRadius: 8, marginBottom: 6, fontSize: 13 }}>
+                  <div style={{ flex: 1 }}><b>{c.name || c.rut}</b> · RUT {c.rut} · ID {c.nubox_id}</div>
+                  <button onClick={async () => {
+                    await fetch(`${API_URL}/nubox/clients/${c.id}`, { method: "DELETE", headers: h });
+                    loadAll();
+                  }} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 16 }}>✕</button>
+                </div>
+              ))}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                <input value={newClientRut} onChange={e => setNewClientRut(e.target.value)} placeholder="RUT cliente (ej: 70954200-1)" style={{ padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, backgroundColor: C.bg, color: C.text }} />
+                <input value={newClientName} onChange={e => setNewClientName(e.target.value)} placeholder="Nombre (ej: Corporación Municipal de Lampa)" style={{ padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, backgroundColor: C.bg, color: C.text }} />
+                <input value={newClientNuboxId} onChange={e => setNewClientNuboxId(e.target.value)} placeholder="ID Nubox (de la URL /clientes/ver/ID)" style={{ padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, backgroundColor: C.bg, color: C.text }} />
+                <button onClick={async () => {
+                  if (!newClientRut || !newClientNuboxId) return setMsg("RUT e ID Nubox son obligatorios");
+                  const r = await fetch(`${API_URL}/nubox/clients`, { method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify({ rut: newClientRut, name: newClientName, nuboxId: newClientNuboxId }) }).then(r => r.json());
+                  if (r.ok) { setMsg("✅ Cliente registrado"); setNewClientRut(""); setNewClientName(""); setNewClientNuboxId(""); loadAll(); }
+                  else setMsg("❌ " + r.message);
+                }} style={{ padding: "10px 0", backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                  + Agregar cliente
+                </button>
+              </div>
             </div>
           </div>
         )}
