@@ -2415,15 +2415,16 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
                 El token JWT dura ~23h. Cuando expire, ObrasSync te avisará para que lo renueves copiando uno nuevo desde pyme.nubox.com.
               </div>
               <div style={{ backgroundColor: C.infoDim, borderRadius: 8, padding: 12, marginBottom: 12, fontSize: 12, color: C.info }}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>Cómo obtener el token (una vez):</div>
-                <div>1. Entra a <b>pyme.nubox.com</b> en Chrome</div>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Cómo obtener los datos (una vez):</div>
+                <div>1. Entra a <b>pyme.nubox.com</b> en Chrome y loguéate</div>
                 <div>2. Abre DevTools → Consola (F12)</div>
-                <div>3. Escribe: <code style={{ background: "#fff", padding: "1px 4px", borderRadius: 3 }}>localStorage.getItem('token')</code></div>
-                <div>4. Copia el valor y pégalo abajo</div>
+                <div>3. Token: <code style={{ background: "#fff", padding: "1px 4px", borderRadius: 3 }}>localStorage.getItem('token')</code></div>
+                <div style={{ marginTop: 4 }}>4. Company ID: <code style={{ background: "#fff", padding: "1px 4px", borderRadius: 3 }}>localStorage.getItem('company')</code></div>
+                <div style={{ marginTop: 4, color: C.muted }}>Copia cada valor (sin las comillas) y pégalo abajo</div>
               </div>
-              <textarea value={nuboxJwt} onChange={e => setNuboxJwt(e.target.value)} placeholder="Pega aquí el token JWT de Nubox..."
+              <textarea value={nuboxJwt} onChange={e => setNuboxJwt(e.target.value)} placeholder="Token JWT (empieza con eyJ...)"
                 rows={4} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 11, marginBottom: 8, boxSizing: "border-box", fontFamily: "monospace", resize: "none" }} />
-              <input value={nuboxCompanyId} onChange={e => setNuboxCompanyId(e.target.value)} placeholder="Company ID (opcional, se detecta automáticamente)"
+              <input value={nuboxCompanyId} onChange={e => setNuboxCompanyId(e.target.value)} placeholder="Company ID de Nubox (requerido)"
                 style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, marginBottom: 10, boxSizing: "border-box" }} />
               <button onClick={connectNubox} disabled={connecting} style={{ width: "100%", backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 10, padding: "12px 0", fontSize: 14, fontWeight: 700, cursor: connecting ? "not-allowed" : "pointer", opacity: connecting ? 0.7 : 1 }}>
                 {connecting ? "Conectando..." : nuboxStatus?.connected ? "Actualizar credenciales" : "Conectar Nubox"}
