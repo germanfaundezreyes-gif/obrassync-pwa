@@ -11,7 +11,11 @@ const C = {
   info: "#2563EB", infoDim: "#EFF6FF", purple: "#7C3AED", purpleDim: "#F5F3FF",
 };
 
-type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos";
+type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones";
+type Quotation = { id: string; client_name?: string; client_rut?: string; reference?: string; status: string; nubox_doc_number_services?: string; nubox_doc_number_materials?: string; total_services: number; total_materials: number; source_type: string; created_at: string; created_by_name?: string };
+type NuboxProduct = { id: string; nubox_id: number; name: string; unit: string; price_neto: number; product_type: string };
+type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
+type AIItem = { nubox_id: number | null; name: string; unit: string; quantity: number; price_neto: number; is_new: boolean };
 type Project = { id: string; code: string; name: string; client_name?: string; start_date?: string; end_date?: string; progress_percent?: number };
 type Task = { id: string; name: string; duration?: string; start_date?: string; end_date?: string; progress_percent?: number; status?: string; photo_count?: number; unit?: string; quantity?: string; codigo?: string; esquema?: string };
 type TaskPhoto = { id: string; filename: string; local_path?: string; onedrive_url?: string; created_at: string; description?: string; photo_type?: string };
@@ -43,6 +47,7 @@ const PERMISSIONS = [
   { key: "kpis", label: "KPIs inicio", sub: "Ver métricas en el dashboard", icon: "📊" },
   { key: "montos", label: "Ver montos", sub: "Ver cifras y montos de dinero", icon: "💰" },
   { key: "gastos", label: "Módulo Gastos", sub: "Ver y registrar gastos", icon: "💳" },
+  { key: "cotizaciones", label: "Cotizaciones", sub: "Crear y ver cotizaciones en Nubox", icon: "📋" },
   { key: "admin", label: "Administración", sub: "Gestionar usuarios y permisos", icon: "👤" },
 ];
 
@@ -246,6 +251,7 @@ export default function App() {
   const canSeeMontos = canSee("montos");
   const canSeeGastos = canSee("gastos");
   const canSeeReports = canSee("reports");
+  const canSeeCotizaciones = canSee("cotizaciones");
 
   useEffect(() => { if (token) { loadProjects(); loadKpis(); if (isAdmin) { loadUsers(); loadCostCenters(); } } }, [token]);
   useEffect(() => { if (selectedProject && token) loadTasks(selectedProject.id); }, [selectedProject]);
@@ -2085,6 +2091,9 @@ export default function App() {
         </>
       )}
 
+      {/* ── PANTALLA COTIZACIONES ─────────────────────────────────────────────── */}
+      {screen === "cotizaciones" && <CotizacionesScreen token={token} isAdmin={isAdmin} />}
+
       {/* Nav inferior */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: C.card, borderTop: `0.5px solid ${C.border}`, display: "flex", padding: "6px 0 14px", zIndex: 100 }}>
         {([
@@ -2092,6 +2101,7 @@ export default function App() {
           { sc: "proyectos" as Screen, icon: <FolderOpen size={19} />, label: "Proyectos" },
           { sc: "crearProyecto" as Screen, icon: null, label: "Crear" },
           ...(canSeeGastos ? [{ sc: "gastos" as Screen, icon: <DollarSign size={19} />, label: "Gastos" }] : []),
+          ...(canSeeCotizaciones ? [{ sc: "cotizaciones" as Screen, icon: <FileText size={19} />, label: "Cotizar" }] : []),
           ...(isAdmin ? [{ sc: "admin" as Screen, icon: <Shield size={19} />, label: "Admin" }] : []),
           { sc: "configuracion" as Screen, icon: <Av name={userName} size={20} />, label: "Perfil" },
         ] as { sc: Screen; icon: React.ReactNode; label: string }[]).map(({ sc, icon, label }) => {
@@ -2108,6 +2118,326 @@ export default function App() {
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COTIZACIONES SCREEN
+// ═══════════════════════════════════════════════════════════════════════════════
+function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolean }) {
+  const [tab, setTab] = useState<"lista" | "nueva" | "config">("lista");
+  const [quotations, setQuotations] = useState<Quotation[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [nuboxStatus, setNuboxStatus] = useState<{ connected: boolean; email?: string; tokenValid?: boolean } | null>(null);
+  const [nuboxEmail, setNuboxEmail] = useState("");
+  const [nuboxPassword, setNuboxPassword] = useState("");
+  const [nuboxCompanyId, setNuboxCompanyId] = useState("");
+  const [connecting, setConnecting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [productCount, setProductCount] = useState(0);
+  const [msg, setMsg] = useState("");
+  // Nueva cotización con IA
+  const [uploadText, setUploadText] = useState("");
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [processing, setProcessing] = useState(false);
+  const [aiResult, setAiResult] = useState<AIQuotationResult | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [createResult, setCreateResult] = useState<{ cotServices?: { number: string }; cotMaterials?: { number: string }; newProductsCreated?: string[] } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const h = { Authorization: `Bearer ${token}` };
+
+  useEffect(() => { loadAll(); }, []);
+
+  async function loadAll() {
+    setLoading(true);
+    try {
+      const [qRes, statusRes, prodRes] = await Promise.all([
+        fetch(`${API_URL}/quotations`, { headers: h }).then(r => r.json()),
+        fetch(`${API_URL}/nubox/session-status`, { headers: h }).then(r => r.json()),
+        fetch(`${API_URL}/nubox/products`, { headers: h }).then(r => r.json()),
+      ]);
+      if (qRes.ok) setQuotations(qRes.quotations || []);
+      if (statusRes.ok) setNuboxStatus(statusRes);
+      if (prodRes.ok) setProductCount(prodRes.products?.length || 0);
+    } catch (_) {}
+    setLoading(false);
+  }
+
+  async function connectNubox() {
+    if (!nuboxEmail || !nuboxPassword) return setMsg("Ingresa email y contraseña de Nubox");
+    setConnecting(true); setMsg("");
+    try {
+      const r = await fetch(`${API_URL}/nubox/connect`, {
+        method: "POST", headers: { ...h, "Content-Type": "application/json" },
+        body: JSON.stringify({ email: nuboxEmail, password: nuboxPassword, nuboxCompanyId: nuboxCompanyId || undefined }),
+      }).then(r => r.json());
+      if (r.ok) { setMsg("✅ Nubox conectado correctamente"); setNuboxPassword(""); loadAll(); }
+      else setMsg("❌ " + r.message);
+    } catch (_) { setMsg("❌ Error de conexión"); }
+    setConnecting(false);
+  }
+
+  async function syncProducts() {
+    setSyncing(true); setMsg("");
+    try {
+      const r = await fetch(`${API_URL}/nubox/products/sync`, { method: "POST", headers: h }).then(r => r.json());
+      if (r.ok) { setMsg(`✅ ${r.synced} productos sincronizados desde Nubox`); loadAll(); }
+      else setMsg("❌ " + r.message);
+    } catch (_) { setMsg("❌ Error al sincronizar"); }
+    setSyncing(false);
+  }
+
+  async function processOT() {
+    if (!uploadText && uploadFiles.length === 0) return setMsg("Sube un archivo o pega el texto de la OT");
+    setProcessing(true); setMsg(""); setAiResult(null);
+    try {
+      const fd = new FormData();
+      if (uploadText) fd.append("text", uploadText);
+      uploadFiles.forEach(f => fd.append("files", f));
+      const r = await fetch(`${API_URL}/quotations/process`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd }).then(r => r.json());
+      if (r.ok) { setAiResult(r.result); setMsg(""); }
+      else setMsg("❌ " + r.message);
+    } catch (_) { setMsg("❌ Error al procesar"); }
+    setProcessing(false);
+  }
+
+  async function createQuotations() {
+    if (!aiResult) return;
+    setCreating(true); setMsg("");
+    try {
+      const r = await fetch(`${API_URL}/quotations/create`, {
+        method: "POST", headers: { ...h, "Content-Type": "application/json" },
+        body: JSON.stringify({ aiResult }),
+      }).then(r => r.json());
+      if (r.ok) {
+        setCreateResult(r);
+        setAiResult(null); setUploadText(""); setUploadFiles([]);
+        loadAll(); setTab("lista");
+      } else setMsg("❌ " + r.message);
+    } catch (_) { setMsg("❌ Error al crear"); }
+    setCreating(false);
+  }
+
+  const fmtCLP = (n: number) => new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", minimumFractionDigits: 0 }).format(n);
+  const statusColor = (s: string) => s === "created" ? C.info : s === "sent" ? C.orange : s === "approved" ? C.success : C.muted;
+  const statusLabel = (s: string) => ({ created: "Creada", sent: "Enviada", approved: "Aprobada", rejected: "Rechazada" }[s] || s);
+
+  return (
+    <div style={{ minHeight: "100vh", backgroundColor: C.bg, paddingBottom: 80 }}>
+      {/* Header */}
+      <div style={{ backgroundColor: C.orange, padding: "52px 20px 16px", color: "#fff" }}>
+        <div style={{ fontSize: 20, fontWeight: 700 }}>Cotizaciones</div>
+        <div style={{ fontSize: 12, opacity: 0.85 }}>
+          {nuboxStatus?.connected ? `✅ Nubox conectado · ${productCount} productos` : "⚠️ Nubox no conectado"}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", backgroundColor: C.card, borderBottom: `1px solid ${C.border}` }}>
+        {(["lista", "nueva", ...(isAdmin ? ["config"] : [])] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "12px 0", border: "none", background: "none", cursor: "pointer", fontSize: 13, fontWeight: tab === t ? 700 : 400, color: tab === t ? C.orange : C.muted, borderBottom: tab === t ? `2px solid ${C.orange}` : "2px solid transparent" }}>
+            {t === "lista" ? "Historial" : t === "nueva" ? "+ Nueva" : "⚙️ Config"}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ padding: 16 }}>
+        {msg && <div style={{ padding: "10px 14px", borderRadius: 8, backgroundColor: msg.startsWith("✅") ? C.successDim : C.dangerDim, color: msg.startsWith("✅") ? C.success : C.danger, fontSize: 13, marginBottom: 12 }}>{msg}</div>}
+
+        {createResult && (
+          <div style={{ backgroundColor: C.successDim, border: `1px solid ${C.success}`, borderRadius: 10, padding: 14, marginBottom: 12 }}>
+            <div style={{ fontWeight: 700, color: C.success, marginBottom: 6 }}>✅ Cotizaciones creadas en Nubox</div>
+            {createResult.cotServices && <div style={{ fontSize: 13, color: C.text }}>📋 Servicios — COT N°{createResult.cotServices.number}</div>}
+            {createResult.cotMaterials && <div style={{ fontSize: 13, color: C.text }}>🧱 Materiales — COT N°{createResult.cotMaterials.number}</div>}
+            {createResult.newProductsCreated && createResult.newProductsCreated.length > 0 && (
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Productos creados en Nubox: {createResult.newProductsCreated.join(", ")}</div>
+            )}
+            <button onClick={() => setCreateResult(null)} style={{ marginTop: 8, fontSize: 12, color: C.muted, background: "none", border: "none", cursor: "pointer" }}>Cerrar</button>
+          </div>
+        )}
+
+        {/* ── LISTA ── */}
+        {tab === "lista" && (
+          <>
+            {loading ? <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Cargando...</div>
+              : quotations.length === 0 ? (
+                <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>
+                  <div style={{ fontSize: 36, marginBottom: 8 }}>📋</div>
+                  <div>No hay cotizaciones aún</div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>Los emails con "cotización" se procesan automáticamente</div>
+                </div>
+              ) : quotations.map(q => (
+                <div key={q.id} style={{ backgroundColor: C.card, borderRadius: 10, padding: 14, marginBottom: 10, border: `1px solid ${C.border}` }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{q.client_name || "Cliente no detectado"}</div>
+                      <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{q.reference}</div>
+                      <div style={{ fontSize: 11, color: C.mutedSoft, marginTop: 4 }}>
+                        {q.source_type === "email" ? "📧 Email automático" : "📎 Manual"} · {new Date(q.created_at).toLocaleDateString("es-CL")}
+                      </div>
+                    </div>
+                    <span style={{ backgroundColor: statusColor(q.status) + "20", color: statusColor(q.status), borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 600 }}>{statusLabel(q.status)}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                    {q.nubox_doc_number_services && (
+                      <div style={{ flex: 1, backgroundColor: C.infoDim, borderRadius: 6, padding: "6px 10px" }}>
+                        <div style={{ fontSize: 10, color: C.info, fontWeight: 600 }}>SERVICIOS</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>COT-{q.nubox_doc_number_services}</div>
+                        <div style={{ fontSize: 11, color: C.muted }}>{fmtCLP(q.total_services)}</div>
+                      </div>
+                    )}
+                    {q.nubox_doc_number_materials && (
+                      <div style={{ flex: 1, backgroundColor: C.orangeDim, borderRadius: 6, padding: "6px 10px" }}>
+                        <div style={{ fontSize: 10, color: C.orange, fontWeight: 600 }}>MATERIALES</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>COT-{q.nubox_doc_number_materials}</div>
+                        <div style={{ fontSize: 11, color: C.muted }}>{fmtCLP(q.total_materials)}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+          </>
+        )}
+
+        {/* ── NUEVA COT MANUAL ── */}
+        {tab === "nueva" && (
+          <div>
+            {!nuboxStatus?.connected && (
+              <div style={{ backgroundColor: C.dangerDim, border: `1px solid ${C.danger}`, borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 13, color: C.danger }}>
+                ⚠️ Nubox no está conectado. Ve a Configuración para conectarlo.
+              </div>
+            )}
+
+            {!aiResult ? (
+              <>
+                <div style={{ backgroundColor: C.card, borderRadius: 10, padding: 16, marginBottom: 12, border: `1px solid ${C.border}` }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10, color: C.text }}>📎 Subir OT, email o descripción</div>
+                  <textarea
+                    value={uploadText}
+                    onChange={e => setUploadText(e.target.value)}
+                    placeholder="Pega aquí el texto del email o descripción de la OT..."
+                    rows={5}
+                    style={{ width: "100%", padding: 10, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" }}
+                  />
+                  <div style={{ marginTop: 10 }}>
+                    <input ref={fileRef} type="file" multiple accept="image/*,.pdf" style={{ display: "none" }} onChange={e => setUploadFiles(Array.from(e.target.files || []))} />
+                    <button onClick={() => fileRef.current?.click()} style={{ backgroundColor: C.cardAlt, border: `1px dashed ${C.border}`, borderRadius: 8, padding: "10px 16px", width: "100%", cursor: "pointer", fontSize: 13, color: C.muted }}>
+                      📷 Adjuntar fotos o PDF {uploadFiles.length > 0 && `(${uploadFiles.length} archivos)`}
+                    </button>
+                  </div>
+                </div>
+                <button onClick={processOT} disabled={processing} style={{ width: "100%", backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 10, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.7 : 1 }}>
+                  {processing ? "🤖 Analizando con IA..." : "🤖 Analizar y cubicar"}
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={{ backgroundColor: C.card, borderRadius: 10, padding: 14, marginBottom: 12, border: `1px solid ${C.border}` }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 8 }}>Cliente detectado</div>
+                  <div style={{ fontSize: 13, color: C.text }}>{aiResult.client?.name || "—"}</div>
+                  <div style={{ fontSize: 12, color: C.muted }}>{aiResult.client?.rut} · {aiResult.client?.email}</div>
+                  <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{aiResult.reference}</div>
+                </div>
+
+                {aiResult.services?.length > 0 && (
+                  <div style={{ backgroundColor: C.card, borderRadius: 10, padding: 14, marginBottom: 12, border: `1px solid ${C.border}` }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: C.info, marginBottom: 8 }}>📋 Servicios / Mano de obra</div>
+                    {aiResult.services.map((s, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 6, marginBottom: 6, borderBottom: i < aiResult.services.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, color: C.text }}>{s.name}</div>
+                          <div style={{ fontSize: 11, color: C.muted }}>{s.quantity} {s.unit} × {fmtCLP(s.price_neto)}</div>
+                          {s.is_new && <span style={{ fontSize: 10, color: C.orange, fontWeight: 600 }}>✨ Nuevo en Nubox</span>}
+                        </div>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: C.text }}>{fmtCLP(s.quantity * s.price_neto)}</div>
+                      </div>
+                    ))}
+                    <div style={{ textAlign: "right", fontWeight: 700, color: C.info, marginTop: 6 }}>
+                      Neto: {fmtCLP(aiResult.services.reduce((s, i) => s + i.quantity * i.price_neto, 0))}
+                    </div>
+                  </div>
+                )}
+
+                {aiResult.materials?.length > 0 && (
+                  <div style={{ backgroundColor: C.card, borderRadius: 10, padding: 14, marginBottom: 12, border: `1px solid ${C.border}` }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: C.orange, marginBottom: 8 }}>🧱 Materiales e insumos</div>
+                    {aiResult.materials.map((m, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 6, marginBottom: 6, borderBottom: i < aiResult.materials.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, color: C.text }}>{m.name}</div>
+                          <div style={{ fontSize: 11, color: C.muted }}>{m.quantity} {m.unit} × {fmtCLP(m.price_neto)}</div>
+                          {m.is_new && <span style={{ fontSize: 10, color: C.orange, fontWeight: 600 }}>✨ Nuevo en Nubox</span>}
+                        </div>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: C.text }}>{fmtCLP(m.quantity * m.price_neto)}</div>
+                      </div>
+                    ))}
+                    <div style={{ textAlign: "right", fontWeight: 700, color: C.orange, marginTop: 6 }}>
+                      Neto: {fmtCLP(aiResult.materials.reduce((s, i) => s + i.quantity * i.price_neto, 0))}
+                    </div>
+                  </div>
+                )}
+
+                {aiResult.notes && <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>📝 {aiResult.notes}</div>}
+
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={() => setAiResult(null)} style={{ flex: 1, backgroundColor: C.cardAlt, color: C.muted, border: "none", borderRadius: 10, padding: "12px 0", fontSize: 14, cursor: "pointer" }}>
+                    ← Editar
+                  </button>
+                  <button onClick={createQuotations} disabled={creating || !nuboxStatus?.connected} style={{ flex: 2, backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 10, padding: "12px 0", fontSize: 14, fontWeight: 700, cursor: creating ? "not-allowed" : "pointer", opacity: creating ? 0.7 : 1 }}>
+                    {creating ? "Creando en Nubox..." : "✅ Crear en Nubox"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── CONFIG NUBOX ── */}
+        {tab === "config" && isAdmin && (
+          <div>
+            <div style={{ backgroundColor: C.card, borderRadius: 10, padding: 16, marginBottom: 12, border: `1px solid ${C.border}` }}>
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4, color: C.text }}>Conexión Nubox</div>
+              {nuboxStatus?.connected ? (
+                <div style={{ backgroundColor: C.successDim, borderRadius: 8, padding: 10, marginBottom: 12 }}>
+                  <div style={{ color: C.success, fontWeight: 600, fontSize: 13 }}>✅ Conectado</div>
+                  <div style={{ fontSize: 12, color: C.muted }}>{nuboxStatus.email}</div>
+                  <div style={{ fontSize: 11, color: nuboxStatus.tokenValid ? C.success : C.danger, marginTop: 2 }}>
+                    Token: {nuboxStatus.tokenValid ? "Válido (se renueva automáticamente)" : "Expirado — se renovará en el próximo uso"}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ backgroundColor: C.dangerDim, borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 13, color: C.danger }}>
+                  No conectado
+                </div>
+              )}
+              <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>
+                Ingresa las mismas credenciales que usas para entrar a pyme.nubox.com. ObrasSync las guarda de forma segura y renueva el token automáticamente cada 23 horas.
+              </div>
+              <input value={nuboxEmail} onChange={e => setNuboxEmail(e.target.value)} placeholder="Email de Nubox" type="email"
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 14, marginBottom: 8, boxSizing: "border-box" }} />
+              <input value={nuboxPassword} onChange={e => setNuboxPassword(e.target.value)} placeholder="Contraseña de Nubox" type="password"
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 14, marginBottom: 8, boxSizing: "border-box" }} />
+              <input value={nuboxCompanyId} onChange={e => setNuboxCompanyId(e.target.value)} placeholder="Company ID (opcional, se detecta auto)"
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 14, marginBottom: 10, boxSizing: "border-box" }} />
+              <button onClick={connectNubox} disabled={connecting} style={{ width: "100%", backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 10, padding: "12px 0", fontSize: 14, fontWeight: 700, cursor: connecting ? "not-allowed" : "pointer", opacity: connecting ? 0.7 : 1 }}>
+                {connecting ? "Conectando..." : nuboxStatus?.connected ? "Actualizar credenciales" : "Conectar Nubox"}
+              </button>
+            </div>
+
+            <div style={{ backgroundColor: C.card, borderRadius: 10, padding: 16, border: `1px solid ${C.border}` }}>
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4, color: C.text }}>Productos en Nubox</div>
+              <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>
+                {productCount > 0 ? `${productCount} productos sincronizados` : "Sin productos. Sincroniza para que la IA pueda mapear códigos."} La IA usa estos productos para cubicar y crear cotizaciones. El email watcher corre cada 5 minutos.
+              </div>
+              <button onClick={syncProducts} disabled={syncing || !nuboxStatus?.connected} style={{ width: "100%", backgroundColor: C.info, color: "#fff", border: "none", borderRadius: 10, padding: "12px 0", fontSize: 14, fontWeight: 700, cursor: syncing ? "not-allowed" : "pointer", opacity: (syncing || !nuboxStatus?.connected) ? 0.6 : 1 }}>
+                {syncing ? "Sincronizando..." : "🔄 Sincronizar productos desde Nubox"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
