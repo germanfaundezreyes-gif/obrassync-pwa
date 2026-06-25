@@ -2168,7 +2168,10 @@ function BookmarkletRenewer({ apiUrl, token, onRenewed }: { apiUrl: string; toke
             🔑 Renovar Nubox
           </a>
           <div style={{ fontSize: 13, color: "#166534", marginBottom: 10 }}>
-            <b>2.</b> Ve a <a href="https://pyme.nubox.com" target="_blank" rel="noreferrer" style={{ color: "#f97316" }}>pyme.nubox.com</a>, inicia sesión, y haz clic en ese favorito.
+            <b>2.</b> Ve a <a href="https://pyme.nubox.com" target="_blank" rel="noreferrer" style={{ color: "#f97316" }}>pyme.nubox.com</a> (inicia sesión si pide credenciales), y haz clic en el favorito guardado.
+          </div>
+          <div style={{ fontSize: 11, color: "#166534", backgroundColor: "#dcfce7", borderRadius: 6, padding: "6px 10px", marginBottom: 8 }}>
+            💡 Aunque ingreses por web.nubox.com, el token JWT está en pyme.nubox.com — el bookmarklet debe ejecutarse allí.
           </div>
           <div style={{ fontSize: 11, color: "#166534", opacity: 0.7 }}>Esperando renovación... (válido 10 min)</div>
           <button onClick={() => { clearInterval(pollRef.current!); setStep("idle"); }} style={{ marginTop: 8, background: "none", border: "none", color: "#6b7280", fontSize: 12, cursor: "pointer" }}>Cancelar</button>
