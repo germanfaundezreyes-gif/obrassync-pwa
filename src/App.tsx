@@ -2274,16 +2274,43 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
     if (!aiResult) return;
     setCreating(true); setMsg("");
     try {
-      const r = await fetch(`${API_URL}/quotations/create`, {
+      // 1. Pedir al backend los payloads listos (resuelve clientId, items, etc.)
+      const bp = await fetch(`${API_URL}/quotations/build-payloads`, {
         method: "POST", headers: { ...h, "Content-Type": "application/json" },
         body: JSON.stringify({ aiResult }),
+      }).then(r => r.json());
+      if (!bp.ok) { setMsg("❌ " + bp.message); setCreating(false); return; }
+
+      // 2. El browser llama a Nubox directamente (IP residencial, evita bloqueo)
+      const nuboxHdrs = {
+        "Authorization": `Bearer ${bp.nuboxToken}`,
+        "X-Company-Id": bp.nuboxCompanyId,
+        "Content-Type": "application/json",
+        "Origin": "https://pyme.nubox.com",
+      };
+      let cotServices = null, cotMaterials = null;
+      if (bp.payloadServices) {
+        const rs = await fetch(bp.nuboxUrl, { method: "POST", headers: nuboxHdrs, body: JSON.stringify(bp.payloadServices) }).then(r => r.json());
+        if (!rs.id && !rs.folio) throw new Error("Error al crear COT servicios: " + JSON.stringify(rs).slice(0, 150));
+        cotServices = rs;
+      }
+      if (bp.payloadMaterials) {
+        const rm = await fetch(bp.nuboxUrl, { method: "POST", headers: nuboxHdrs, body: JSON.stringify(bp.payloadMaterials) }).then(r => r.json());
+        if (!rm.id && !rm.folio) throw new Error("Error al crear COT materiales: " + JSON.stringify(rm).slice(0, 150));
+        cotMaterials = rm;
+      }
+
+      // 3. Guardar resultado en nuestra BD
+      const r = await fetch(`${API_URL}/quotations/save`, {
+        method: "POST", headers: { ...h, "Content-Type": "application/json" },
+        body: JSON.stringify({ aiResult: bp.aiResult, cotServices, cotMaterials }),
       }).then(r => r.json());
       if (r.ok) {
         setCreateResult(r);
         setAiResult(null); setUploadText(""); setUploadFiles([]);
         loadAll(); setTab("lista");
       } else setMsg("❌ " + r.message);
-    } catch (_) { setMsg("❌ Error al crear"); }
+    } catch (e: unknown) { setMsg("❌ " + (e instanceof Error ? e.message : "Error al crear")); }
     setCreating(false);
   }
 
