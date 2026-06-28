@@ -13,7 +13,6 @@ const C = {
 
 type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones" | "rendiciones";
 type Rendicion = { id: string; worker_name: string; worker_email?: string; date: string; boleta_date?: string; amount: number; vendor: string; description: string; rut_vendor?: string; category: string; image_data?: string; onedrive_url?: string; onedrive_path?: string; cost_center_id?: string; cost_center_name?: string; cost_center_code?: string; tipo?: string; doc_firmado_data?: string; doc_firmado_onedrive_url?: string; reembolso_status?: string; folio?: number; status: string; submitted_at?: string; created_at: string };
-type CostCenter = { id: string; name: string; code?: string; project_name?: string };
 type Quotation = { id: string; client_name?: string; client_rut?: string; reference?: string; status: string; nubox_doc_number_services?: string; nubox_doc_number_materials?: string; total_services: number; total_materials: number; source_type: string; created_at: string; created_by_name?: string };
 type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
 type AIItem = { nubox_id: number | null; name: string; unit: string; quantity: number; price_neto: number; is_new: boolean };
@@ -2686,7 +2685,6 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
   const [editingId, setEditingId] = React.useState<string|null>(null);
   const [editForm, setEditForm] = React.useState<Partial<typeof emptyForm>>({});
   const [attachingId, setAttachingId] = React.useState<string|null>(null);
-  const attachRef = React.useRef<HTMLInputElement>(null);
 
   const loadRendiciones = React.useCallback(async () => {
     setLoading(true);
@@ -2829,7 +2827,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
     return <span style={{ fontSize: 11, backgroundColor: s.bg, color: s.color, padding: "2px 8px", borderRadius: 20, fontWeight: 600 }}>{s.label}</span>;
   }
 
-  const fInp = (label: string, key: keyof typeof emptyForm, val: string, onChange: (v: string) => void, props: any = {}) => (
+  const fInp = (label: string, _key: keyof typeof emptyForm, val: string, onChange: (v: string) => void, props: any = {}) => (
     <div style={{ marginBottom: 10 }}>
       <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>{label}</div>
       <input value={val} onChange={e => onChange(e.target.value)}
