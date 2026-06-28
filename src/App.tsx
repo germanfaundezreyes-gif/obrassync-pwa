@@ -2671,17 +2671,22 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
   // Nueva rendición
   const [scanning, setScanning] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
-  const [submitting, setSubmitting] = React.useState<string|null>(null);
   const [imagePreview, setImagePreview] = React.useState<string|null>(null);
   const [onedriveInfo, setOnedriveInfo] = React.useState<{ url: string|null; path: string|null }>({ url: null, path: null });
+  const [docPreview, setDocPreview] = React.useState<string|null>(null);
   const today = new Date().toISOString().split("T")[0];
-  const [form, setForm] = React.useState({ vendor:"", rut_vendor:"", boleta_date:"", rendicion_date: today, amount:"", description:"", category:"otros", worker_name: userName, cost_center_id:"", tipo:"boleta" });
-  const [docFirmadoPreview, setDocFirmadoPreview] = React.useState<string|null>(null);
-  const [docFirmadoOD, setDocFirmadoOD] = React.useState<{ url: string|null; path: string|null }>({ url: null, path: null });
+  const emptyForm = { vendor:"", rut_vendor:"", boleta_date:"", rendicion_date: today, amount:"", description:"", category:"otros", worker_name: userName, cost_center_id:"" };
+  const [form, setForm] = React.useState(emptyForm);
+  const [formReady, setFormReady] = React.useState(false);
   const [costCenters, setCostCenters] = React.useState<CostCenter[]>([]);
-  const docFirmadoRef = React.useRef<HTMLInputElement>(null);
-  const [savedId, setSavedId] = React.useState<string|null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
+  const docRef = React.useRef<HTMLInputElement>(null);
+  // Historial — expand/edit/attach
+  const [expandedId, setExpandedId] = React.useState<string|null>(null);
+  const [editingId, setEditingId] = React.useState<string|null>(null);
+  const [editForm, setEditForm] = React.useState<Partial<typeof emptyForm>>({});
+  const [attachingId, setAttachingId] = React.useState<string|null>(null);
+  const attachRef = React.useRef<HTMLInputElement>(null);
 
   const loadRendiciones = React.useCallback(async () => {
     setLoading(true);
@@ -2695,12 +2700,13 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
     fetch(`${API_URL}/cost-centers`, { headers: h }).then(r => r.json()).then(r => setCostCenters(r.costCenters || r.cost_centers || [])).catch(() => {});
   }, [loadRendiciones]);
 
-  const showMsg = (m: string) => { setMsg(m); setTimeout(() => setMsg(""), 5000); };
+  const showMsg = (m: string) => { setMsg(m); setTimeout(() => setMsg(""), 6000); };
 
-  async function handleImage(e: React.ChangeEvent<HTMLInputElement>) {
+  // Escanear boleta con IA
+  async function handleBoleta(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setScanning(true); setImagePreview(null); setSavedId(null);
+    setScanning(true); setImagePreview(null); setFormReady(false);
     const fd = new FormData();
     fd.append("image", file);
     try {
@@ -2711,88 +2717,123 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
         setOnedriveInfo({ url: r.onedriveUrl || null, path: r.onedrivePath || null });
         setForm(f => ({
           ...f,
-          vendor: d.vendor || f.vendor,
-          rut_vendor: d.rut_vendor || f.rut_vendor,
-          boleta_date: d.date || f.boleta_date,
-          amount: d.amount ? String(d.amount) : f.amount,
-          description: d.description || f.description,
-          category: d.category || f.category,
+          vendor: d.vendor || "",
+          rut_vendor: d.rut_vendor || "",
+          boleta_date: d.date || "",
+          amount: d.amount ? String(d.amount) : "",
+          description: d.description || "",
+          category: d.category || "otros",
         }));
-        const odMsg = (r.onedriveUrl || r.onedrivePath) ? " · 📁 Guardada en OneDrive" : "";
-        showMsg("✅ Boleta analizada. Revisa y corrige los datos si es necesario." + odMsg);
+        setFormReady(true);
+        showMsg("✅ IA leyó la boleta. Revisa y ajusta los datos.");
       } else { showMsg("❌ " + r.message); }
     } catch { showMsg("❌ Error al analizar la imagen"); }
     setScanning(false);
   }
 
-  async function saveRendicion() {
-    if (!form.amount || !form.vendor) { showMsg("⚠️ Completa al menos proveedor y monto"); return null; }
-    setSaving(true);
-    const body = { ...form, date: form.rendicion_date, amount: parseFloat(form.amount), image_data: imagePreview, onedrive_url: onedriveInfo.url, onedrive_path: onedriveInfo.path, doc_firmado_data: docFirmadoPreview, doc_firmado_onedrive_url: docFirmadoOD.url, doc_firmado_onedrive_path: docFirmadoOD.path };
-    const r = await fetch(`${API_URL}/rendiciones`, { method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json());
-    setSaving(false);
-    if (r.ok) { setSavedId(r.rendicion.id); loadRendiciones(); return r.rendicion.id; }
-    showMsg("❌ " + r.message); return null;
-  }
-
-  async function handleSave() {
-    const id = await saveRendicion();
-    if (id) showMsg("✅ Guardada en OneDrive. Puedes rendirla por correo cuando quieras.");
-  }
-
-  async function handleSaveAndSubmit() {
-    let id = savedId;
-    if (!id) { id = await saveRendicion(); }
-    if (!id) return;
-    setSubmitting(id);
-    const r = await fetch(`${API_URL}/rendiciones/${id}/submit`, { method: "POST", headers: h }).then(r => r.json());
-    setSubmitting(null);
-    if (r.ok) { showMsg("✅ " + r.message); loadRendiciones(); setSavedId(null); setTab("lista"); }
-    else showMsg("❌ " + r.message);
-  }
-
-  async function handleSubmit(id: string) {
-    setSubmitting(id);
-    const r = await fetch(`${API_URL}/rendiciones/${id}/submit`, { method: "POST", headers: h }).then(r => r.json());
-    setSubmitting(null);
-    if (r.ok) { showMsg("✅ " + r.message); loadRendiciones(); }
-    else showMsg("❌ " + r.message);
-  }
-
-  async function handleDocFirmado(e: React.ChangeEvent<HTMLInputElement>) {
+  // Cargar doc rendición (foto o PDF)
+  function handleDoc(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => setDocFirmadoPreview(ev.target?.result as string);
+    reader.onload = ev => { setDocPreview(ev.target?.result as string); showMsg("📄 Documento listo."); };
     reader.readAsDataURL(file);
-    showMsg("📄 Documento firmado cargado.");
   }
 
-  async function handleReembolsar(id: string) {
-    const r = await fetch(`${API_URL}/rendiciones/${id}/reembolsar`, { method: "POST", headers: h }).then(r => r.json());
-    if (r.ok) { showMsg("✅ Reembolso marcado como pagado"); loadRendiciones(); }
+  // Guardar rendición
+  async function handleGuardar() {
+    if (!form.vendor || !form.amount) { showMsg("⚠️ Completa al menos proveedor y monto"); return; }
+    setSaving(true);
+    const body = {
+      ...form,
+      rendicion_date: form.rendicion_date,
+      amount: parseFloat(form.amount),
+      image_data: imagePreview,
+      onedrive_url: onedriveInfo.url,
+      onedrive_path: onedriveInfo.path,
+      doc_firmado_data: docPreview || null,
+    };
+    const r = await fetch(`${API_URL}/rendiciones`, {
+      method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify(body)
+    }).then(r => r.json());
+    setSaving(false);
+    if (r.ok) {
+      const folio = r.rendicion?.folio ? ` (REN-${String(r.rendicion.folio).padStart(4,"0")})` : "";
+      const emailMsg = r.emailSent ? " · 📧 Correo enviado a Paulette" : "";
+      showMsg(`✅ Guardada${folio}${emailMsg}`);
+      loadRendiciones();
+      resetForm();
+      setTab("lista");
+    } else { showMsg("❌ " + r.message); }
+  }
+
+  // Adjuntar doc a rendición existente desde historial
+  async function handleAttachDoc(id: string, e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAttachingId(id);
+    const reader = new FileReader();
+    reader.onload = async ev => {
+      const doc_firmado_data = ev.target?.result as string;
+      const r = await fetch(`${API_URL}/rendiciones/${id}/attach-doc`, {
+        method: "POST", headers: { ...h, "Content-Type": "application/json" },
+        body: JSON.stringify({ doc_firmado_data })
+      }).then(r => r.json());
+      setAttachingId(null);
+      if (r.ok) { showMsg(`✅ Documento adjunto${r.folioStr ? " · " + r.folioStr : ""} · 📧 Correo enviado`); loadRendiciones(); }
+      else showMsg("❌ " + r.message);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // Marcar como pagado
+  async function handlePagado(id: string) {
+    const r = await fetch(`${API_URL}/rendiciones/${id}/marcar-pagado`, { method: "POST", headers: h }).then(r => r.json());
+    if (r.ok) { showMsg("✅ Marcado como pagado"); loadRendiciones(); }
     else showMsg("❌ " + r.message);
   }
 
   async function handleDelete(id: string) {
     if (!confirm("¿Eliminar esta rendición?")) return;
     await fetch(`${API_URL}/rendiciones/${id}`, { method: "DELETE", headers: h });
-    loadRendiciones();
+    loadRendiciones(); setExpandedId(null);
+  }
+
+  async function handleEdit(id: string) {
+    const r = await fetch(`${API_URL}/rendiciones/${id}`, {
+      method: "PUT", headers: { ...h, "Content-Type": "application/json" },
+      body: JSON.stringify({ ...editForm, amount: parseFloat(editForm.amount || "0") })
+    }).then(r => r.json());
+    if (r.ok) { showMsg("✅ Actualizada"); setEditingId(null); loadRendiciones(); }
+    else showMsg("❌ " + r.message);
   }
 
   function resetForm() {
-    setForm({ vendor:"", rut_vendor:"", boleta_date:"", rendicion_date: new Date().toISOString().split("T")[0], amount:"", description:"", category:"otros", worker_name: userName, cost_center_id:"", tipo:"boleta" });
-    setImagePreview(null); setSavedId(null); setOnedriveInfo({ url: null, path: null });
-    setDocFirmadoPreview(null); setDocFirmadoOD({ url: null, path: null });
-    if (docFirmadoRef.current) docFirmadoRef.current.value = "";
+    setForm({ ...emptyForm, rendicion_date: new Date().toISOString().split("T")[0] });
+    setImagePreview(null); setOnedriveInfo({ url: null, path: null });
+    setDocPreview(null); setFormReady(false);
     if (fileRef.current) fileRef.current.value = "";
+    if (docRef.current) docRef.current.value = "";
   }
 
-  const inp = (label: string, key: keyof typeof form, props: any = {}) => (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, fontWeight: 600 }}>{label}</div>
-      <input value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-        style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 14, backgroundColor: C.bg, color: C.text, boxSizing: "border-box" }}
+  // Status badge helper
+  function StatusBadge({ status }: { status: string }) {
+    const cfg: Record<string, { bg: string; color: string; label: string }> = {
+      guardado:       { bg: "#f3f4f6", color: "#374151", label: "💾 Guardado" },
+      pendiente_pago: { bg: "#fef9c3", color: "#854d0e", label: "⏳ Pendiente pago" },
+      pagado:         { bg: "#dcfce7", color: "#15803d", label: "✅ Pagado" },
+      borrador:       { bg: "#f3f4f6", color: "#374151", label: "💾 Guardado" },
+      enviada:        { bg: "#fef9c3", color: "#854d0e", label: "⏳ Pendiente pago" },
+    };
+    const s = cfg[status] || cfg.guardado;
+    return <span style={{ fontSize: 11, backgroundColor: s.bg, color: s.color, padding: "2px 8px", borderRadius: 20, fontWeight: 600 }}>{s.label}</span>;
+  }
+
+  const fInp = (label: string, key: keyof typeof emptyForm, val: string, onChange: (v: string) => void, props: any = {}) => (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>{label}</div>
+      <input value={val} onChange={e => onChange(e.target.value)}
+        style={{ width: "100%", padding: "9px 11px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 14, backgroundColor: C.bg, color: C.text, boxSizing: "border-box" }}
         {...props} />
     </div>
   );
@@ -2807,7 +2848,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
             <button key={t} onClick={() => { setTab(t); if (t === "nueva") resetForm(); }}
               style={{ flex: 1, padding: "10px 0", border: "none", background: "none", fontSize: 13, fontWeight: tab === t ? 700 : 400,
                 color: tab === t ? C.orange : C.muted, borderBottom: tab === t ? `2px solid ${C.orange}` : "2px solid transparent", cursor: "pointer" }}>
-              {t === "lista" ? "📋 Historial" : "📷 Nueva rendición"}
+              {t === "lista" ? "📋 Historial" : "➕ Nueva rendición"}
             </button>
           ))}
         </div>
@@ -2815,10 +2856,10 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
 
       {msg && <div style={{ margin: "12px 16px 0", padding: "10px 14px", backgroundColor: msg.startsWith("✅") ? "#f0fdf4" : msg.startsWith("⚠️") ? "#fffbeb" : "#fef2f2", borderRadius: 8, fontSize: 13, color: msg.startsWith("✅") ? "#15803d" : msg.startsWith("⚠️") ? "#92400e" : "#dc2626" }}>{msg}</div>}
 
-      {/* ── TAB: LISTA ── */}
+      {/* ── TAB: HISTORIAL ── */}
       {tab === "lista" && (
         <div style={{ padding: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <div style={{ fontSize: 13, color: C.muted }}>{rendiciones.length} rendición(es)</div>
             <button onClick={async () => {
                 const r = await fetch(`${API_URL}/rendiciones/excel`, { headers: h });
@@ -2828,212 +2869,256 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                 a.download = `rendiciones_${new Date().toISOString().split("T")[0]}.xlsx`; a.click();
               }}
               style={{ fontSize: 12, backgroundColor: "#16a34a", color: "#fff", padding: "7px 12px", borderRadius: 8, border: "none", fontWeight: 700, cursor: "pointer" }}>
-              📥 Exportar Excel
+              📥 Excel
             </button>
           </div>
-          <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>El Excel incluye todas las rendiciones guardadas hasta ahora, con link a cada foto en OneDrive.</div>
+
           {loading ? <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Cargando...</div> :
-          rendiciones.length === 0 ? <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin rendiciones aún. Usa la pestaña "Nueva rendición".</div> :
-          rendiciones.map(r => (
-            <div key={r.id} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 16 }}>{CAT_ICON[r.category] || "📦"}</span>
-                    <span style={{ fontWeight: 700, fontSize: 14 }}>{r.vendor || "Sin proveedor"}</span>
-                    <span style={{ fontSize: 11, backgroundColor: r.status === "enviada" ? "#dcfce7" : "#fef9c3", color: r.status === "enviada" ? "#15803d" : "#854d0e", padding: "2px 7px", borderRadius: 20, fontWeight: 600 }}>
-                      {r.status === "enviada" ? "✅ Enviada" : "📝 Borrador"}
-                    </span>
-                    {r.tipo === "reembolso" && (
-                      <span style={{ fontSize: 11, backgroundColor: r.reembolso_status === "pagado" ? "#dcfce7" : "#fef3c7", color: r.reembolso_status === "pagado" ? "#15803d" : "#92400e", padding: "2px 7px", borderRadius: 20, fontWeight: 600 }}>
-                        {r.reembolso_status === "pagado" ? "💵 Reembolsado" : "💵 Reembolso pendiente"}
-                      </span>
+          rendiciones.length === 0 ? <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin rendiciones. Toca "Nueva rendición" para comenzar.</div> :
+          rendiciones.map(r => {
+            const isExpanded = expandedId === r.id;
+            const isEditing = editingId === r.id;
+            return (
+              <div key={r.id} style={{ backgroundColor: C.card, border: `0.5px solid ${isExpanded ? C.orange : C.border}`, borderRadius: 14, marginBottom: 10, overflow: "hidden" }}>
+                {/* Card header — tap to expand */}
+                <div onClick={() => { setExpandedId(isExpanded ? null : r.id); setEditingId(null); }} style={{ padding: 14, cursor: "pointer" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 4 }}>
+                        <span style={{ fontSize: 15 }}>{CAT_ICON[r.category] || "📦"}</span>
+                        <span style={{ fontWeight: 700, fontSize: 14 }}>{r.vendor || "Sin proveedor"}</span>
+                        <StatusBadge status={r.status} />
+                        {r.folio && <span style={{ fontSize: 11, color: "#f97316", fontWeight: 700 }}>🔖 REN-{String(r.folio).padStart(4,"0")}</span>}
+                      </div>
+                      <div style={{ fontSize: 20, fontWeight: 800, color: C.orange }}>${Number(r.amount || 0).toLocaleString("es-CL")}</div>
+                      <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>👤 {r.worker_name} · 📅 {r.date ? new Date(r.date + "T12:00:00").toLocaleDateString("es-CL") : "-"}</div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 8, flexShrink: 0 }}>
+                      {r.image_data && <img src={r.image_data} alt="boleta" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.border}` }} />}
+                      <span style={{ color: C.muted, fontSize: 18 }}>{isExpanded ? "▲" : "▼"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Detalle expandido */}
+                {isExpanded && (
+                  <div style={{ borderTop: `0.5px solid ${C.border}`, padding: 14, backgroundColor: C.bg }}>
+                    {!isEditing ? (
+                      <>
+                        {/* Detalles */}
+                        <div style={{ fontSize: 13, display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+                          {r.description && <div><span style={{ color: C.muted }}>Descripción: </span>{r.description}</div>}
+                          {r.rut_vendor && <div><span style={{ color: C.muted }}>RUT proveedor: </span>{r.rut_vendor}</div>}
+                          {r.boleta_date && <div><span style={{ color: C.muted }}>Fecha boleta: </span>{new Date(r.boleta_date + "T12:00:00").toLocaleDateString("es-CL")}</div>}
+                          {r.cost_center_name && <div><span style={{ color: C.muted }}>Centro de costo: </span>{r.cost_center_code ? `[${r.cost_center_code}] ` : ""}{r.cost_center_name}</div>}
+                          {r.submitted_at && <div><span style={{ color: C.muted }}>Correo enviado: </span>{new Date(r.submitted_at).toLocaleDateString("es-CL")}</div>}
+                        </div>
+                        {/* Links OneDrive */}
+                        <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+                          {r.onedrive_url && <a href={r.onedrive_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#0284c7", padding: "5px 10px", backgroundColor: "#f0f9ff", borderRadius: 8 }}>📷 Ver boleta →</a>}
+                          {r.doc_firmado_onedrive_url && <a href={r.doc_firmado_onedrive_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#16a34a", padding: "5px 10px", backgroundColor: "#f0fdf4", borderRadius: 8 }}>📄 Ver doc firmado →</a>}
+                        </div>
+                        {/* Botones de acción */}
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {r.status === "guardado" && (
+                            <>
+                              <label style={{ flex: 1, minWidth: 140, backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "center", display: "block", opacity: attachingId === r.id ? 0.6 : 1 }}>
+                                {attachingId === r.id ? "Subiendo..." : "📄 Adjuntar doc rendición"}
+                                <input type="file" accept="image/*,application/pdf" capture="environment" style={{ display: "none" }}
+                                  onChange={e => handleAttachDoc(r.id, e)} disabled={attachingId === r.id} />
+                              </label>
+                            </>
+                          )}
+                          {r.status === "pendiente_pago" && (
+                            <button onClick={() => handlePagado(r.id)}
+                              style={{ flex: 1, minWidth: 140, backgroundColor: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                              ✅ Marcar pagado
+                            </button>
+                          )}
+                          <button onClick={() => { setEditingId(r.id); setEditForm({ vendor: r.vendor, rut_vendor: r.rut_vendor || "", boleta_date: r.boleta_date || "", rendicion_date: r.date, amount: String(r.amount), description: r.description, category: r.category, cost_center_id: r.cost_center_id || "", worker_name: r.worker_name }); }}
+                            style={{ backgroundColor: "#eff6ff", color: "#1d4ed8", border: "none", borderRadius: 8, padding: "10px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                            ✏️ Editar
+                          </button>
+                          <button onClick={() => handleDelete(r.id)}
+                            style={{ backgroundColor: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 8, padding: "10px 12px", fontSize: 13, cursor: "pointer" }}>
+                            🗑️
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      /* Formulario de edición inline */
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>✏️ Editar rendición</div>
+                        {fInp("Trabajador", "worker_name", editForm.worker_name || "", v => setEditForm(f => ({ ...f, worker_name: v })))}
+                        {fInp("Proveedor", "vendor", editForm.vendor || "", v => setEditForm(f => ({ ...f, vendor: v })))}
+                        {fInp("RUT Proveedor", "rut_vendor", editForm.rut_vendor || "", v => setEditForm(f => ({ ...f, rut_vendor: v })))}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                          <div>
+                            <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>📅 Fecha rendición</div>
+                            <input type="date" value={editForm.rendicion_date || ""} onChange={e => setEditForm(f => ({ ...f, rendicion_date: e.target.value }))}
+                              style={{ width: "100%", padding: "9px 8px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, backgroundColor: C.bg, color: C.text, boxSizing: "border-box" }} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>🧾 Fecha boleta</div>
+                            <input type="date" value={editForm.boleta_date || ""} onChange={e => setEditForm(f => ({ ...f, boleta_date: e.target.value }))}
+                              style={{ width: "100%", padding: "9px 8px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, backgroundColor: C.bg, color: C.text, boxSizing: "border-box" }} />
+                          </div>
+                        </div>
+                        {fInp("Monto ($)", "amount", editForm.amount || "", v => setEditForm(f => ({ ...f, amount: v })), { type: "number" })}
+                        {fInp("Descripción", "description", editForm.description || "", v => setEditForm(f => ({ ...f, description: v })))}
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>Centro de costo</div>
+                          <select value={editForm.cost_center_id || ""} onChange={e => setEditForm(f => ({ ...f, cost_center_id: e.target.value }))}
+                            style={{ width: "100%", padding: "9px 11px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, backgroundColor: C.bg, color: C.text, boxSizing: "border-box" }}>
+                            <option value="">— Sin centro de costo —</option>
+                            {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.code ? `[${cc.code}] ` : ""}{cc.name}</option>)}
+                          </select>
+                        </div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button onClick={() => handleEdit(r.id)} style={{ flex: 1, backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                            💾 Guardar cambios
+                          </button>
+                          <button onClick={() => setEditingId(null)} style={{ backgroundColor: C.bg, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, cursor: "pointer" }}>
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: C.orange }}>${Number(r.amount || 0).toLocaleString("es-CL")}</div>
-                  <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{r.description}</div>
-                  <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
-                    👤 {r.worker_name}
-                  </div>
-                  <div style={{ fontSize: 11, marginTop: 3, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <span style={{ color: C.orange, fontWeight: 600 }}>📅 Rendición: {r.date ? new Date(r.date + "T12:00:00").toLocaleDateString("es-CL") : "-"}</span>
-                    {r.boleta_date && <span style={{ color: C.muted }}>🧾 Boleta: {new Date(r.boleta_date + "T12:00:00").toLocaleDateString("es-CL")}</span>}
-                  </div>
-                  {r.folio && (
-                    <div style={{ fontSize: 12, color: "#f97316", fontWeight: 700, marginTop: 3 }}>
-                      🔖 REN-{String(r.folio).padStart(4, "0")}
-                    </div>
-                  )}
-                  {r.cost_center_name && (
-                    <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>
-                      🏗️ {r.cost_center_code ? `[${r.cost_center_code}] ` : ""}{r.cost_center_name}
-                    </div>
-                  )}
-                  {r.onedrive_url && (
-                    <a href={r.onedrive_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#0284c7", marginTop: 4, display: "block" }}>
-                      📁 Ver foto en OneDrive →
-                    </a>
-                  )}
-                </div>
-                {r.image_data && <img src={r.image_data} alt="boleta" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8, marginLeft: 10, border: `1px solid ${C.border}` }} />}
-              </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                {r.status !== "enviada" && (
-                  <button onClick={() => handleSubmit(r.id)} disabled={submitting === r.id}
-                    style={{ flex: 1, backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 8, padding: "9px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: submitting === r.id ? 0.6 : 1 }}>
-                    {submitting === r.id ? "Enviando..." : "📤 Enviar correo"}
-                  </button>
                 )}
-                {r.tipo === "reembolso" && r.reembolso_status !== "pagado" && (
-                  <button onClick={() => handleReembolsar(r.id)}
-                    style={{ flex: 1, backgroundColor: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "9px 0", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                    💵 Marcar pagado
-                  </button>
-                )}
-                <button onClick={() => handleDelete(r.id)} style={{ backgroundColor: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 8, padding: "9px 12px", fontSize: 13, cursor: "pointer" }}>
-                  🗑️
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {/* ── TAB: NUEVA ── */}
       {tab === "nueva" && (
         <div style={{ padding: 16 }}>
-          {/* Foto boleta */}
-          <div style={{ backgroundColor: C.card, border: `1px dashed ${C.border}`, borderRadius: 14, padding: 16, marginBottom: 16, textAlign: "center" }}>
-            {scanning ? (
-              <div style={{ padding: 20 }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
-                <div style={{ fontSize: 14, color: C.muted }}>Analizando boleta con IA...</div>
-              </div>
-            ) : imagePreview ? (
-              <div>
-                <img src={imagePreview} alt="boleta" style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, objectFit: "contain" }} />
-                {onedriveInfo.path && (
-                  <div style={{ marginTop: 8, padding: "6px 10px", backgroundColor: "#f0f9ff", borderRadius: 8, fontSize: 11, color: "#0369a1", display: "flex", alignItems: "center", gap: 6 }}>
-                    <span>📁</span>
-                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>OneDrive: {onedriveInfo.path}</span>
-                    {onedriveInfo.url && <a href={onedriveInfo.url} target="_blank" rel="noopener noreferrer" style={{ color: "#0284c7", fontWeight: 700, flexShrink: 0 }}>Ver →</a>}
-                  </div>
+
+          {/* ─── Paso 1: Dos botones naranjos ─── */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+            {/* Botón boleta */}
+            <div style={{ position: "relative" }}>
+              <button onClick={() => fileRef.current?.click()}
+                style={{ width: "100%", backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 14, padding: "18px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "center", opacity: scanning ? 0.7 : 1 }}>
+                {scanning ? (
+                  <><div style={{ fontSize: 26, marginBottom: 4 }}>🔍</div><div>Analizando...</div></>
+                ) : imagePreview ? (
+                  <><div style={{ fontSize: 26, marginBottom: 4 }}>✅</div><div>Foto boleta</div><div style={{ fontSize: 10, marginTop: 2, opacity: 0.8 }}>Toca para cambiar</div></>
+                ) : (
+                  <><div style={{ fontSize: 28, marginBottom: 4 }}>📷</div><div>Foto boleta</div><div style={{ fontSize: 10, marginTop: 2, opacity: 0.8 }}>La IA lee los datos</div></>
                 )}
-                <button onClick={() => fileRef.current?.click()} style={{ marginTop: 8, background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer", color: C.muted }}>
-                  Cambiar imagen
-                </button>
-              </div>
-            ) : (
-              <div onClick={() => fileRef.current?.click()} style={{ cursor: "pointer", padding: "10px 0" }}>
-                <div style={{ fontSize: 40, marginBottom: 8 }}>📷</div>
-                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Sacar foto a la boleta</div>
-                <div style={{ fontSize: 12, color: C.muted }}>La IA extraerá los datos automáticamente</div>
-              </div>
-            )}
-            <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handleImage} />
+              </button>
+              <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handleBoleta} />
+            </div>
+
+            {/* Botón doc rendición */}
+            <div style={{ position: "relative" }}>
+              <button onClick={() => docRef.current?.click()}
+                style={{ width: "100%", backgroundColor: docPreview ? "#16a34a" : C.orange, color: "#fff", border: "none", borderRadius: 14, padding: "18px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "center" }}>
+                {docPreview ? (
+                  <><div style={{ fontSize: 26, marginBottom: 4 }}>✅</div><div>Doc rendición</div><div style={{ fontSize: 10, marginTop: 2, opacity: 0.8 }}>Toca para cambiar</div></>
+                ) : (
+                  <><div style={{ fontSize: 28, marginBottom: 4 }}>📄</div><div>Doc rendición</div><div style={{ fontSize: 10, marginTop: 2, opacity: 0.8 }}>Foto o PDF firmado</div></>
+                )}
+              </button>
+              <input ref={docRef} type="file" accept="image/*,application/pdf" capture="environment" style={{ display: "none" }} onChange={handleDoc} />
+            </div>
           </div>
 
-          {/* Documento firmado — solo para reembolso */}
-          {form.tipo === "reembolso" && (
-            <div style={{ backgroundColor: C.card, border: `1px dashed #16a34a`, borderRadius: 14, padding: 16, marginBottom: 14, textAlign: "center" }}>
-              {docFirmadoPreview ? (
-                <div>
-                  <img src={docFirmadoPreview} alt="doc firmado" style={{ maxWidth: "100%", maxHeight: 180, borderRadius: 8, objectFit: "contain" }} />
-                  {docFirmadoOD.path && <div style={{ marginTop: 6, fontSize: 11, color: "#16a34a" }}>📁 OneDrive: {docFirmadoOD.path}</div>}
-                  <button onClick={() => docFirmadoRef.current?.click()} style={{ marginTop: 8, background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer", color: C.muted }}>
-                    Cambiar documento
-                  </button>
-                </div>
-              ) : (
-                <div onClick={() => docFirmadoRef.current?.click()} style={{ cursor: "pointer", padding: "8px 0" }}>
-                  <div style={{ fontSize: 36, marginBottom: 6 }}>📄</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#16a34a", marginBottom: 2 }}>Foto del documento firmado</div>
-                  <div style={{ fontSize: 12, color: C.muted }}>Formulario de rendición firmado por el trabajador</div>
+          {/* Info sobre qué pasará al guardar */}
+          {(imagePreview || docPreview) && (
+            <div style={{ marginBottom: 14, padding: "10px 14px", borderRadius: 10, backgroundColor: docPreview ? "#f0fdf4" : "#fff7ed", border: `1px solid ${docPreview ? "#86efac" : "#fed7aa"}`, fontSize: 12, color: docPreview ? "#15803d" : "#92400e" }}>
+              {docPreview
+                ? "📧 Al guardar: se asignará folio correlativo y se enviará correo a Paulette con el documento adjunto. Estado: Pendiente pago."
+                : "💾 Al guardar: solo se guardará la boleta en OneDrive. Puedes adjuntar el doc firmado después desde el historial. Estado: Guardado."}
+            </div>
+          )}
+
+          {/* Preview miniatura */}
+          {(imagePreview || docPreview) && (
+            <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+              {imagePreview && (
+                <div style={{ textAlign: "center" }}>
+                  <img src={imagePreview} alt="boleta" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.border}` }} />
+                  <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>Boleta</div>
+                  {onedriveInfo.url && <a href={onedriveInfo.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: "#0284c7" }}>OneDrive ↗</a>}
                 </div>
               )}
-              <input ref={docFirmadoRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handleDocFirmado} />
+              {docPreview && (
+                <div style={{ textAlign: "center" }}>
+                  {docPreview.startsWith("data:image") ? (
+                    <img src={docPreview} alt="doc" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, border: `2px solid #16a34a` }} />
+                  ) : (
+                    <div style={{ width: 80, height: 80, borderRadius: 8, border: `2px solid #16a34a`, backgroundColor: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>📄</div>
+                  )}
+                  <div style={{ fontSize: 10, color: "#16a34a", marginTop: 2 }}>Doc firmado</div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Selector tipo de rendición */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-            {[{ v:"boleta", label:"🧾 Boleta empresa", sub:"La empresa paga" }, { v:"reembolso", label:"💵 Reembolso", sub:"El trabajador pagó" }].map(({ v, label, sub }) => (
-              <button key={v} onClick={() => setForm(f => ({ ...f, tipo: v }))}
-                style={{ padding: "12px 8px", borderRadius: 12, border: `2px solid ${form.tipo === v ? C.orange : C.border}`, backgroundColor: form.tipo === v ? "#fff7ed" : C.card, cursor: "pointer", textAlign: "center" }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: form.tipo === v ? C.orange : C.text }}>{label}</div>
-                <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{sub}</div>
-              </button>
-            ))}
-          </div>
+          {/* ─── Paso 2: Formulario (aparece tras scan) ─── */}
+          {formReady && (
+            <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: C.text }}>📝 Revisa y completa los datos</div>
 
-          {form.tipo === "reembolso" && (
-            <div style={{ backgroundColor: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#92400e" }}>
-              💵 El trabajador pagó con dinero propio. Se debe adjuntar la boleta y el documento de rendición firmado para reembolsarle.
+              {fInp("Trabajador", "worker_name", form.worker_name, v => setForm(f => ({ ...f, worker_name: v })))}
+              {fInp("Proveedor *", "vendor", form.vendor, v => setForm(f => ({ ...f, vendor: v })), { placeholder: "Sodimac, Easy, ferretería..." })}
+              {fInp("RUT Proveedor", "rut_vendor", form.rut_vendor, v => setForm(f => ({ ...f, rut_vendor: v })), { placeholder: "76.123.456-7" })}
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>📅 Fecha rendición</div>
+                  <input type="date" value={form.rendicion_date} onChange={e => setForm(f => ({ ...f, rendicion_date: e.target.value }))}
+                    style={{ width: "100%", padding: "9px 8px", borderRadius: 8, border: `2px solid ${C.orange}`, fontSize: 13, backgroundColor: C.bg, color: C.text, boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>🧾 Fecha boleta</div>
+                  <input type="date" value={form.boleta_date} onChange={e => setForm(f => ({ ...f, boleta_date: e.target.value }))}
+                    style={{ width: "100%", padding: "9px 8px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, backgroundColor: C.bg, color: C.text, boxSizing: "border-box" }} />
+                </div>
+              </div>
+
+              {fInp("Monto Total ($) *", "amount", form.amount, v => setForm(f => ({ ...f, amount: v })), { type: "number", placeholder: "0" })}
+              {fInp("Descripción", "description", form.description, v => setForm(f => ({ ...f, description: v })), { placeholder: "¿Qué se compró?" })}
+
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 6, fontWeight: 600 }}>Categoría</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {CATEGORIAS.map(cat => (
+                    <button key={cat} onClick={() => setForm(f => ({ ...f, category: cat }))}
+                      style={{ padding: "5px 10px", borderRadius: 20, border: `1px solid ${form.category === cat ? C.orange : C.border}`, backgroundColor: form.category === cat ? "#fff7ed" : C.bg, color: form.category === cat ? C.orange : C.text, fontSize: 12, cursor: "pointer", fontWeight: form.category === cat ? 700 : 400 }}>
+                      {CAT_ICON[cat]} {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>🏗️ Centro de Costo</div>
+                <select value={form.cost_center_id} onChange={e => setForm(f => ({ ...f, cost_center_id: e.target.value }))}
+                  style={{ width: "100%", padding: "9px 11px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, backgroundColor: C.bg, color: C.text, boxSizing: "border-box" }}>
+                  <option value="">— Sin centro de costo —</option>
+                  {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.code ? `[${cc.code}] ` : ""}{cc.name}{cc.project_name ? ` · ${cc.project_name}` : ""}</option>)}
+                </select>
+              </div>
+
+              <button onClick={handleGuardar} disabled={saving || !form.vendor || !form.amount}
+                style={{ width: "100%", backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 10, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: (saving || !form.vendor || !form.amount) ? 0.5 : 1 }}>
+                {saving ? "Guardando..." : docPreview ? "📤 Guardar y enviar correo" : "💾 Guardar rendición"}
+              </button>
             </div>
           )}
 
-          {/* Formulario */}
-          <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 16 }}>
-            {inp("Trabajador", "worker_name")}
-            {inp("Proveedor / Comercio *", "vendor", { placeholder: "Ej: Sodimac, Easy, ferretería..." })}
-            {inp("RUT Proveedor", "rut_vendor", { placeholder: "Ej: 76.123.456-7" })}
-
-            {/* Fechas */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-              <div>
-                <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, fontWeight: 600 }}>📅 Fecha rendición *</div>
-                <input type="date" value={form.rendicion_date} onChange={e => setForm(f => ({ ...f, rendicion_date: e.target.value }))}
-                  style={{ width: "100%", padding: "10px 10px", borderRadius: 8, border: `2px solid ${C.orange}`, fontSize: 14, backgroundColor: C.bg, color: C.text, boxSizing: "border-box", fontWeight: 600 }} />
-                <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>Día de la rendición</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, fontWeight: 600 }}>🧾 Fecha boleta</div>
-                <input type="date" value={form.boleta_date} onChange={e => setForm(f => ({ ...f, boleta_date: e.target.value }))}
-                  style={{ width: "100%", padding: "10px 10px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 14, backgroundColor: C.bg, color: C.text, boxSizing: "border-box" }} />
-                <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>Leída de la boleta</div>
-              </div>
+          {/* Si no ha escaneado boleta aún, mostrar indicación */}
+          {!imagePreview && !scanning && (
+            <div style={{ textAlign: "center", padding: "20px 0", color: C.muted, fontSize: 13 }}>
+              Toca <strong style={{ color: C.orange }}>📷 Foto boleta</strong> para comenzar.<br/>
+              <span style={{ fontSize: 12 }}>La IA leerá los datos automáticamente.</span>
             </div>
-
-            {inp("Monto Total ($) *", "amount", { type: "number", placeholder: "0", min: "0" })}
-            {inp("Descripción", "description", { placeholder: "¿Qué se compró?" })}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: C.muted, marginBottom: 6, fontWeight: 600 }}>Categoría</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {CATEGORIAS.map(cat => (
-                  <button key={cat} onClick={() => setForm(f => ({ ...f, category: cat }))}
-                    style={{ padding: "6px 12px", borderRadius: 20, border: `1px solid ${form.category === cat ? C.orange : C.border}`, backgroundColor: form.category === cat ? "#fff7ed" : C.bg, color: form.category === cat ? C.orange : C.text, fontSize: 12, cursor: "pointer", fontWeight: form.category === cat ? 700 : 400 }}>
-                    {CAT_ICON[cat]} {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Centro de costo */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, fontWeight: 600 }}>🏗️ Centro de Costo *</div>
-              <select value={form.cost_center_id} onChange={e => setForm(f => ({ ...f, cost_center_id: e.target.value }))}
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `2px solid ${form.cost_center_id ? C.orange : C.border}`, fontSize: 14, backgroundColor: C.bg, color: form.cost_center_id ? C.text : C.muted, boxSizing: "border-box", appearance: "auto" }}>
-                <option value="">— Seleccionar centro de costo —</option>
-                {costCenters.map(cc => (
-                  <option key={cc.id} value={cc.id}>
-                    {cc.code ? `[${cc.code}] ` : ""}{cc.name}{cc.project_name ? ` · ${cc.project_name}` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Botones de acción */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <button onClick={handleSaveAndSubmit} disabled={saving || !!submitting || !form.vendor || !form.amount}
-                style={{ width: "100%", backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 10, padding: "14px 0", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: (saving || !!submitting || !form.vendor || !form.amount) ? 0.5 : 1 }}>
-                {submitting ? "Enviando..." : saving ? "Guardando..." : "📤 Guardar y enviar por correo"}
-              </button>
-              <button onClick={handleSave} disabled={saving || !!submitting || !form.vendor || !form.amount}
-                style={{ width: "100%", backgroundColor: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 10, padding: "13px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", opacity: (saving || !!submitting || !form.vendor || !form.amount) ? 0.5 : 1 }}>
-                {saving ? "Guardando..." : "☁️ Solo guardar en OneDrive"}
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       )}
     </div>
