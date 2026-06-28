@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Shield, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Shield, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle, Receipt } from "lucide-react";
 
 const API_URL = "https://obrassync-backend-production.up.railway.app";
 
@@ -11,7 +11,8 @@ const C = {
   info: "#2563EB", infoDim: "#EFF6FF", purple: "#7C3AED", purpleDim: "#F5F3FF",
 };
 
-type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones";
+type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones" | "rendiciones";
+type Rendicion = { id: string; worker_name: string; worker_email?: string; date: string; amount: number; vendor: string; description: string; rut_vendor?: string; category: string; image_data?: string; status: string; submitted_at?: string; created_at: string };
 type Quotation = { id: string; client_name?: string; client_rut?: string; reference?: string; status: string; nubox_doc_number_services?: string; nubox_doc_number_materials?: string; total_services: number; total_materials: number; source_type: string; created_at: string; created_by_name?: string };
 type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
 type AIItem = { nubox_id: number | null; name: string; unit: string; quantity: number; price_neto: number; is_new: boolean };
@@ -2093,6 +2094,9 @@ export default function App() {
       {/* ── PANTALLA COTIZACIONES ─────────────────────────────────────────────── */}
       {screen === "cotizaciones" && <CotizacionesScreen token={token} isAdmin={isAdmin} />}
 
+      {/* ── PANTALLA RENDICIONES ──────────────────────────────────────────────── */}
+      {screen === "rendiciones" && <RendicionesScreen token={token} userName={userName} />}
+
       {/* Nav inferior */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: C.card, borderTop: `0.5px solid ${C.border}`, display: "flex", padding: "6px 0 14px", zIndex: 100 }}>
         {([
@@ -2101,6 +2105,7 @@ export default function App() {
           { sc: "crearProyecto" as Screen, icon: null, label: "Crear" },
           ...(canSeeGastos ? [{ sc: "gastos" as Screen, icon: <DollarSign size={19} />, label: "Gastos" }] : []),
           ...(canSeeCotizaciones ? [{ sc: "cotizaciones" as Screen, icon: <FileText size={19} />, label: "Cotizar" }] : []),
+          { sc: "rendiciones" as Screen, icon: <Receipt size={19} />, label: "Rendir" },
           ...(isAdmin ? [{ sc: "admin" as Screen, icon: <Shield size={19} />, label: "Admin" }] : []),
           { sc: "configuracion" as Screen, icon: <Av name={userName} size={20} />, label: "Perfil" },
         ] as { sc: Screen; icon: React.ReactNode; label: string }[]).map(({ sc, icon, label }) => {
@@ -2646,6 +2651,235 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// COMPONENTE RENDICIONES
+// ══════════════════════════════════════════════════════════════
+const CATEGORIAS = ["materiales","herramientas","alimentacion","transporte","combustible","servicios","otros"];
+const CAT_ICON: Record<string,string> = { materiales:"🧱", herramientas:"🔧", alimentacion:"🍽️", transporte:"🚗", combustible:"⛽", servicios:"🛠️", otros:"📦" };
+
+function RendicionesScreen({ token, userName }: { token: string; userName: string }) {
+  const h = { Authorization: `Bearer ${token}` };
+  const [tab, setTab] = React.useState<"lista"|"nueva">("lista");
+  const [rendiciones, setRendiciones] = React.useState<Rendicion[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [msg, setMsg] = React.useState("");
+  // Nueva rendición
+  const [scanning, setScanning] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState<string|null>(null);
+  const [imagePreview, setImagePreview] = React.useState<string|null>(null);
+  const [form, setForm] = React.useState({ vendor:"", rut_vendor:"", date: new Date().toISOString().split("T")[0], amount:"", description:"", category:"otros", worker_name: userName });
+  const [savedId, setSavedId] = React.useState<string|null>(null);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+
+  const loadRendiciones = React.useCallback(async () => {
+    setLoading(true);
+    const r = await fetch(`${API_URL}/rendiciones`, { headers: h }).then(r => r.json()).catch(() => ({ rendiciones: [] }));
+    setRendiciones(r.rendiciones || []);
+    setLoading(false);
+  }, [token]);
+
+  React.useEffect(() => { loadRendiciones(); }, [loadRendiciones]);
+
+  const showMsg = (m: string) => { setMsg(m); setTimeout(() => setMsg(""), 5000); };
+
+  async function handleImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setScanning(true); setImagePreview(null); setSavedId(null);
+    const fd = new FormData();
+    fd.append("image", file);
+    try {
+      const r = await fetch(`${API_URL}/rendiciones/scan`, { method: "POST", headers: h, body: fd }).then(r => r.json());
+      if (r.ok) {
+        const d = r.data || {};
+        setImagePreview(r.imageBase64 || null);
+        setForm(f => ({
+          ...f,
+          vendor: d.vendor || f.vendor,
+          rut_vendor: d.rut_vendor || f.rut_vendor,
+          date: d.date || f.date,
+          amount: d.amount ? String(d.amount) : f.amount,
+          description: d.description || f.description,
+          category: d.category || f.category,
+        }));
+        showMsg("✅ Boleta analizada. Revisa y corrige los datos si es necesario.");
+      } else { showMsg("❌ " + r.message); }
+    } catch { showMsg("❌ Error al analizar la imagen"); }
+    setScanning(false);
+  }
+
+  async function handleSave() {
+    if (!form.amount || !form.vendor) return showMsg("⚠️ Completa al menos proveedor y monto");
+    setSaving(true);
+    const body = { ...form, amount: parseFloat(form.amount), image_data: imagePreview };
+    const r = await fetch(`${API_URL}/rendiciones`, { method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json());
+    setSaving(false);
+    if (r.ok) { setSavedId(r.rendicion.id); showMsg("✅ Guardada. Puedes rendirla ahora."); loadRendiciones(); }
+    else showMsg("❌ " + r.message);
+  }
+
+  async function handleSubmit(id: string) {
+    setSubmitting(id);
+    const r = await fetch(`${API_URL}/rendiciones/${id}/submit`, { method: "POST", headers: h }).then(r => r.json());
+    setSubmitting(null);
+    if (r.ok) { showMsg("✅ " + r.message); loadRendiciones(); setSavedId(null); setTab("lista"); }
+    else showMsg("❌ " + r.message);
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("¿Eliminar esta rendición?")) return;
+    await fetch(`${API_URL}/rendiciones/${id}`, { method: "DELETE", headers: h });
+    loadRendiciones();
+  }
+
+  function resetForm() {
+    setForm({ vendor:"", rut_vendor:"", date: new Date().toISOString().split("T")[0], amount:"", description:"", category:"otros", worker_name: userName });
+    setImagePreview(null); setSavedId(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  const inp = (label: string, key: keyof typeof form, props: any = {}) => (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, fontWeight: 600 }}>{label}</div>
+      <input value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+        style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 14, backgroundColor: C.bg, color: C.text, boxSizing: "border-box" }}
+        {...props} />
+    </div>
+  );
+
+  return (
+    <div style={{ paddingBottom: 80, minHeight: "100vh", backgroundColor: C.bg }}>
+      {/* Header */}
+      <div style={{ backgroundColor: C.card, borderBottom: `0.5px solid ${C.border}`, padding: "16px 16px 0" }}>
+        <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 12 }}>💰 Rendiciones</div>
+        <div style={{ display: "flex", gap: 0 }}>
+          {(["lista","nueva"] as const).map(t => (
+            <button key={t} onClick={() => { setTab(t); if (t === "nueva") resetForm(); }}
+              style={{ flex: 1, padding: "10px 0", border: "none", background: "none", fontSize: 13, fontWeight: tab === t ? 700 : 400,
+                color: tab === t ? C.orange : C.muted, borderBottom: tab === t ? `2px solid ${C.orange}` : "2px solid transparent", cursor: "pointer" }}>
+              {t === "lista" ? "📋 Historial" : "📷 Nueva rendición"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {msg && <div style={{ margin: "12px 16px 0", padding: "10px 14px", backgroundColor: msg.startsWith("✅") ? "#f0fdf4" : msg.startsWith("⚠️") ? "#fffbeb" : "#fef2f2", borderRadius: 8, fontSize: 13, color: msg.startsWith("✅") ? "#15803d" : msg.startsWith("⚠️") ? "#92400e" : "#dc2626" }}>{msg}</div>}
+
+      {/* ── TAB: LISTA ── */}
+      {tab === "lista" && (
+        <div style={{ padding: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ fontSize: 13, color: C.muted }}>{rendiciones.length} rendición(es)</div>
+            <a href={`${API_URL}/rendiciones/excel?token=${token}`}
+              onClick={async (e) => { e.preventDefault(); const r = await fetch(`${API_URL}/rendiciones/excel`, { headers: h }); const b = await r.blob(); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = `rendiciones_${new Date().toISOString().split("T")[0]}.xlsx`; a.click(); }}
+              style={{ fontSize: 12, backgroundColor: "#16a34a", color: "#fff", padding: "7px 12px", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>
+              📥 Exportar Excel
+            </a>
+          </div>
+          {loading ? <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Cargando...</div> :
+          rendiciones.length === 0 ? <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin rendiciones aún. Usa la pestaña "Nueva rendición".</div> :
+          rendiciones.map(r => (
+            <div key={r.id} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                    <span style={{ fontSize: 16 }}>{CAT_ICON[r.category] || "📦"}</span>
+                    <span style={{ fontWeight: 700, fontSize: 14 }}>{r.vendor || "Sin proveedor"}</span>
+                    <span style={{ fontSize: 11, backgroundColor: r.status === "enviada" ? "#dcfce7" : "#fef9c3", color: r.status === "enviada" ? "#15803d" : "#854d0e", padding: "2px 7px", borderRadius: 20, fontWeight: 600 }}>
+                      {r.status === "enviada" ? "✅ Enviada" : "📝 Borrador"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: C.orange }}>${Number(r.amount || 0).toLocaleString("es-CL")}</div>
+                  <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{r.description}</div>
+                  <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+                    {r.worker_name} · {r.date ? new Date(r.date + "T12:00:00").toLocaleDateString("es-CL") : "-"}
+                  </div>
+                </div>
+                {r.image_data && <img src={r.image_data} alt="boleta" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8, marginLeft: 10, border: `1px solid ${C.border}` }} />}
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                {r.status !== "enviada" && (
+                  <button onClick={() => handleSubmit(r.id)} disabled={submitting === r.id}
+                    style={{ flex: 1, backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 8, padding: "9px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: submitting === r.id ? 0.6 : 1 }}>
+                    {submitting === r.id ? "Enviando..." : "📤 Rendir"}
+                  </button>
+                )}
+                <button onClick={() => handleDelete(r.id)} style={{ backgroundColor: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 8, padding: "9px 12px", fontSize: 13, cursor: "pointer" }}>
+                  🗑️
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── TAB: NUEVA ── */}
+      {tab === "nueva" && (
+        <div style={{ padding: 16 }}>
+          {/* Foto boleta */}
+          <div style={{ backgroundColor: C.card, border: `1px dashed ${C.border}`, borderRadius: 14, padding: 16, marginBottom: 16, textAlign: "center" }}>
+            {scanning ? (
+              <div style={{ padding: 20 }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
+                <div style={{ fontSize: 14, color: C.muted }}>Analizando boleta con IA...</div>
+              </div>
+            ) : imagePreview ? (
+              <div>
+                <img src={imagePreview} alt="boleta" style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, objectFit: "contain" }} />
+                <button onClick={() => fileRef.current?.click()} style={{ marginTop: 10, background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer", color: C.muted }}>
+                  Cambiar imagen
+                </button>
+              </div>
+            ) : (
+              <div onClick={() => fileRef.current?.click()} style={{ cursor: "pointer", padding: "10px 0" }}>
+                <div style={{ fontSize: 40, marginBottom: 8 }}>📷</div>
+                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Sacar foto a la boleta</div>
+                <div style={{ fontSize: 12, color: C.muted }}>La IA extraerá los datos automáticamente</div>
+              </div>
+            )}
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handleImage} />
+          </div>
+
+          {/* Formulario */}
+          <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 16 }}>
+            {inp("Trabajador", "worker_name")}
+            {inp("Proveedor / Comercio *", "vendor", { placeholder: "Ej: Sodimac, Easy, ferretería..." })}
+            {inp("RUT Proveedor", "rut_vendor", { placeholder: "Ej: 76.123.456-7" })}
+            {inp("Fecha *", "date", { type: "date" })}
+            {inp("Monto Total ($) *", "amount", { type: "number", placeholder: "0", min: "0" })}
+            {inp("Descripción", "description", { placeholder: "¿Qué se compró?" })}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 6, fontWeight: 600 }}>Categoría</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {CATEGORIAS.map(cat => (
+                  <button key={cat} onClick={() => setForm(f => ({ ...f, category: cat }))}
+                    style={{ padding: "6px 12px", borderRadius: 20, border: `1px solid ${form.category === cat ? C.orange : C.border}`, backgroundColor: form.category === cat ? "#fff7ed" : C.bg, color: form.category === cat ? C.orange : C.text, fontSize: 12, cursor: "pointer", fontWeight: form.category === cat ? 700 : 400 }}>
+                    {CAT_ICON[cat]} {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={handleSave} disabled={saving || !form.vendor || !form.amount}
+                style={{ flex: 1, backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 10, padding: "13px 0", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: (saving || !form.vendor || !form.amount) ? 0.5 : 1 }}>
+                {saving ? "Guardando..." : "💾 Guardar"}
+              </button>
+              {savedId && (
+                <button onClick={() => handleSubmit(savedId)} disabled={submitting === savedId}
+                  style={{ flex: 1, backgroundColor: "#16a34a", color: "#fff", border: "none", borderRadius: 10, padding: "13px 0", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: submitting === savedId ? 0.6 : 1 }}>
+                  {submitting === savedId ? "Enviando..." : "📤 Rendir"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
