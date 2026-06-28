@@ -64,7 +64,7 @@ const STATUS_OPTIONS = [
   { value: "atrasada", label: "Atrasada", color: "#EF4444", bg: "#1A0D0D" },
 ];
 
-function fmtDate(iso?: string) { if (!iso) return ""; const d = new Date(iso.includes("T") ? iso : iso + "T12:00:00"); return d.toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" }); }
+function fmtDate(iso?: string) { if (!iso) return ""; const d = new Date(iso.substring(0, 10) + "T12:00:00"); return d.toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" }); }
 function fmtMonth(ym: string) { const [y, m] = ym.split("-"); return new Date(+y, +m - 1).toLocaleDateString("es-CL", { month: "long", year: "numeric" }); }
 
 function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
