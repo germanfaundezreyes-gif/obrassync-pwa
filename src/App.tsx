@@ -2125,65 +2125,60 @@ export default function App() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // COTIZACIONES SCREEN
 // ═══════════════════════════════════════════════════════════════════════════════
-function BookmarkletRenewer({ apiUrl, token, onRenewed }: { apiUrl: string; token: string; onRenewed: () => void }) {
-  const [step, setStep] = useState<"idle" | "ready" | "waiting" | "done">("idle");
-  const [, setCode] = useState("");
-  const [bookmarklet, setBookmarklet] = useState("");
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+function BookmarkletRenewer({ apiUrl, token, onRenewed, hasCredentials }: { apiUrl: string; token: string; onRenewed: () => void; hasCredentials?: boolean }) {
+  const [step, setStep] = useState<"idle" | "form" | "loading" | "done">("idle");
+  const [rut, setRut] = useState("");
+  const [password, setPassword] = useState("");
 
-  async function startRenewal() {
-    const r = await fetch(`${apiUrl}/nubox/renew-code`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }).then(r => r.json());
-    if (!r.ok) return;
-    setCode(r.code);
-    const script = `javascript:(function(){var t=localStorage.getItem('token')||localStorage.getItem('pyme_token');var c=localStorage.getItem('companyId')||localStorage.getItem('company');if(!t){alert('No se encontró token. Asegúrate de estar en pyme.nubox.com con sesión activa.');return;}fetch('${apiUrl}/nubox/renew',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:'${r.code}',jwtToken:t,nuboxCompanyId:c||undefined})}).then(r=>r.json()).then(d=>{if(d.ok){alert('✅ Token Nubox renovado en ObrasSync');}else{alert('❌ '+d.message);}}).catch(()=>alert('❌ Error de conexión'));})();`;
-    setBookmarklet(script);
-    setStep("ready");
-    // Polling: esperar que el backend confirme renovación
-    pollRef.current = setInterval(async () => {
-      const s = await fetch(`${apiUrl}/nubox/session-status`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).catch(() => null);
-      if (s?.connected && s?.tokenValid) {
-        clearInterval(pollRef.current!);
-        setStep("done");
-        onRenewed();
-      }
-    }, 3000);
-    setTimeout(() => { clearInterval(pollRef.current!); if (step === "waiting") setStep("idle"); }, 10 * 60 * 1000);
+  async function saveAndLogin() {
+    if (!rut || !password) return;
+    setStep("loading");
+    try {
+      const r = await fetch(`${apiUrl}/nubox/auto-login`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ rut: rut.trim(), password }),
+      }).then(r => r.json());
+      if (r.ok) { setStep("done"); onRenewed(); }
+      else { alert("❌ " + r.message); setStep("form"); }
+    } catch (e: any) { alert("❌ Error: " + e.message); setStep("form"); }
   }
 
-  return (
-    <div style={{ marginBottom: 12 }}>
-      {step === "idle" && (
-        <button onClick={startRenewal} style={{ width: "100%", backgroundColor: "#22c55e", color: "#fff", border: "none", borderRadius: 10, padding: "14px 0", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-          🔄 Renovar token Nubox automáticamente
-        </button>
-      )}
-      {step === "ready" && (
-        <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: 14 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: "#15803d" }}>2 pasos para renovar:</div>
-          <div style={{ fontSize: 13, color: "#166534", marginBottom: 10 }}>
-            <b>1.</b> Arrastra este botón a tu barra de favoritos:
-          </div>
-          <a href={bookmarklet} style={{ display: "inline-block", backgroundColor: "#f97316", color: "#fff", padding: "8px 16px", borderRadius: 8, fontWeight: 700, fontSize: 13, textDecoration: "none", marginBottom: 12 }}
-            onClick={e => { e.preventDefault(); alert("Arrastra este botón a tu barra de favoritos (no hagas clic aquí)"); }}>
-            🔑 Renovar Nubox
-          </a>
-          <div style={{ fontSize: 13, color: "#166534", marginBottom: 10 }}>
-            <b>2.</b> Ve a <a href="https://pyme.nubox.com" target="_blank" rel="noreferrer" style={{ color: "#f97316" }}>pyme.nubox.com</a> (inicia sesión si pide credenciales), y haz clic en el favorito guardado.
-          </div>
-          <div style={{ fontSize: 11, color: "#166534", backgroundColor: "#dcfce7", borderRadius: 6, padding: "6px 10px", marginBottom: 8 }}>
-            💡 Aunque ingreses por web.nubox.com, el token JWT está en pyme.nubox.com — el bookmarklet debe ejecutarse allí.
-          </div>
-          <div style={{ fontSize: 11, color: "#166534", opacity: 0.7 }}>Esperando renovación... (válido 10 min)</div>
-          <button onClick={() => { clearInterval(pollRef.current!); setStep("idle"); }} style={{ marginTop: 8, background: "none", border: "none", color: "#6b7280", fontSize: 12, cursor: "pointer" }}>Cancelar</button>
-        </div>
-      )}
-      {step === "done" && (
-        <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: 14, textAlign: "center" }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#15803d" }}>✅ Token Nubox renovado exitosamente</div>
-          <button onClick={() => setStep("idle")} style={{ marginTop: 8, background: "none", border: "none", color: "#6b7280", fontSize: 12, cursor: "pointer" }}>Renovar de nuevo</button>
-        </div>
-      )}
+  if (step === "done") return (
+    <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: 12, textAlign: "center" }}>
+      <div style={{ fontWeight: 700, color: "#15803d" }}>✅ Nubox conectado y credenciales guardadas</div>
+      <div style={{ fontSize: 12, color: "#16a34a", marginTop: 4 }}>El token se renovará automáticamente en el futuro</div>
+      <button onClick={() => setStep("idle")} style={{ marginTop: 8, background: "none", border: "none", color: "#6b7280", fontSize: 12, cursor: "pointer" }}>Cambiar credenciales</button>
     </div>
+  );
+
+  if (step === "form" || step === "loading") return (
+    <div style={{ backgroundColor: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: 14 }}>
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: "#1e40af" }}>🔑 Conectar Nubox automáticamente</div>
+      <div style={{ fontSize: 12, color: "#3b82f6", marginBottom: 10 }}>Guarda tus credenciales para que el token se renueve solo desde el celular</div>
+      <input value={rut} onChange={e => setRut(e.target.value)} placeholder="RUT o email de Nubox (ej: 12345678-9)"
+        disabled={step === "loading"}
+        style={{ width: "100%", padding: "9px 10px", borderRadius: 7, border: "1px solid #bfdbfe", fontSize: 13, marginBottom: 8, boxSizing: "border-box" }} />
+      <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña de Nubox"
+        disabled={step === "loading"}
+        onKeyDown={e => e.key === "Enter" && saveAndLogin()}
+        style={{ width: "100%", padding: "9px 10px", borderRadius: 7, border: "1px solid #bfdbfe", fontSize: 13, marginBottom: 10, boxSizing: "border-box" }} />
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={saveAndLogin} disabled={step === "loading" || !rut || !password}
+          style={{ flex: 1, backgroundColor: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: (step === "loading" || !rut || !password) ? 0.5 : 1 }}>
+          {step === "loading" ? "Conectando... (puede tardar ~30s)" : "🚀 Guardar y conectar"}
+        </button>
+        <button onClick={() => setStep("idle")} disabled={step === "loading"} style={{ backgroundColor: "#e5e7eb", color: "#374151", border: "none", borderRadius: 8, padding: "10px 14px", fontSize: 13, cursor: "pointer" }}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <button onClick={() => setStep("form")} style={{ width: "100%", backgroundColor: hasCredentials ? "#059669" : "#2563eb", color: "#fff", border: "none", borderRadius: 10, padding: "12px 0", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 12 }}>
+      {hasCredentials ? "🔄 Renovar token Nubox automáticamente" : "🔑 Configurar auto-renovación Nubox"}
+    </button>
   );
 }
 
@@ -2213,7 +2208,7 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
   const [processing, setProcessing] = useState(false);
   const [aiResult, setAiResult] = useState<AIQuotationResult | null>(null);
   const [creating, setCreating] = useState(false);
-  const [createResult, setCreateResult] = useState<{ cotServices?: { number: string }; cotMaterials?: { number: string }; newProductsCreated?: string[] } | null>(null);
+  const [createResult, setCreateResult] = useState<{ cotServices?: any; cotMaterials?: any; newProductsCreated?: string[]; quotation?: any } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const h = { Authorization: `Bearer ${token}` };
@@ -2298,12 +2293,21 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
       let cotServices = null, cotMaterials = null;
       if (bp.payloadServices) {
         const rs = await fetch(bp.nuboxUrl, { method: "POST", headers: nuboxHdrs, body: JSON.stringify(bp.payloadServices) }).then(r => r.json());
-        if (!rs.id && !rs.folio) throw new Error("Error COT servicios: " + JSON.stringify(rs?.errors || rs, null, 0));
+        if (!rs.id && !rs.folio) {
+          console.error("[NUBOX ERROR servicios]", JSON.stringify(rs, null, 2));
+          const errDetail = (rs?.errors || []).map((e: any) => JSON.stringify(e)).join(" | ");
+          throw new Error("Error COT servicios: " + (errDetail || JSON.stringify(rs)));
+        }
+        console.log("[NUBOX OK servicios]", JSON.stringify(rs));
         cotServices = rs;
       }
       if (bp.payloadMaterials) {
         const rm = await fetch(bp.nuboxUrl, { method: "POST", headers: nuboxHdrs, body: JSON.stringify(bp.payloadMaterials) }).then(r => r.json());
-        if (!rm.id && !rm.folio) throw new Error("Error COT materiales: " + JSON.stringify(rm?.errors || rm, null, 0));
+        if (!rm.id && !rm.folio) {
+          const errDetail = (rm?.errors || []).map((e: any) => `${e.object}: ${e.message} (campo: ${e.field})`).join(" | ");
+          throw new Error("Error COT materiales: " + (errDetail || JSON.stringify(rm)));
+        }
+        console.log("[NUBOX OK materiales]", JSON.stringify(rm));
         cotMaterials = rm;
       }
 
@@ -2313,9 +2317,12 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
         body: JSON.stringify({ aiResult: bp.aiResult, cotServices, cotMaterials }),
       }).then(r => r.json());
       if (r.ok) {
-        setCreateResult(r);
+        setCreateResult({ ...r, cotServices, cotMaterials });
         setAiResult(null); setUploadText(""); setUploadFiles([]);
         loadAll(); setTab("lista");
+        if (bp.notFoundServices?.length > 0) {
+          setMsg(`⚠️ COT creada. Partidas SIN código CLM (incluidas con precio estimado): ${bp.notFoundServices.join(", ")}`);
+        }
       } else setMsg("❌ " + r.message);
     } catch (e: unknown) { setMsg("❌ " + (e instanceof Error ? e.message : "Error al crear")); }
     setCreating(false);
@@ -2350,8 +2357,8 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
         {createResult && (
           <div style={{ backgroundColor: C.successDim, border: `1px solid ${C.success}`, borderRadius: 10, padding: 14, marginBottom: 12 }}>
             <div style={{ fontWeight: 700, color: C.success, marginBottom: 6 }}>✅ Cotizaciones creadas en Nubox</div>
-            {createResult.cotServices && <div style={{ fontSize: 13, color: C.text }}>📋 Servicios — COT N°{createResult.cotServices.number}</div>}
-            {createResult.cotMaterials && <div style={{ fontSize: 13, color: C.text }}>🧱 Materiales — COT N°{createResult.cotMaterials.number}</div>}
+            {createResult.cotServices && <div style={{ fontSize: 13, color: C.text }}>📋 Servicios — COT N°{createResult.cotServices.documentNumber || createResult.cotServices.number || createResult.cotServices.folio || createResult.cotServices.id}</div>}
+            {createResult.cotMaterials && <div style={{ fontSize: 13, color: C.text }}>🧱 Materiales — COT N°{createResult.cotMaterials.documentNumber || createResult.cotMaterials.number || createResult.cotMaterials.folio || createResult.cotMaterials.id}</div>}
             {createResult.newProductsCreated && createResult.newProductsCreated.length > 0 && (
               <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Productos creados en Nubox: {createResult.newProductsCreated.join(", ")}</div>
             )}
@@ -2514,7 +2521,7 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
                 </div>
               )}
               {/* Renovación automática con bookmarklet */}
-              <BookmarkletRenewer apiUrl={API_URL} token={token} onRenewed={() => { setMsg("✅ Token Nubox renovado"); loadAll(); }} />
+              <BookmarkletRenewer apiUrl={API_URL} token={token} hasCredentials={!!nuboxStatus?.email} onRenewed={() => { setMsg("✅ Token Nubox renovado"); loadAll(); }} />
 
               {/* Conexión manual como respaldo */}
               <details style={{ marginTop: 12 }}>
