@@ -2672,6 +2672,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
   const [saving, setSaving] = React.useState(false);
   const [submitting, setSubmitting] = React.useState<string|null>(null);
   const [imagePreview, setImagePreview] = React.useState<string|null>(null);
+  const [onedriveInfo, setOnedriveInfo] = React.useState<{ url: string|null; path: string|null }>({ url: null, path: null });
   const [form, setForm] = React.useState({ vendor:"", rut_vendor:"", date: new Date().toISOString().split("T")[0], amount:"", description:"", category:"otros", worker_name: userName });
   const [savedId, setSavedId] = React.useState<string|null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
@@ -2698,6 +2699,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
       if (r.ok) {
         const d = r.data || {};
         setImagePreview(r.imageBase64 || null);
+        setOnedriveInfo({ url: r.onedriveUrl || null, path: r.onedrivePath || null });
         setForm(f => ({
           ...f,
           vendor: d.vendor || f.vendor,
@@ -2707,7 +2709,8 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
           description: d.description || f.description,
           category: d.category || f.category,
         }));
-        showMsg("✅ Boleta analizada. Revisa y corrige los datos si es necesario.");
+        const odMsg = r.onedriveUrl ? " · 📁 Guardada en OneDrive" : "";
+        showMsg("✅ Boleta analizada. Revisa y corrige los datos si es necesario." + odMsg);
       } else { showMsg("❌ " + r.message); }
     } catch { showMsg("❌ Error al analizar la imagen"); }
     setScanning(false);
@@ -2716,7 +2719,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
   async function handleSave() {
     if (!form.amount || !form.vendor) return showMsg("⚠️ Completa al menos proveedor y monto");
     setSaving(true);
-    const body = { ...form, amount: parseFloat(form.amount), image_data: imagePreview };
+    const body = { ...form, amount: parseFloat(form.amount), image_data: imagePreview, onedrive_url: onedriveInfo.url, onedrive_path: onedriveInfo.path };
     const r = await fetch(`${API_URL}/rendiciones`, { method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json());
     setSaving(false);
     if (r.ok) { setSavedId(r.rendicion.id); showMsg("✅ Guardada. Puedes rendirla ahora."); loadRendiciones(); }
@@ -2739,7 +2742,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
 
   function resetForm() {
     setForm({ vendor:"", rut_vendor:"", date: new Date().toISOString().split("T")[0], amount:"", description:"", category:"otros", worker_name: userName });
-    setImagePreview(null); setSavedId(null);
+    setImagePreview(null); setSavedId(null); setOnedriveInfo({ url: null, path: null });
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -2799,6 +2802,11 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                   <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
                     {r.worker_name} · {r.date ? new Date(r.date + "T12:00:00").toLocaleDateString("es-CL") : "-"}
                   </div>
+                  {r.onedrive_url && (
+                    <a href={r.onedrive_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#0284c7", marginTop: 4, display: "block" }}>
+                      📁 Ver foto en OneDrive →
+                    </a>
+                  )}
                 </div>
                 {r.image_data && <img src={r.image_data} alt="boleta" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8, marginLeft: 10, border: `1px solid ${C.border}` }} />}
               </div>
@@ -2831,7 +2839,14 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
             ) : imagePreview ? (
               <div>
                 <img src={imagePreview} alt="boleta" style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, objectFit: "contain" }} />
-                <button onClick={() => fileRef.current?.click()} style={{ marginTop: 10, background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer", color: C.muted }}>
+                {onedriveInfo.path && (
+                  <div style={{ marginTop: 8, padding: "6px 10px", backgroundColor: "#f0f9ff", borderRadius: 8, fontSize: 11, color: "#0369a1", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span>📁</span>
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>OneDrive: {onedriveInfo.path}</span>
+                    {onedriveInfo.url && <a href={onedriveInfo.url} target="_blank" rel="noopener noreferrer" style={{ color: "#0284c7", fontWeight: 700, flexShrink: 0 }}>Ver →</a>}
+                  </div>
+                )}
+                <button onClick={() => fileRef.current?.click()} style={{ marginTop: 8, background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer", color: C.muted }}>
                   Cambiar imagen
                 </button>
               </div>
