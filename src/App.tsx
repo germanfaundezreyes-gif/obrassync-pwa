@@ -90,6 +90,60 @@ function Badge({ status }: { status?: string }) {
   return <span style={{ backgroundColor: s.bg, color: s.color, fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6 }}>{s.label}</span>;
 }
 
+function DraggableCreateButton({ onPress, cardColor, orangeColor }: { onPress: () => void; cardColor: string; orangeColor: string }) {
+  const [pos, setPos] = React.useState<{ x: number; y: number } | null>(null);
+  const dragging = React.useRef(false);
+  const startTouch = React.useRef<{ tx: number; ty: number; bx: number; by: number } | null>(null);
+  const moved = React.useRef(false);
+  const btnRef = React.useRef<HTMLDivElement>(null);
+
+  // Posición inicial: justo encima de la barra de nav, lado derecho
+  const defaultBottom = 72; // encima de la barra (58px aprox)
+  const defaultRight = 12;
+
+  function getStyle(): React.CSSProperties {
+    if (pos) return { position: "fixed", left: pos.x, top: pos.y, zIndex: 200, touchAction: "none" };
+    return { position: "fixed", bottom: defaultBottom, right: defaultRight, zIndex: 200, touchAction: "none" };
+  }
+
+  function onTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0];
+    const rect = btnRef.current!.getBoundingClientRect();
+    dragging.current = true;
+    moved.current = false;
+    startTouch.current = { tx: t.clientX, ty: t.clientY, bx: rect.left, by: rect.top };
+  }
+
+  function onTouchMove(e: React.TouchEvent) {
+    if (!dragging.current || !startTouch.current) return;
+    const t = e.touches[0];
+    const dx = t.clientX - startTouch.current.tx;
+    const dy = t.clientY - startTouch.current.ty;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved.current = true;
+    if (!moved.current) return;
+    e.preventDefault();
+    const newX = Math.max(0, Math.min(window.innerWidth - 56, startTouch.current.bx + dx));
+    const newY = Math.max(0, Math.min(window.innerHeight - 56, startTouch.current.by + dy));
+    setPos({ x: newX, y: newY });
+  }
+
+  function onTouchEnd() {
+    dragging.current = false;
+    if (!moved.current) onPress();
+  }
+
+  return (
+    <div ref={btnRef} style={getStyle()}
+      onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+      onClick={() => { if (!moved.current) onPress(); }}>
+      <div style={{ width: 50, height: 50, background: orangeColor, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 14px rgba(249,115,22,0.45), 0 0 0 3px ${cardColor}`, cursor: "grab" }}>
+        <Plus size={22} color="#fff" />
+      </div>
+      <div style={{ fontSize: 9, fontWeight: 700, color: orangeColor, textAlign: "center", marginTop: 2, letterSpacing: 0.3 }}>Crear</div>
+    </div>
+  );
+}
+
 export default function App() {
   const [token, setTokenState] = useState<string | null>(() => localStorage.getItem("obs_token"));
   const [userName, setUserName] = useState(() => localStorage.getItem("obs_name") || "");
@@ -2098,11 +2152,11 @@ export default function App() {
       {screen === "rendiciones" && <RendicionesScreen token={token} userName={userName} />}
 
       {/* Nav inferior */}
+      {/* Barra de navegación — sin botón Crear */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: C.card, borderTop: `0.5px solid ${C.border}`, display: "flex", padding: "6px 0 14px", zIndex: 100 }}>
         {([
           { sc: "home" as Screen, icon: <Home size={19} />, label: "Inicio" },
           { sc: "proyectos" as Screen, icon: <FolderOpen size={19} />, label: "Proyectos" },
-          { sc: "crearProyecto" as Screen, icon: null, label: "Crear" },
           ...(canSeeGastos ? [{ sc: "gastos" as Screen, icon: <DollarSign size={19} />, label: "Gastos" }] : []),
           ...(canSeeCotizaciones ? [{ sc: "cotizaciones" as Screen, icon: <FileText size={19} />, label: "Cotizar" }] : []),
           { sc: "rendiciones" as Screen, icon: <Receipt size={19} />, label: "Rendir" },
@@ -2110,19 +2164,17 @@ export default function App() {
           { sc: "configuracion" as Screen, icon: <Av name={userName} size={20} />, label: "Perfil" },
         ] as { sc: Screen; icon: React.ReactNode; label: string }[]).map(({ sc, icon, label }) => {
           const active = screen === sc || (sc === "home" && (screen === "partidas" || screen === "fotos"));
-          const isCreate = sc === "crearProyecto";
           return (
             <button key={sc} onClick={() => { setScreen(sc); if (sc === "gastos") { setGastosTab("resumen"); setExpenseSummary(null); setNuboxSummary(null); loadCostCenters(); loadExpenses(); loadNuboxSummary(); } }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", color: active ? C.orange : C.muted, padding: "2px 0" }}>
-              {isCreate ? (
-                <div style={{ width: 42, height: 42, background: C.orange, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", marginTop: -18, boxShadow: `0 0 0 4px ${C.card}` }}>
-                  <Plus size={19} color="#fff" />
-                </div>
-              ) : icon}
+              {icon}
               <span style={{ fontSize: 9, fontWeight: 600 }}>{label}</span>
             </button>
           );
         })}
       </div>
+
+      {/* Botón Crear flotante y arrastrable */}
+      <DraggableCreateButton onPress={() => setScreen("crearProyecto")} cardColor={C.card} orangeColor={C.orange} />
     </div>
   );
 }
