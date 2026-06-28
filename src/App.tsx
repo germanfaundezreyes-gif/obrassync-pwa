@@ -2673,7 +2673,8 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
   const [submitting, setSubmitting] = React.useState<string|null>(null);
   const [imagePreview, setImagePreview] = React.useState<string|null>(null);
   const [onedriveInfo, setOnedriveInfo] = React.useState<{ url: string|null; path: string|null }>({ url: null, path: null });
-  const [form, setForm] = React.useState({ vendor:"", rut_vendor:"", date: new Date().toISOString().split("T")[0], amount:"", description:"", category:"otros", worker_name: userName });
+  const today = new Date().toISOString().split("T")[0];
+  const [form, setForm] = React.useState({ vendor:"", rut_vendor:"", boleta_date:"", rendicion_date: today, amount:"", description:"", category:"otros", worker_name: userName });
   const [savedId, setSavedId] = React.useState<string|null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
@@ -2704,7 +2705,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
           ...f,
           vendor: d.vendor || f.vendor,
           rut_vendor: d.rut_vendor || f.rut_vendor,
-          date: d.date || f.date,
+          boleta_date: d.date || f.boleta_date,
           amount: d.amount ? String(d.amount) : f.amount,
           description: d.description || f.description,
           category: d.category || f.category,
@@ -2716,13 +2717,29 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
     setScanning(false);
   }
 
-  async function handleSave() {
-    if (!form.amount || !form.vendor) return showMsg("⚠️ Completa al menos proveedor y monto");
+  async function saveRendicion() {
+    if (!form.amount || !form.vendor) { showMsg("⚠️ Completa al menos proveedor y monto"); return null; }
     setSaving(true);
-    const body = { ...form, amount: parseFloat(form.amount), image_data: imagePreview, onedrive_url: onedriveInfo.url, onedrive_path: onedriveInfo.path };
+    const body = { ...form, date: form.rendicion_date, amount: parseFloat(form.amount), image_data: imagePreview, onedrive_url: onedriveInfo.url, onedrive_path: onedriveInfo.path };
     const r = await fetch(`${API_URL}/rendiciones`, { method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json());
     setSaving(false);
-    if (r.ok) { setSavedId(r.rendicion.id); showMsg("✅ Guardada. Puedes rendirla ahora."); loadRendiciones(); }
+    if (r.ok) { setSavedId(r.rendicion.id); loadRendiciones(); return r.rendicion.id; }
+    showMsg("❌ " + r.message); return null;
+  }
+
+  async function handleSave() {
+    const id = await saveRendicion();
+    if (id) showMsg("✅ Guardada en OneDrive. Puedes rendirla por correo cuando quieras.");
+  }
+
+  async function handleSaveAndSubmit() {
+    let id = savedId;
+    if (!id) { id = await saveRendicion(); }
+    if (!id) return;
+    setSubmitting(id);
+    const r = await fetch(`${API_URL}/rendiciones/${id}/submit`, { method: "POST", headers: h }).then(r => r.json());
+    setSubmitting(null);
+    if (r.ok) { showMsg("✅ " + r.message); loadRendiciones(); setSavedId(null); setTab("lista"); }
     else showMsg("❌ " + r.message);
   }
 
@@ -2730,7 +2747,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
     setSubmitting(id);
     const r = await fetch(`${API_URL}/rendiciones/${id}/submit`, { method: "POST", headers: h }).then(r => r.json());
     setSubmitting(null);
-    if (r.ok) { showMsg("✅ " + r.message); loadRendiciones(); setSavedId(null); setTab("lista"); }
+    if (r.ok) { showMsg("✅ " + r.message); loadRendiciones(); }
     else showMsg("❌ " + r.message);
   }
 
@@ -2741,7 +2758,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
   }
 
   function resetForm() {
-    setForm({ vendor:"", rut_vendor:"", date: new Date().toISOString().split("T")[0], amount:"", description:"", category:"otros", worker_name: userName });
+    setForm({ vendor:"", rut_vendor:"", boleta_date:"", rendicion_date: new Date().toISOString().split("T")[0], amount:"", description:"", category:"otros", worker_name: userName });
     setImagePreview(null); setSavedId(null); setOnedriveInfo({ url: null, path: null });
     if (fileRef.current) fileRef.current.value = "";
   }
@@ -2776,14 +2793,20 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
       {/* ── TAB: LISTA ── */}
       {tab === "lista" && (
         <div style={{ padding: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
             <div style={{ fontSize: 13, color: C.muted }}>{rendiciones.length} rendición(es)</div>
-            <a href={`${API_URL}/rendiciones/excel?token=${token}`}
-              onClick={async (e) => { e.preventDefault(); const r = await fetch(`${API_URL}/rendiciones/excel`, { headers: h }); const b = await r.blob(); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = `rendiciones_${new Date().toISOString().split("T")[0]}.xlsx`; a.click(); }}
-              style={{ fontSize: 12, backgroundColor: "#16a34a", color: "#fff", padding: "7px 12px", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>
+            <button onClick={async () => {
+                const r = await fetch(`${API_URL}/rendiciones/excel`, { headers: h });
+                const b = await r.blob();
+                const u = URL.createObjectURL(b);
+                const a = document.createElement("a"); a.href = u;
+                a.download = `rendiciones_${new Date().toISOString().split("T")[0]}.xlsx`; a.click();
+              }}
+              style={{ fontSize: 12, backgroundColor: "#16a34a", color: "#fff", padding: "7px 12px", borderRadius: 8, border: "none", fontWeight: 700, cursor: "pointer" }}>
               📥 Exportar Excel
-            </a>
+            </button>
           </div>
+          <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>El Excel incluye todas las rendiciones guardadas hasta ahora, con link a cada foto en OneDrive.</div>
           {loading ? <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Cargando...</div> :
           rendiciones.length === 0 ? <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin rendiciones aún. Usa la pestaña "Nueva rendición".</div> :
           rendiciones.map(r => (
@@ -2814,7 +2837,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                 {r.status !== "enviada" && (
                   <button onClick={() => handleSubmit(r.id)} disabled={submitting === r.id}
                     style={{ flex: 1, backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 8, padding: "9px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: submitting === r.id ? 0.6 : 1 }}>
-                    {submitting === r.id ? "Enviando..." : "📤 Rendir"}
+                    {submitting === r.id ? "Enviando..." : "📤 Enviar por correo"}
                   </button>
                 )}
                 <button onClick={() => handleDelete(r.id)} style={{ backgroundColor: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 8, padding: "9px 12px", fontSize: 13, cursor: "pointer" }}>
@@ -2865,7 +2888,23 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
             {inp("Trabajador", "worker_name")}
             {inp("Proveedor / Comercio *", "vendor", { placeholder: "Ej: Sodimac, Easy, ferretería..." })}
             {inp("RUT Proveedor", "rut_vendor", { placeholder: "Ej: 76.123.456-7" })}
-            {inp("Fecha *", "date", { type: "date" })}
+
+            {/* Fechas */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+              <div>
+                <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, fontWeight: 600 }}>📅 Fecha rendición *</div>
+                <input type="date" value={form.rendicion_date} onChange={e => setForm(f => ({ ...f, rendicion_date: e.target.value }))}
+                  style={{ width: "100%", padding: "10px 10px", borderRadius: 8, border: `2px solid ${C.orange}`, fontSize: 14, backgroundColor: C.bg, color: C.text, boxSizing: "border-box", fontWeight: 600 }} />
+                <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>Día de la rendición</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, fontWeight: 600 }}>🧾 Fecha boleta</div>
+                <input type="date" value={form.boleta_date} onChange={e => setForm(f => ({ ...f, boleta_date: e.target.value }))}
+                  style={{ width: "100%", padding: "10px 10px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 14, backgroundColor: C.bg, color: C.text, boxSizing: "border-box" }} />
+                <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>Leída de la boleta</div>
+              </div>
+            </div>
+
             {inp("Monto Total ($) *", "amount", { type: "number", placeholder: "0", min: "0" })}
             {inp("Descripción", "description", { placeholder: "¿Qué se compró?" })}
             <div style={{ marginBottom: 16 }}>
@@ -2880,17 +2919,16 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={handleSave} disabled={saving || !form.vendor || !form.amount}
-                style={{ flex: 1, backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 10, padding: "13px 0", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: (saving || !form.vendor || !form.amount) ? 0.5 : 1 }}>
-                {saving ? "Guardando..." : "💾 Guardar"}
+            {/* Botones de acción */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button onClick={handleSaveAndSubmit} disabled={saving || !!submitting || !form.vendor || !form.amount}
+                style={{ width: "100%", backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 10, padding: "14px 0", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: (saving || !!submitting || !form.vendor || !form.amount) ? 0.5 : 1 }}>
+                {submitting ? "Enviando..." : saving ? "Guardando..." : "📤 Guardar y enviar por correo"}
               </button>
-              {savedId && (
-                <button onClick={() => handleSubmit(savedId)} disabled={submitting === savedId}
-                  style={{ flex: 1, backgroundColor: "#16a34a", color: "#fff", border: "none", borderRadius: 10, padding: "13px 0", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: submitting === savedId ? 0.6 : 1 }}>
-                  {submitting === savedId ? "Enviando..." : "📤 Rendir"}
-                </button>
-              )}
+              <button onClick={handleSave} disabled={saving || !!submitting || !form.vendor || !form.amount}
+                style={{ width: "100%", backgroundColor: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 10, padding: "13px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", opacity: (saving || !!submitting || !form.vendor || !form.amount) ? 0.5 : 1 }}>
+                {saving ? "Guardando..." : "☁️ Solo guardar en OneDrive"}
+              </button>
             </div>
           </div>
         </div>
