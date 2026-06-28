@@ -12,7 +12,7 @@ const C = {
 };
 
 type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones" | "rendiciones";
-type Rendicion = { id: string; worker_name: string; worker_email?: string; date: string; amount: number; vendor: string; description: string; rut_vendor?: string; category: string; image_data?: string; status: string; submitted_at?: string; created_at: string };
+type Rendicion = { id: string; worker_name: string; worker_email?: string; date: string; boleta_date?: string; amount: number; vendor: string; description: string; rut_vendor?: string; category: string; image_data?: string; onedrive_url?: string; onedrive_path?: string; status: string; submitted_at?: string; created_at: string };
 type Quotation = { id: string; client_name?: string; client_rut?: string; reference?: string; status: string; nubox_doc_number_services?: string; nubox_doc_number_materials?: string; total_services: number; total_materials: number; source_type: string; created_at: string; created_by_name?: string };
 type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
 type AIItem = { nubox_id: number | null; name: string; unit: string; quantity: number; price_neto: number; is_new: boolean };
@@ -2823,7 +2823,11 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                   <div style={{ fontSize: 20, fontWeight: 800, color: C.orange }}>${Number(r.amount || 0).toLocaleString("es-CL")}</div>
                   <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{r.description}</div>
                   <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
-                    {r.worker_name} · {r.date ? new Date(r.date + "T12:00:00").toLocaleDateString("es-CL") : "-"}
+                    👤 {r.worker_name}
+                  </div>
+                  <div style={{ fontSize: 11, marginTop: 3, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <span style={{ color: C.orange, fontWeight: 600 }}>📅 Rendición: {r.date ? new Date(r.date + "T12:00:00").toLocaleDateString("es-CL") : "-"}</span>
+                    {r.boleta_date && <span style={{ color: C.muted }}>🧾 Boleta: {new Date(r.boleta_date + "T12:00:00").toLocaleDateString("es-CL")}</span>}
                   </div>
                   {r.onedrive_url && (
                     <a href={r.onedrive_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#0284c7", marginTop: 4, display: "block" }}>
