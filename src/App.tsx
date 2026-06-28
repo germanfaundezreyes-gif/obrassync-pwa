@@ -48,6 +48,7 @@ const PERMISSIONS = [
   { key: "montos", label: "Ver montos", sub: "Ver cifras y montos de dinero", icon: "💰" },
   { key: "gastos", label: "Módulo Gastos", sub: "Ver y registrar gastos", icon: "💳" },
   { key: "cotizaciones", label: "Cotizaciones", sub: "Crear y ver cotizaciones en Nubox", icon: "📋" },
+  { key: "rendiciones", label: "Rendiciones", sub: "Subir boletas y rendir gastos", icon: "💰" },
   { key: "admin", label: "Administración", sub: "Gestionar usuarios y permisos", icon: "👤" },
 ];
 
@@ -306,6 +307,7 @@ export default function App() {
   const canSeeGastos = canSee("gastos");
   const canSeeReports = canSee("reports");
   const canSeeCotizaciones = canSee("cotizaciones");
+  const canSeeRendiciones = canSee("rendiciones");
 
   useEffect(() => { if (token) { loadProjects(); loadKpis(); if (isAdmin) { loadUsers(); loadCostCenters(); } } }, [token]);
   useEffect(() => { if (selectedProject && token) loadTasks(selectedProject.id); }, [selectedProject]);
@@ -2149,7 +2151,7 @@ export default function App() {
       {screen === "cotizaciones" && <CotizacionesScreen token={token} isAdmin={isAdmin} />}
 
       {/* ── PANTALLA RENDICIONES ──────────────────────────────────────────────── */}
-      {screen === "rendiciones" && <RendicionesScreen token={token} userName={userName} />}
+      {screen === "rendiciones" && canSeeRendiciones && <RendicionesScreen token={token} userName={userName} />}
 
       {/* Nav inferior */}
       {/* Barra de navegación — sin botón Crear */}
@@ -2159,7 +2161,7 @@ export default function App() {
           { sc: "proyectos" as Screen, icon: <FolderOpen size={19} />, label: "Proyectos" },
           ...(canSeeGastos ? [{ sc: "gastos" as Screen, icon: <DollarSign size={19} />, label: "Gastos" }] : []),
           ...(canSeeCotizaciones ? [{ sc: "cotizaciones" as Screen, icon: <FileText size={19} />, label: "Cotizar" }] : []),
-          { sc: "rendiciones" as Screen, icon: <Receipt size={19} />, label: "Rendir" },
+          ...(canSeeRendiciones ? [{ sc: "rendiciones" as Screen, icon: <Receipt size={19} />, label: "Rendir" }] : []),
           ...(isAdmin ? [{ sc: "admin" as Screen, icon: <Shield size={19} />, label: "Admin" }] : []),
           { sc: "configuracion" as Screen, icon: <Av name={userName} size={20} />, label: "Perfil" },
         ] as { sc: Screen; icon: React.ReactNode; label: string }[]).map(({ sc, icon, label }) => {
