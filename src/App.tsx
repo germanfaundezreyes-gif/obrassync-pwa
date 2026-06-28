@@ -12,7 +12,7 @@ const C = {
 };
 
 type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones" | "rendiciones";
-type Rendicion = { id: string; worker_name: string; worker_email?: string; date: string; boleta_date?: string; amount: number; vendor: string; description: string; rut_vendor?: string; category: string; image_data?: string; onedrive_url?: string; onedrive_path?: string; cost_center_id?: string; cost_center_name?: string; cost_center_code?: string; tipo?: string; doc_firmado_data?: string; doc_firmado_onedrive_url?: string; reembolso_status?: string; status: string; submitted_at?: string; created_at: string };
+type Rendicion = { id: string; worker_name: string; worker_email?: string; date: string; boleta_date?: string; amount: number; vendor: string; description: string; rut_vendor?: string; category: string; image_data?: string; onedrive_url?: string; onedrive_path?: string; cost_center_id?: string; cost_center_name?: string; cost_center_code?: string; tipo?: string; doc_firmado_data?: string; doc_firmado_onedrive_url?: string; reembolso_status?: string; folio?: number; status: string; submitted_at?: string; created_at: string };
 type CostCenter = { id: string; name: string; code?: string; project_name?: string };
 type Quotation = { id: string; client_name?: string; client_rut?: string; reference?: string; status: string; nubox_doc_number_services?: string; nubox_doc_number_materials?: string; total_services: number; total_materials: number; source_type: string; created_at: string; created_by_name?: string };
 type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
@@ -2859,6 +2859,11 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                     <span style={{ color: C.orange, fontWeight: 600 }}>📅 Rendición: {r.date ? new Date(r.date + "T12:00:00").toLocaleDateString("es-CL") : "-"}</span>
                     {r.boleta_date && <span style={{ color: C.muted }}>🧾 Boleta: {new Date(r.boleta_date + "T12:00:00").toLocaleDateString("es-CL")}</span>}
                   </div>
+                  {r.folio && (
+                    <div style={{ fontSize: 12, color: "#f97316", fontWeight: 700, marginTop: 3 }}>
+                      🔖 REN-{String(r.folio).padStart(4, "0")}
+                    </div>
+                  )}
                   {r.cost_center_name && (
                     <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>
                       🏗️ {r.cost_center_code ? `[${r.cost_center_code}] ` : ""}{r.cost_center_name}
