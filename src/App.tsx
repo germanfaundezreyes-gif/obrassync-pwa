@@ -2695,7 +2695,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
 
   React.useEffect(() => {
     loadRendiciones();
-    fetch(`${API_URL}/cost-centers`, { headers: h }).then(r => r.json()).then(r => setCostCenters(r.costCenters || r.cost_centers || [])).catch(() => {});
+    fetch(`${API_URL}/cost-centers`, { headers: h }).then(r => r.json()).then(r => setCostCenters(r.items || r.costCenters || r.cost_centers || [])).catch(() => {});
   }, [loadRendiciones]);
 
   const showMsg = (m: string) => { setMsg(m); setTimeout(() => setMsg(""), 6000); };
