@@ -47,6 +47,7 @@ const PERMISSIONS = [
   { key: "kpis", label: "KPIs inicio", sub: "Ver métricas en el dashboard", icon: "📊" },
   { key: "montos", label: "Ver montos", sub: "Ver cifras y montos de dinero", icon: "💰" },
   { key: "gastos", label: "Módulo Gastos", sub: "Ver y registrar gastos", icon: "💳" },
+  { key: "gastos_resumen", label: "Gastos — Resumen", sub: "Ver pestaña de resumen y totales en Gastos", icon: "📊" },
   { key: "cotizaciones", label: "Cotizaciones", sub: "Crear y ver cotizaciones en Nubox", icon: "📋" },
   { key: "rendiciones", label: "Rendiciones", sub: "Subir boletas y rendir gastos", icon: "💰" },
   { key: "admin", label: "Administración", sub: "Gestionar usuarios y permisos", icon: "👤" },
@@ -305,6 +306,7 @@ export default function App() {
   const canSeeKpis = canSee("kpis");
   const canSeeMontos = canSee("montos");
   const canSeeGastos = canSee("gastos");
+  const canSeeGastosResumen = canSee("gastos_resumen");
   const canSeeReports = canSee("reports");
   const canSeeCotizaciones = canSee("cotizaciones");
   const canSeeRendiciones = canSee("rendiciones");
@@ -1566,7 +1568,7 @@ export default function App() {
 
           {/* Tabs */}
           <div style={{ display: "flex", backgroundColor: C.cardAlt, borderRadius: 10, padding: 4, marginBottom: 16, gap: 3 }}>
-            {(["resumen", "lista", "nubox", "centros"] as const).map(t => (
+            {(["resumen", "lista", "nubox", "centros"] as const).filter(t => t !== "resumen" || canSeeGastosResumen).map(t => (
               <button key={t} onClick={() => { setGastosTab(t as typeof gastosTab); if (t === "lista" || t === "resumen") { loadExpenses(); loadNuboxSummary(); } if (t === "nubox") { loadNuboxPurchases(); loadCostCenters(); loadProjects(); } }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: gastosTab === t ? C.card : "transparent", color: gastosTab === t ? C.orange : C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
                 {t === "resumen" ? "Resumen" : t === "lista" ? "Detalle" : t === "nubox" ? "Nubox" : "Centros"}
               </button>
@@ -1574,7 +1576,7 @@ export default function App() {
           </div>
 
           {/* TAB: RESUMEN */}
-          {gastosTab === "resumen" && (
+          {gastosTab === "resumen" && canSeeGastosResumen && (
             <>
               {/* ── SECCIÓN NUBOX ── */}
               <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 14 }}>
@@ -2167,7 +2169,7 @@ export default function App() {
         ] as { sc: Screen; icon: React.ReactNode; label: string }[]).map(({ sc, icon, label }) => {
           const active = screen === sc || (sc === "home" && (screen === "partidas" || screen === "fotos"));
           return (
-            <button key={sc} onClick={() => { setScreen(sc); if (sc === "gastos") { setGastosTab("resumen"); setExpenseSummary(null); setNuboxSummary(null); loadCostCenters(); loadExpenses(); loadNuboxSummary(); } }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", color: active ? C.orange : C.muted, padding: "2px 0" }}>
+            <button key={sc} onClick={() => { setScreen(sc); if (sc === "gastos") { setGastosTab(canSeeGastosResumen ? "resumen" : "lista"); setExpenseSummary(null); setNuboxSummary(null); loadCostCenters(); loadExpenses(); loadNuboxSummary(); } }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", color: active ? C.orange : C.muted, padding: "2px 0" }}>
               {icon}
               <span style={{ fontSize: 9, fontWeight: 600 }}>{label}</span>
             </button>
