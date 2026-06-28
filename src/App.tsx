@@ -12,7 +12,7 @@ const C = {
 };
 
 type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones" | "rendiciones";
-type Rendicion = { id: string; worker_name: string; worker_email?: string; date: string; boleta_date?: string; amount: number; vendor: string; description: string; rut_vendor?: string; category: string; image_data?: string; onedrive_url?: string; onedrive_path?: string; cost_center_id?: string; cost_center_name?: string; cost_center_code?: string; status: string; submitted_at?: string; created_at: string };
+type Rendicion = { id: string; worker_name: string; worker_email?: string; date: string; boleta_date?: string; amount: number; vendor: string; description: string; rut_vendor?: string; category: string; image_data?: string; onedrive_url?: string; onedrive_path?: string; cost_center_id?: string; cost_center_name?: string; cost_center_code?: string; tipo?: string; doc_firmado_data?: string; doc_firmado_onedrive_url?: string; reembolso_status?: string; status: string; submitted_at?: string; created_at: string };
 type CostCenter = { id: string; name: string; code?: string; project_name?: string };
 type Quotation = { id: string; client_name?: string; client_rut?: string; reference?: string; status: string; nubox_doc_number_services?: string; nubox_doc_number_materials?: string; total_services: number; total_materials: number; source_type: string; created_at: string; created_by_name?: string };
 type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
@@ -2675,8 +2675,11 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
   const [imagePreview, setImagePreview] = React.useState<string|null>(null);
   const [onedriveInfo, setOnedriveInfo] = React.useState<{ url: string|null; path: string|null }>({ url: null, path: null });
   const today = new Date().toISOString().split("T")[0];
-  const [form, setForm] = React.useState({ vendor:"", rut_vendor:"", boleta_date:"", rendicion_date: today, amount:"", description:"", category:"otros", worker_name: userName, cost_center_id:"" });
+  const [form, setForm] = React.useState({ vendor:"", rut_vendor:"", boleta_date:"", rendicion_date: today, amount:"", description:"", category:"otros", worker_name: userName, cost_center_id:"", tipo:"boleta" });
+  const [docFirmadoPreview, setDocFirmadoPreview] = React.useState<string|null>(null);
+  const [docFirmadoOD, setDocFirmadoOD] = React.useState<{ url: string|null; path: string|null }>({ url: null, path: null });
   const [costCenters, setCostCenters] = React.useState<CostCenter[]>([]);
+  const docFirmadoRef = React.useRef<HTMLInputElement>(null);
   const [savedId, setSavedId] = React.useState<string|null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
@@ -2715,7 +2718,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
           description: d.description || f.description,
           category: d.category || f.category,
         }));
-        const odMsg = r.onedriveUrl ? " · 📁 Guardada en OneDrive" : "";
+        const odMsg = (r.onedriveUrl || r.onedrivePath) ? " · 📁 Guardada en OneDrive" : "";
         showMsg("✅ Boleta analizada. Revisa y corrige los datos si es necesario." + odMsg);
       } else { showMsg("❌ " + r.message); }
     } catch { showMsg("❌ Error al analizar la imagen"); }
@@ -2725,7 +2728,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
   async function saveRendicion() {
     if (!form.amount || !form.vendor) { showMsg("⚠️ Completa al menos proveedor y monto"); return null; }
     setSaving(true);
-    const body = { ...form, date: form.rendicion_date, amount: parseFloat(form.amount), image_data: imagePreview, onedrive_url: onedriveInfo.url, onedrive_path: onedriveInfo.path };
+    const body = { ...form, date: form.rendicion_date, amount: parseFloat(form.amount), image_data: imagePreview, onedrive_url: onedriveInfo.url, onedrive_path: onedriveInfo.path, doc_firmado_data: docFirmadoPreview, doc_firmado_onedrive_url: docFirmadoOD.url, doc_firmado_onedrive_path: docFirmadoOD.path };
     const r = await fetch(`${API_URL}/rendiciones`, { method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json());
     setSaving(false);
     if (r.ok) { setSavedId(r.rendicion.id); loadRendiciones(); return r.rendicion.id; }
@@ -2756,6 +2759,21 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
     else showMsg("❌ " + r.message);
   }
 
+  async function handleDocFirmado(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setDocFirmadoPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+    showMsg("📄 Documento firmado cargado.");
+  }
+
+  async function handleReembolsar(id: string) {
+    const r = await fetch(`${API_URL}/rendiciones/${id}/reembolsar`, { method: "POST", headers: h }).then(r => r.json());
+    if (r.ok) { showMsg("✅ Reembolso marcado como pagado"); loadRendiciones(); }
+    else showMsg("❌ " + r.message);
+  }
+
   async function handleDelete(id: string) {
     if (!confirm("¿Eliminar esta rendición?")) return;
     await fetch(`${API_URL}/rendiciones/${id}`, { method: "DELETE", headers: h });
@@ -2763,8 +2781,10 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
   }
 
   function resetForm() {
-    setForm({ vendor:"", rut_vendor:"", boleta_date:"", rendicion_date: new Date().toISOString().split("T")[0], amount:"", description:"", category:"otros", worker_name: userName, cost_center_id:"" });
+    setForm({ vendor:"", rut_vendor:"", boleta_date:"", rendicion_date: new Date().toISOString().split("T")[0], amount:"", description:"", category:"otros", worker_name: userName, cost_center_id:"", tipo:"boleta" });
     setImagePreview(null); setSavedId(null); setOnedriveInfo({ url: null, path: null });
+    setDocFirmadoPreview(null); setDocFirmadoOD({ url: null, path: null });
+    if (docFirmadoRef.current) docFirmadoRef.current.value = "";
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -2818,12 +2838,17 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
             <div key={r.id} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 16 }}>{CAT_ICON[r.category] || "📦"}</span>
                     <span style={{ fontWeight: 700, fontSize: 14 }}>{r.vendor || "Sin proveedor"}</span>
                     <span style={{ fontSize: 11, backgroundColor: r.status === "enviada" ? "#dcfce7" : "#fef9c3", color: r.status === "enviada" ? "#15803d" : "#854d0e", padding: "2px 7px", borderRadius: 20, fontWeight: 600 }}>
                       {r.status === "enviada" ? "✅ Enviada" : "📝 Borrador"}
                     </span>
+                    {r.tipo === "reembolso" && (
+                      <span style={{ fontSize: 11, backgroundColor: r.reembolso_status === "pagado" ? "#dcfce7" : "#fef3c7", color: r.reembolso_status === "pagado" ? "#15803d" : "#92400e", padding: "2px 7px", borderRadius: 20, fontWeight: 600 }}>
+                        {r.reembolso_status === "pagado" ? "💵 Reembolsado" : "💵 Reembolso pendiente"}
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize: 20, fontWeight: 800, color: C.orange }}>${Number(r.amount || 0).toLocaleString("es-CL")}</div>
                   <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{r.description}</div>
@@ -2851,7 +2876,13 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                 {r.status !== "enviada" && (
                   <button onClick={() => handleSubmit(r.id)} disabled={submitting === r.id}
                     style={{ flex: 1, backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 8, padding: "9px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: submitting === r.id ? 0.6 : 1 }}>
-                    {submitting === r.id ? "Enviando..." : "📤 Enviar por correo"}
+                    {submitting === r.id ? "Enviando..." : "📤 Enviar correo"}
+                  </button>
+                )}
+                {r.tipo === "reembolso" && r.reembolso_status !== "pagado" && (
+                  <button onClick={() => handleReembolsar(r.id)}
+                    style={{ flex: 1, backgroundColor: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "9px 0", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                    💵 Marcar pagado
                   </button>
                 )}
                 <button onClick={() => handleDelete(r.id)} style={{ backgroundColor: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 8, padding: "9px 12px", fontSize: 13, cursor: "pointer" }}>
@@ -2896,6 +2927,45 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
             )}
             <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handleImage} />
           </div>
+
+          {/* Documento firmado — solo para reembolso */}
+          {form.tipo === "reembolso" && (
+            <div style={{ backgroundColor: C.card, border: `1px dashed #16a34a`, borderRadius: 14, padding: 16, marginBottom: 14, textAlign: "center" }}>
+              {docFirmadoPreview ? (
+                <div>
+                  <img src={docFirmadoPreview} alt="doc firmado" style={{ maxWidth: "100%", maxHeight: 180, borderRadius: 8, objectFit: "contain" }} />
+                  {docFirmadoOD.path && <div style={{ marginTop: 6, fontSize: 11, color: "#16a34a" }}>📁 OneDrive: {docFirmadoOD.path}</div>}
+                  <button onClick={() => docFirmadoRef.current?.click()} style={{ marginTop: 8, background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer", color: C.muted }}>
+                    Cambiar documento
+                  </button>
+                </div>
+              ) : (
+                <div onClick={() => docFirmadoRef.current?.click()} style={{ cursor: "pointer", padding: "8px 0" }}>
+                  <div style={{ fontSize: 36, marginBottom: 6 }}>📄</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#16a34a", marginBottom: 2 }}>Foto del documento firmado</div>
+                  <div style={{ fontSize: 12, color: C.muted }}>Formulario de rendición firmado por el trabajador</div>
+                </div>
+              )}
+              <input ref={docFirmadoRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handleDocFirmado} />
+            </div>
+          )}
+
+          {/* Selector tipo de rendición */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+            {[{ v:"boleta", label:"🧾 Boleta empresa", sub:"La empresa paga" }, { v:"reembolso", label:"💵 Reembolso", sub:"El trabajador pagó" }].map(({ v, label, sub }) => (
+              <button key={v} onClick={() => setForm(f => ({ ...f, tipo: v }))}
+                style={{ padding: "12px 8px", borderRadius: 12, border: `2px solid ${form.tipo === v ? C.orange : C.border}`, backgroundColor: form.tipo === v ? "#fff7ed" : C.card, cursor: "pointer", textAlign: "center" }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: form.tipo === v ? C.orange : C.text }}>{label}</div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{sub}</div>
+              </button>
+            ))}
+          </div>
+
+          {form.tipo === "reembolso" && (
+            <div style={{ backgroundColor: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#92400e" }}>
+              💵 El trabajador pagó con dinero propio. Se debe adjuntar la boleta y el documento de rendición firmado para reembolsarle.
+            </div>
+          )}
 
           {/* Formulario */}
           <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 16 }}>
