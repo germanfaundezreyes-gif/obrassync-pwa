@@ -12,7 +12,8 @@ const C = {
 };
 
 type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones" | "rendiciones";
-type Rendicion = { id: string; worker_name: string; worker_email?: string; date: string; boleta_date?: string; amount: number; vendor: string; description: string; rut_vendor?: string; category: string; image_data?: string; onedrive_url?: string; onedrive_path?: string; status: string; submitted_at?: string; created_at: string };
+type Rendicion = { id: string; worker_name: string; worker_email?: string; date: string; boleta_date?: string; amount: number; vendor: string; description: string; rut_vendor?: string; category: string; image_data?: string; onedrive_url?: string; onedrive_path?: string; cost_center_id?: string; cost_center_name?: string; cost_center_code?: string; status: string; submitted_at?: string; created_at: string };
+type CostCenter = { id: string; name: string; code?: string; project_name?: string };
 type Quotation = { id: string; client_name?: string; client_rut?: string; reference?: string; status: string; nubox_doc_number_services?: string; nubox_doc_number_materials?: string; total_services: number; total_materials: number; source_type: string; created_at: string; created_by_name?: string };
 type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
 type AIItem = { nubox_id: number | null; name: string; unit: string; quantity: number; price_neto: number; is_new: boolean };
@@ -2674,7 +2675,8 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
   const [imagePreview, setImagePreview] = React.useState<string|null>(null);
   const [onedriveInfo, setOnedriveInfo] = React.useState<{ url: string|null; path: string|null }>({ url: null, path: null });
   const today = new Date().toISOString().split("T")[0];
-  const [form, setForm] = React.useState({ vendor:"", rut_vendor:"", boleta_date:"", rendicion_date: today, amount:"", description:"", category:"otros", worker_name: userName });
+  const [form, setForm] = React.useState({ vendor:"", rut_vendor:"", boleta_date:"", rendicion_date: today, amount:"", description:"", category:"otros", worker_name: userName, cost_center_id:"" });
+  const [costCenters, setCostCenters] = React.useState<CostCenter[]>([]);
   const [savedId, setSavedId] = React.useState<string|null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
@@ -2685,7 +2687,10 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
     setLoading(false);
   }, [token]);
 
-  React.useEffect(() => { loadRendiciones(); }, [loadRendiciones]);
+  React.useEffect(() => {
+    loadRendiciones();
+    fetch(`${API_URL}/cost-centers`, { headers: h }).then(r => r.json()).then(r => setCostCenters(r.costCenters || r.cost_centers || [])).catch(() => {});
+  }, [loadRendiciones]);
 
   const showMsg = (m: string) => { setMsg(m); setTimeout(() => setMsg(""), 5000); };
 
@@ -2758,7 +2763,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
   }
 
   function resetForm() {
-    setForm({ vendor:"", rut_vendor:"", boleta_date:"", rendicion_date: new Date().toISOString().split("T")[0], amount:"", description:"", category:"otros", worker_name: userName });
+    setForm({ vendor:"", rut_vendor:"", boleta_date:"", rendicion_date: new Date().toISOString().split("T")[0], amount:"", description:"", category:"otros", worker_name: userName, cost_center_id:"" });
     setImagePreview(null); setSavedId(null); setOnedriveInfo({ url: null, path: null });
     if (fileRef.current) fileRef.current.value = "";
   }
@@ -2829,6 +2834,11 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                     <span style={{ color: C.orange, fontWeight: 600 }}>📅 Rendición: {r.date ? new Date(r.date + "T12:00:00").toLocaleDateString("es-CL") : "-"}</span>
                     {r.boleta_date && <span style={{ color: C.muted }}>🧾 Boleta: {new Date(r.boleta_date + "T12:00:00").toLocaleDateString("es-CL")}</span>}
                   </div>
+                  {r.cost_center_name && (
+                    <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>
+                      🏗️ {r.cost_center_code ? `[${r.cost_center_code}] ` : ""}{r.cost_center_name}
+                    </div>
+                  )}
                   {r.onedrive_url && (
                     <a href={r.onedrive_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#0284c7", marginTop: 4, display: "block" }}>
                       📁 Ver foto en OneDrive →
@@ -2921,6 +2931,20 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Centro de costo */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, fontWeight: 600 }}>🏗️ Centro de Costo *</div>
+              <select value={form.cost_center_id} onChange={e => setForm(f => ({ ...f, cost_center_id: e.target.value }))}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `2px solid ${form.cost_center_id ? C.orange : C.border}`, fontSize: 14, backgroundColor: C.bg, color: form.cost_center_id ? C.text : C.muted, boxSizing: "border-box", appearance: "auto" }}>
+                <option value="">— Seleccionar centro de costo —</option>
+                {costCenters.map(cc => (
+                  <option key={cc.id} value={cc.id}>
+                    {cc.code ? `[${cc.code}] ` : ""}{cc.name}{cc.project_name ? ` · ${cc.project_name}` : ""}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Botones de acción */}
