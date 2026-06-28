@@ -12,7 +12,7 @@ const C = {
 };
 
 type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones" | "rendiciones";
-type Rendicion = { id: string; worker_name: string; worker_email?: string; date: string; boleta_date?: string; amount: number; vendor: string; description: string; rut_vendor?: string; category: string; image_data?: string; onedrive_url?: string; onedrive_path?: string; cost_center_id?: string; cost_center_name?: string; cost_center_code?: string; tipo?: string; doc_firmado_data?: string; doc_firmado_onedrive_url?: string; reembolso_status?: string; folio?: number; status: string; submitted_at?: string; created_at: string };
+type Rendicion = { id: string; worker_name: string; worker_email?: string; date: string; boleta_date?: string; boleta_number?: string; amount: number; vendor: string; description: string; rut_vendor?: string; category: string; image_data?: string; onedrive_url?: string; onedrive_path?: string; cost_center_id?: string; cost_center_name?: string; cost_center_code?: string; tipo?: string; doc_firmado_data?: string; doc_firmado_onedrive_url?: string; reembolso_status?: string; folio?: number; status: string; submitted_at?: string; created_at: string };
 type Quotation = { id: string; client_name?: string; client_rut?: string; reference?: string; status: string; nubox_doc_number_services?: string; nubox_doc_number_materials?: string; total_services: number; total_materials: number; source_type: string; created_at: string; created_by_name?: string };
 type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
 type AIItem = { nubox_id: number | null; name: string; unit: string; quantity: number; price_neto: number; is_new: boolean };
@@ -2674,7 +2674,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
   const [onedriveInfo, setOnedriveInfo] = React.useState<{ url: string|null; path: string|null }>({ url: null, path: null });
   const [docPreview, setDocPreview] = React.useState<string|null>(null);
   const today = new Date().toISOString().split("T")[0];
-  const emptyForm = { vendor:"", rut_vendor:"", boleta_date:"", rendicion_date: today, amount:"", description:"", category:"otros", worker_name: userName, cost_center_id:"" };
+  const emptyForm = { vendor:"", rut_vendor:"", boleta_number:"", boleta_date:"", rendicion_date: today, amount:"", description:"", category:"otros", worker_name: userName, cost_center_id:"" };
   const [form, setForm] = React.useState(emptyForm);
   const [formReady, setFormReady] = React.useState(false);
   const [costCenters, setCostCenters] = React.useState<CostCenter[]>([]);
@@ -2717,6 +2717,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
           ...f,
           vendor: d.vendor || "",
           rut_vendor: d.rut_vendor || "",
+          boleta_number: d.boleta_number || "",
           boleta_date: d.date || "",
           amount: d.amount ? String(d.amount) : "",
           description: d.description || "",
@@ -2907,6 +2908,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                         <div style={{ fontSize: 13, display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
                           {r.description && <div><span style={{ color: C.muted }}>Descripción: </span>{r.description}</div>}
                           {r.rut_vendor && <div><span style={{ color: C.muted }}>RUT proveedor: </span>{r.rut_vendor}</div>}
+                          {r.boleta_number && <div><span style={{ color: C.muted }}>N° Boleta: </span><strong>{r.boleta_number}</strong></div>}
                           {r.boleta_date && <div><span style={{ color: C.muted }}>Fecha boleta: </span>{fmtDate(r.boleta_date)}</div>}
                           {r.cost_center_name && <div><span style={{ color: C.muted }}>Centro de costo: </span>{r.cost_center_code ? `[${r.cost_center_code}] ` : ""}{r.cost_center_name}</div>}
                           {r.submitted_at && <div><span style={{ color: C.muted }}>Correo enviado: </span>{fmtDate(r.submitted_at)}</div>}
@@ -2950,6 +2952,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                         {fInp("Trabajador", "worker_name", editForm.worker_name || "", v => setEditForm(f => ({ ...f, worker_name: v })))}
                         {fInp("Proveedor", "vendor", editForm.vendor || "", v => setEditForm(f => ({ ...f, vendor: v })))}
                         {fInp("RUT Proveedor", "rut_vendor", editForm.rut_vendor || "", v => setEditForm(f => ({ ...f, rut_vendor: v })))}
+                        {fInp("N° Boleta / Folio", "boleta_number", editForm.boleta_number || "", v => setEditForm(f => ({ ...f, boleta_number: v })))}
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
                           <div>
                             <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>📅 Fecha rendición</div>
@@ -3065,6 +3068,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
               {fInp("Trabajador", "worker_name", form.worker_name, v => setForm(f => ({ ...f, worker_name: v })))}
               {fInp("Proveedor *", "vendor", form.vendor, v => setForm(f => ({ ...f, vendor: v })), { placeholder: "Sodimac, Easy, ferretería..." })}
               {fInp("RUT Proveedor", "rut_vendor", form.rut_vendor, v => setForm(f => ({ ...f, rut_vendor: v })), { placeholder: "76.123.456-7" })}
+              {fInp("N° Boleta / Folio", "boleta_number", form.boleta_number, v => setForm(f => ({ ...f, boleta_number: v })), { placeholder: "Ej: 123456" })}
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                 <div>
