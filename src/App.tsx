@@ -2889,7 +2889,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                         {r.folio && <span style={{ fontSize: 11, color: "#f97316", fontWeight: 700 }}>🔖 REN-{String(r.folio).padStart(4,"0")}</span>}
                       </div>
                       <div style={{ fontSize: 20, fontWeight: 800, color: C.orange }}>${Number(r.amount || 0).toLocaleString("es-CL")}</div>
-                      <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>👤 {r.worker_name} · 📅 {r.date ? new Date(r.date + "T12:00:00").toLocaleDateString("es-CL") : "-"}</div>
+                      <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>👤 {r.worker_name} · 📅 {fmtDate(r.date)}</div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 8, flexShrink: 0 }}>
                       {r.image_data && <img src={r.image_data} alt="boleta" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.border}` }} />}
@@ -2907,9 +2907,9 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                         <div style={{ fontSize: 13, display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
                           {r.description && <div><span style={{ color: C.muted }}>Descripción: </span>{r.description}</div>}
                           {r.rut_vendor && <div><span style={{ color: C.muted }}>RUT proveedor: </span>{r.rut_vendor}</div>}
-                          {r.boleta_date && <div><span style={{ color: C.muted }}>Fecha boleta: </span>{new Date(r.boleta_date + "T12:00:00").toLocaleDateString("es-CL")}</div>}
+                          {r.boleta_date && <div><span style={{ color: C.muted }}>Fecha boleta: </span>{fmtDate(r.boleta_date)}</div>}
                           {r.cost_center_name && <div><span style={{ color: C.muted }}>Centro de costo: </span>{r.cost_center_code ? `[${r.cost_center_code}] ` : ""}{r.cost_center_name}</div>}
-                          {r.submitted_at && <div><span style={{ color: C.muted }}>Correo enviado: </span>{new Date(r.submitted_at).toLocaleDateString("es-CL")}</div>}
+                          {r.submitted_at && <div><span style={{ color: C.muted }}>Correo enviado: </span>{fmtDate(r.submitted_at)}</div>}
                         </div>
                         {/* Links OneDrive */}
                         <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
