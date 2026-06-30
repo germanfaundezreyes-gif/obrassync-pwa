@@ -2082,8 +2082,8 @@ export default function App() {
                           {loadingDetail && <div style={{ textAlign: "center", color: C.muted, fontSize: 12, padding: "12px 0" }}>Cargando detalle...</div>}
 
                           {/* DEBUG temporal */}
-                          {!loadingDetail && <div style={{ fontSize: 9, color: C.muted, backgroundColor: C.cardAlt, borderRadius: 6, padding: 6, marginBottom: 8, wordBreak: "break-all" as const }}>
-                            links: {JSON.stringify(p.links)}{detail ? ` | lines count: ${detail.lines?.length ?? "?"} | detail keys: ${Object.keys(detail).join(", ")}` : " | sin detail"}
+                          {!loadingDetail && detail?.lines?.[0] && <div style={{ fontSize: 9, color: C.muted, backgroundColor: C.cardAlt, borderRadius: 6, padding: 6, marginBottom: 8, wordBreak: "break-all" as const }}>
+                            line[0] keys: {Object.keys(detail.lines[0]).join(", ")} | values: {JSON.stringify(detail.lines[0]).slice(0, 300)}
                           </div>}
 
                           {/* Líneas de detalle */}
