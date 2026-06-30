@@ -774,7 +774,7 @@ export default function App() {
       const assignedData = cc ? { project_id: cc.project_id, cost_center_id: cc.id, project_name: ccName, cc_name: ccName } : { cost_center_id: selectedValue, cc_name: ccName };
       setNuboxPurchases(prev => prev.map(p => p.id === nuboxId ? { ...p, assigned: assignedData } : p));
       setNuboxSelectedProject(prev => { const n = { ...prev }; delete n[String(nuboxId)]; return n; });
-      await loadKpis();
+      await Promise.all([loadKpis(), loadNuboxSummary()]);
     } catch { alert("Error"); } finally { setNuboxAssigning(null); }
   }
 
