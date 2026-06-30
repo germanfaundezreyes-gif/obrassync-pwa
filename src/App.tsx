@@ -2081,9 +2081,9 @@ export default function App() {
                         <div style={{ borderTop: `0.5px solid ${C.border}`, padding: "10px 14px 14px" }}>
                           {loadingDetail && <div style={{ textAlign: "center", color: C.muted, fontSize: 12, padding: "12px 0" }}>Cargando detalle...</div>}
 
-                          {/* DEBUG temporal — muestra estructura real */}
+                          {/* DEBUG temporal */}
                           {!loadingDetail && <div style={{ fontSize: 9, color: C.muted, backgroundColor: C.cardAlt, borderRadius: 6, padding: 6, marginBottom: 8, wordBreak: "break-all" as const }}>
-                            campos p: {Object.keys(p).join(", ")}{detail ? ` | campos detail: ${Object.keys(detail).join(", ")}` : " | sin detail"}
+                            links: {JSON.stringify(p.links)}{detail ? ` | lines count: ${detail.lines?.length ?? "?"} | detail keys: ${Object.keys(detail).join(", ")}` : " | sin detail"}
                           </div>}
 
                           {/* Líneas de detalle */}
@@ -2116,7 +2116,7 @@ export default function App() {
                           {!loadingDetail && (
                             <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: "8px 10px", marginBottom: 12 }}>
                               {src.totalNetAmount != null && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.muted, marginBottom: 3 }}><span>Neto</span><span>{fmtCLP(src.totalNetAmount)}</span></div>}
-                              {(src.totalTaxAmount ?? src.totalIvaAmount) != null && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.muted, marginBottom: 3 }}><span>IVA</span><span>{fmtCLP(src.totalTaxAmount ?? src.totalIvaAmount)}</span></div>}
+                              {(src.totalTaxVatAmount ?? src.totalTaxAmount ?? src.totalIvaAmount) != null && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.muted, marginBottom: 3 }}><span>IVA</span><span>{fmtCLP(src.totalTaxVatAmount ?? src.totalTaxAmount ?? src.totalIvaAmount)}</span></div>}
                               {src.totalExemptAmount != null && src.totalExemptAmount > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.muted, marginBottom: 3 }}><span>Exento</span><span>{fmtCLP(src.totalExemptAmount)}</span></div>}
                               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, fontWeight: 800, color: C.text, paddingTop: 4, borderTop: `0.5px solid ${C.border}`, marginTop: 3 }}><span>Total</span><span>{fmtCLP(src.totalAmount)}</span></div>
                             </div>
