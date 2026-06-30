@@ -253,6 +253,8 @@ export default function App() {
   const [nuboxShowAll, setNuboxShowAll] = useState(false);
   const [nuboxView, setNuboxView] = useState<"compras" | "ventas">("compras");
   const [nuboxExpanded, setNuboxExpanded] = useState<Record<string, boolean>>({});
+  const [nuboxDetail, setNuboxDetail] = useState<Record<string, any>>({});
+  const [nuboxDetailLoading, setNuboxDetailLoading] = useState<Record<string, boolean>>({});
   const [nuboxSummary, setNuboxSummary] = useState<any | null>(null);
   const [nuboxSalesSummary, setNuboxSalesSummary] = useState<any | null>(null);
   const [nuboxSalesAssigning, setNuboxSalesAssigning] = useState<string | null>(null);
@@ -2031,11 +2033,30 @@ export default function App() {
                   const assignedCC = costCenters.find(cc => cc.id === p.assigned?.cost_center_id || cc.project_id === p.assigned?.project_id);
                   const selectedCC = nuboxSelectedProject[p.id] || "";
                   const expanded = !!nuboxExpanded[p.id];
-                  const lines: any[] = p.lines || p.details || [];
+                  const detail = nuboxDetail[p.id];
+                  const loadingDetail = !!nuboxDetailLoading[p.id];
+
+                  async function toggleExpand() {
+                    const nowExpanded = !nuboxExpanded[p.id];
+                    setNuboxExpanded(prev => ({ ...prev, [p.id]: nowExpanded }));
+                    if (nowExpanded && !nuboxDetail[p.id]) {
+                      setNuboxDetailLoading(prev => ({ ...prev, [p.id]: true }));
+                      try {
+                        const r = await fetch(`${API_URL}/nubox/purchases/${p.id}`, { headers: { Authorization: `Bearer ${token}` } });
+                        const d = await r.json();
+                        if (d.ok) setNuboxDetail(prev => ({ ...prev, [p.id]: d.item }));
+                      } catch {}
+                      finally { setNuboxDetailLoading(prev => ({ ...prev, [p.id]: false })); }
+                    }
+                  }
+
+                  const src = detail || p;
+                  const lines: any[] = src.lines || src.details || src.items || src.lineItems || [];
+
                   return (
                     <div key={p.id} style={{ backgroundColor: C.card, border: `0.5px solid ${isAssigned ? C.success : C.border}`, borderRadius: 14, marginBottom: 10, overflow: "hidden" }}>
                       {/* Cabecera — tap para expandir */}
-                      <div onClick={() => setNuboxExpanded(prev => ({ ...prev, [p.id]: !expanded }))} style={{ padding: 14, cursor: "pointer" }}>
+                      <div onClick={toggleExpand} style={{ padding: 14, cursor: "pointer" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{p.supplier?.tradeName || p.supplier?.businessName || "Proveedor"}</div>
@@ -2058,24 +2079,26 @@ export default function App() {
                       {/* Detalle expandido */}
                       {expanded && (
                         <div style={{ borderTop: `0.5px solid ${C.border}`, padding: "10px 14px 14px" }}>
+                          {loadingDetail && <div style={{ textAlign: "center", color: C.muted, fontSize: 12, padding: "12px 0" }}>Cargando detalle...</div>}
+
                           {/* Líneas de detalle */}
-                          {lines.length > 0 && (
+                          {!loadingDetail && lines.length > 0 && (
                             <div style={{ marginBottom: 12 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Detalle</div>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginBottom: 6, textTransform: "uppercase" as const, letterSpacing: 0.5 }}>Detalle</div>
                               <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, overflow: "hidden" }}>
                                 {lines.map((line: any, i: number) => (
                                   <div key={i} style={{ padding: "8px 10px", borderBottom: i < lines.length - 1 ? `0.5px solid ${C.border}` : "none" }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                                       <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontSize: 12, color: C.text, fontWeight: 600 }}>{line.name || line.description || line.productName || `Ítem ${i + 1}`}</div>
-                                        {(line.code || line.productCode) && <div style={{ fontSize: 10, color: C.muted }}>Cód: {line.code || line.productCode}</div>}
+                                        <div style={{ fontSize: 12, color: C.text, fontWeight: 600 }}>{line.name || line.description || line.productName || line.gloss || `Ítem ${i + 1}`}</div>
+                                        {(line.code || line.productCode || line.sku) && <div style={{ fontSize: 10, color: C.muted }}>Cód: {line.code || line.productCode || line.sku}</div>}
                                         <div style={{ fontSize: 11, color: C.muted }}>
-                                          {line.quantity != null ? `${line.quantity} ${line.unit || "un"}` : ""}
-                                          {line.unitPrice != null ? ` × ${fmtCLP(line.unitPrice)}` : ""}
+                                          {line.quantity != null ? `${line.quantity} ${line.unit || line.measureUnit || "un"}` : ""}
+                                          {line.unitPrice != null ? ` × ${fmtCLP(line.unitPrice)}` : line.price != null ? ` × ${fmtCLP(line.price)}` : ""}
                                         </div>
                                       </div>
                                       <div style={{ fontSize: 13, fontWeight: 700, color: C.text, flexShrink: 0 }}>
-                                        {fmtCLP(line.totalPrice ?? line.total ?? line.amount ?? 0)}
+                                        {fmtCLP(line.totalPrice ?? line.total ?? line.totalAmount ?? line.amount ?? 0)}
                                       </div>
                                     </div>
                                   </div>
@@ -2085,22 +2108,14 @@ export default function App() {
                           )}
 
                           {/* Totales */}
-                          <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: "8px 10px", marginBottom: 12 }}>
-                            {p.totalNetAmount != null && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.muted, marginBottom: 3 }}><span>Neto</span><span>{fmtCLP(p.totalNetAmount)}</span></div>}
-                            {p.totalTaxAmount != null && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.muted, marginBottom: 3 }}><span>IVA</span><span>{fmtCLP(p.totalTaxAmount)}</span></div>}
-                            {p.totalExemptAmount != null && p.totalExemptAmount > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.muted, marginBottom: 3 }}><span>Exento</span><span>{fmtCLP(p.totalExemptAmount)}</span></div>}
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, fontWeight: 800, color: C.text, paddingTop: 4, borderTop: `0.5px solid ${C.border}`, marginTop: 3 }}><span>Total</span><span>{fmtCLP(p.totalAmount)}</span></div>
-                          </div>
-
-                          {/* Botón ver en Nubox */}
-                          <a
-                            href={`https://pyme.nubox.com/compras/ver/${p.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ display: "block", textAlign: "center", padding: "9px 0", borderRadius: 10, backgroundColor: C.orangeDim, color: C.orange, fontWeight: 700, fontSize: 13, textDecoration: "none", marginBottom: 10 }}
-                          >
-                            🔗 Ver documento en Nubox
-                          </a>
+                          {!loadingDetail && (
+                            <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: "8px 10px", marginBottom: 12 }}>
+                              {src.totalNetAmount != null && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.muted, marginBottom: 3 }}><span>Neto</span><span>{fmtCLP(src.totalNetAmount)}</span></div>}
+                              {(src.totalTaxAmount ?? src.totalIvaAmount) != null && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.muted, marginBottom: 3 }}><span>IVA</span><span>{fmtCLP(src.totalTaxAmount ?? src.totalIvaAmount)}</span></div>}
+                              {src.totalExemptAmount != null && src.totalExemptAmount > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.muted, marginBottom: 3 }}><span>Exento</span><span>{fmtCLP(src.totalExemptAmount)}</span></div>}
+                              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, fontWeight: 800, color: C.text, paddingTop: 4, borderTop: `0.5px solid ${C.border}`, marginTop: 3 }}><span>Total</span><span>{fmtCLP(src.totalAmount)}</span></div>
+                            </div>
+                          )}
 
                           {/* Asignar */}
                           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
