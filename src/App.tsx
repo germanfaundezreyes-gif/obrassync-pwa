@@ -2081,6 +2081,11 @@ export default function App() {
                         <div style={{ borderTop: `0.5px solid ${C.border}`, padding: "10px 14px 14px" }}>
                           {loadingDetail && <div style={{ textAlign: "center", color: C.muted, fontSize: 12, padding: "12px 0" }}>Cargando detalle...</div>}
 
+                          {/* DEBUG temporal — muestra estructura real */}
+                          {!loadingDetail && <div style={{ fontSize: 9, color: C.muted, backgroundColor: C.cardAlt, borderRadius: 6, padding: 6, marginBottom: 8, wordBreak: "break-all" as const }}>
+                            campos p: {Object.keys(p).join(", ")}{detail ? ` | campos detail: ${Object.keys(detail).join(", ")}` : " | sin detail"}
+                          </div>}
+
                           {/* Líneas de detalle */}
                           {!loadingDetail && lines.length > 0 && (
                             <div style={{ marginBottom: 12 }}>
