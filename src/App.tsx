@@ -281,6 +281,10 @@ export default function App() {
   const [newCCName, setNewCCName] = useState("");
   const [newCCCode, setNewCCCode] = useState("");
   const [creatingCC, setCreatingCC] = useState(false);
+  const [editingCC, setEditingCC] = useState<string | null>(null);
+  const [editCCName, setEditCCName] = useState("");
+  const [editCCCode, setEditCCCode] = useState("");
+  const [savingCC, setSavingCC] = useState(false);
 
   // SII
   const [siiP12File, setSiiP12File] = useState<File | null>(null);
@@ -585,6 +589,17 @@ export default function App() {
       if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
       setNewCCName(""); setNewCCCode(""); await loadCostCenters();
     } catch { alert("Error"); } finally { setCreatingCC(false); }
+  }
+
+  async function updateCostCenter() {
+    if (!editingCC || !editCCName.trim()) { alert("Ingresa un nombre"); return; }
+    setSavingCC(true);
+    try {
+      const r = await fetch(`${API_URL}/cost-centers/${editingCC}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: editCCName, code: editCCCode }) });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
+      setEditingCC(null); await loadCostCenters();
+    } catch { alert("Error"); } finally { setSavingCC(false); }
   }
 
   const checkSiiStatus = async () => {
@@ -2193,13 +2208,32 @@ export default function App() {
                 <button onClick={createCostCenter} disabled={creatingCC} style={btnPrimary}>{creatingCC ? "Creando..." : "Crear centro de costo"}</button>
               </div>
               {costCenters.map(cc => (
-                <div key={cc.id} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 12, marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 36, height: 36, background: cc.type === "project" ? C.orangeDim : C.infoDim, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{cc.type === "project" ? "🏗️" : "📂"}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{cc.name}</div>
-                    <div style={{ fontSize: 11, color: C.muted }}>{cc.type === "project" ? `Proyecto · ${cc.project_name}` : "Manual"}{cc.code ? ` · #${cc.code}` : ""}</div>
-                  </div>
-                  {cc.type === "manual" && <button onClick={async () => { if (!confirm("¿Eliminar?")) return; await fetch(`${API_URL}/cost-centers/${cc.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); loadCostCenters(); }} style={{ backgroundColor: C.dangerDim, border: "none", borderRadius: 6, padding: "4px 10px", color: C.danger, fontSize: 11, cursor: "pointer" }}>✕</button>}
+                <div key={cc.id} style={{ backgroundColor: C.card, border: `0.5px solid ${editingCC === cc.id ? C.orange : C.border}`, borderRadius: 12, padding: 12, marginBottom: 8 }}>
+                  {editingCC === cc.id ? (
+                    <>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: C.orange, marginBottom: 8 }}>Editar centro de costo</div>
+                      <input value={editCCName} onChange={e => setEditCCName(e.target.value)} placeholder="Nombre" style={{ ...inp, marginBottom: 8 }} />
+                      <input value={editCCCode} onChange={e => setEditCCCode(e.target.value)} placeholder="Código (opcional)" style={{ ...inp, marginBottom: 10 }} />
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button onClick={updateCostCenter} disabled={savingCC} style={{ flex: 1, height: 36, backgroundColor: C.orange, border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{savingCC ? "Guardando..." : "Guardar"}</button>
+                        <button onClick={() => setEditingCC(null)} style={{ height: 36, padding: "0 14px", backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, color: C.muted, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 36, height: 36, background: cc.type === "project" ? C.orangeDim : C.infoDim, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{cc.type === "project" ? "🏗️" : "📂"}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{cc.name}</div>
+                        <div style={{ fontSize: 11, color: C.muted }}>{cc.type === "project" ? `Proyecto · ${cc.project_name}` : "Manual"}{cc.code ? ` · #${cc.code}` : ""}</div>
+                      </div>
+                      {cc.type === "manual" && (
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                          <button onClick={() => { setEditingCC(cc.id); setEditCCName(cc.name); setEditCCCode(cc.code || ""); }} style={{ backgroundColor: C.orangeDim, border: "none", borderRadius: 6, padding: "4px 10px", color: C.orange, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>✏️</button>
+                          <button onClick={async () => { if (!confirm("¿Eliminar?")) return; await fetch(`${API_URL}/cost-centers/${cc.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); loadCostCenters(); }} style={{ backgroundColor: C.dangerDim, border: "none", borderRadius: 6, padding: "4px 10px", color: C.danger, fontSize: 11, cursor: "pointer" }}>✕</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </>
