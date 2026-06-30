@@ -739,7 +739,7 @@ export default function App() {
     } catch { alert("Error subiendo PDF"); } finally { setUploadingPayrollPdf(false); }
   }
 
-  async function assignNuboxPurchase(nuboxId: number | string, selectedValue: string) {
+  async function assignNuboxPurchase(nuboxId: number | string, selectedValue: string, force = false) {
     setNuboxAssigning(String(nuboxId));
     try {
       const cc = costCenters.find(c => c.project_id === selectedValue);
@@ -755,6 +755,7 @@ export default function App() {
         total_amount: purchase?.totalAmount || 0,
         total_net: purchase?.totalNetAmount || 0,
         total_tax: purchase?.totalTaxVatAmount || 0,
+        force,
       };
       const r = await fetch(`${API_URL}/nubox/purchases/${nuboxId}/assign`, {
         method: "POST",
@@ -762,6 +763,12 @@ export default function App() {
         body: JSON.stringify(body)
       });
       const d = await r.json();
+      if (d.dupe) {
+        setNuboxAssigning(null);
+        const confirm_ = window.confirm(`⚠️ Ya existe un gasto manual con N°${purchase?.number} (${purchase?.supplier?.tradeName || purchase?.supplier?.identification?.value}).\n\n¿Asignar igual y mantener ambos registros?`);
+        if (confirm_) await assignNuboxPurchase(nuboxId, selectedValue, true);
+        return;
+      }
       if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
       const ccName = cc?.name || costCenters.find(c => c.id === selectedValue)?.name || "";
       const assignedData = cc ? { project_id: cc.project_id, cost_center_id: cc.id, project_name: ccName, cc_name: ccName } : { cost_center_id: selectedValue, cc_name: ccName };
@@ -2030,6 +2037,7 @@ export default function App() {
                 );
                 return filtered.map(p => {
                   const isAssigned = !!p.assigned;
+                  const hasDupe = !!p.manual_dupe;
                   const assignedCC = costCenters.find(cc => cc.id === p.assigned?.cost_center_id || cc.project_id === p.assigned?.project_id);
                   const selectedCC = nuboxSelectedProject[p.id] || "";
                   const expanded = !!nuboxExpanded[p.id];
@@ -2072,6 +2080,11 @@ export default function App() {
                         {isAssigned && (
                           <div style={{ fontSize: 11, color: C.success, fontWeight: 600 }}>
                             ✅ {assignedCC?.name || p.assigned.project_name || p.assigned.cc_name || "Asignado"}
+                          </div>
+                        )}
+                        {hasDupe && !isAssigned && (
+                          <div style={{ fontSize: 11, color: "#b45309", fontWeight: 600, marginTop: 4, backgroundColor: "#fef3c7", borderRadius: 6, padding: "3px 8px", display: "inline-block" }}>
+                            ⚠️ Ya existe como gasto manual
                           </div>
                         )}
                       </div>
