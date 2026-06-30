@@ -2081,10 +2081,6 @@ export default function App() {
                         <div style={{ borderTop: `0.5px solid ${C.border}`, padding: "10px 14px 14px" }}>
                           {loadingDetail && <div style={{ textAlign: "center", color: C.muted, fontSize: 12, padding: "12px 0" }}>Cargando detalle...</div>}
 
-                          {/* DEBUG temporal */}
-                          {!loadingDetail && detail?.lines?.[0] && <div style={{ fontSize: 9, color: C.muted, backgroundColor: C.cardAlt, borderRadius: 6, padding: 6, marginBottom: 8, wordBreak: "break-all" as const }}>
-                            line[0] keys: {Object.keys(detail.lines[0]).join(", ")} | values: {JSON.stringify(detail.lines[0]).slice(0, 300)}
-                          </div>}
 
                           {/* Líneas de detalle */}
                           {!loadingDetail && lines.length > 0 && (
@@ -2095,11 +2091,10 @@ export default function App() {
                                   <div key={i} style={{ padding: "8px 10px", borderBottom: i < lines.length - 1 ? `0.5px solid ${C.border}` : "none" }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                                       <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontSize: 12, color: C.text, fontWeight: 600 }}>{line.name || line.description || line.productName || line.gloss || `Ítem ${i + 1}`}</div>
-                                        {(line.code || line.productCode || line.sku) && <div style={{ fontSize: 10, color: C.muted }}>Cód: {line.code || line.productCode || line.sku}</div>}
+                                        <div style={{ fontSize: 12, color: C.text, fontWeight: 600 }}>{line.product?.description || line.name || line.description || `Ítem ${i + 1}`}</div>
                                         <div style={{ fontSize: 11, color: C.muted }}>
-                                          {line.quantity != null ? `${line.quantity} ${line.unit || line.measureUnit || "un"}` : ""}
-                                          {line.unitPrice != null ? ` × ${fmtCLP(line.unitPrice)}` : line.price != null ? ` × ${fmtCLP(line.price)}` : ""}
+                                          {line.quantity != null ? `${line.quantity} ${line.product?.uom || line.unit || "un"}` : ""}
+                                          {(line.price ?? line.unitPrice) != null ? ` × ${fmtCLP(line.price ?? line.unitPrice)}` : ""}
                                         </div>
                                       </div>
                                       <div style={{ fontSize: 13, fontWeight: 700, color: C.text, flexShrink: 0 }}>
