@@ -256,6 +256,7 @@ export default function App() {
   const [nuboxDetail, setNuboxDetail] = useState<Record<string, any>>({});
   const [nuboxDetailLoading, setNuboxDetailLoading] = useState<Record<string, boolean>>({});
   const [nuboxSummary, setNuboxSummary] = useState<any | null>(null);
+  const [nuboxKpiExpanded, setNuboxKpiExpanded] = useState(false);
   const [nuboxSalesSummary, setNuboxSalesSummary] = useState<any | null>(null);
   const [nuboxSalesAssigning, setNuboxSalesAssigning] = useState<string | null>(null);
   const [nuboxSalesProject, setNuboxSalesProject] = useState<Record<string, string>>({});
@@ -1626,11 +1627,33 @@ export default function App() {
                       </div>
                     </div>
                     {nuboxSummary.asignadas > 0 && (
-                      <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderTop: `0.5px solid ${C.border}`, fontSize: 12 }}>
+                      <div
+                        onClick={() => setNuboxKpiExpanded(e => !e)}
+                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: `0.5px solid ${C.border}`, fontSize: 12, cursor: "pointer" }}
+                      >
                         <span style={{ color: C.muted }}>✅ Asignadas a centros de costo</span>
-                        <span style={{ fontWeight: 700, color: C.success }}>{fmtCLP(nuboxSummary.total_asignado)} ({nuboxSummary.asignadas})</span>
+                        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontWeight: 700, color: C.success }}>{fmtCLP(nuboxSummary.total_asignado)} ({nuboxSummary.asignadas})</span>
+                          <span style={{ fontSize: 10, color: C.muted }}>{nuboxKpiExpanded ? "▲" : "▼"}</span>
+                        </span>
                       </div>
                     )}
+
+                    {/* Desglose por centro de costo */}
+                    {nuboxKpiExpanded && nuboxSummary.cost_center_breakdown?.length > 0 && (
+                      <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, overflow: "hidden", marginBottom: 8 }}>
+                        {nuboxSummary.cost_center_breakdown.map((cc: any, i: number) => (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", borderBottom: i < nuboxSummary.cost_center_breakdown.length - 1 ? `0.5px solid ${C.border}` : "none" }}>
+                            <div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{cc.code ? `[${cc.code}] ` : ""}{cc.name}</div>
+                              <div style={{ fontSize: 10, color: C.muted }}>{cc.facturas} factura{cc.facturas !== 1 ? "s" : ""}</div>
+                            </div>
+                            <div style={{ fontSize: 13, fontWeight: 800, color: C.text }}>{fmtCLP(cc.total)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     {nuboxSummary.sin_asignar > 0 && (
                       <button onClick={() => setGastosTab("nubox")} style={{ width: "100%", marginTop: 8, padding: "8px 0", borderRadius: 8, border: "none", backgroundColor: C.orangeDim, color: C.orange, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
                         Asignar {nuboxSummary.sin_asignar} factura{nuboxSummary.sin_asignar !== 1 ? "s" : ""} pendiente{nuboxSummary.sin_asignar !== 1 ? "s" : ""} →
