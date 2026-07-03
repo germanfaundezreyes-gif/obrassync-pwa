@@ -1090,7 +1090,7 @@ export default function App() {
                         </div>
                       )}
                     </div>
-                    <img src={`${API_URL}${photo.local_path}`} alt={photo.filename} style={{ width: "100%", maxHeight: 300, objectFit: "cover", display: "block", backgroundColor: C.border }} />
+                    <img src={photo.onedrive_url || `${API_URL}${photo.local_path}`} alt={photo.filename} style={{ width: "100%", maxHeight: 300, objectFit: "cover", display: "block", backgroundColor: C.border }} />
                   </div>
                 ))}
                   </div>;
