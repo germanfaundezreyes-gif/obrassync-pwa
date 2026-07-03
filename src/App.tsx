@@ -2083,7 +2083,9 @@ export default function App() {
                 return filtered.map(p => {
                   const isAssigned = !!p.assigned;
                   const hasDupe = !!p.manual_dupe;
-                  const assignedCC = costCenters.find(cc => cc.id === p.assigned?.cost_center_id || cc.project_id === p.assigned?.project_id);
+                  const assignedCC = p.assigned?.cost_center_id
+                    ? costCenters.find(cc => cc.id === p.assigned.cost_center_id)
+                    : (p.assigned?.project_id ? costCenters.find(cc => cc.project_id === p.assigned.project_id) : undefined);
                   const selectedCC = nuboxSelectedProject[p.id] || "";
                   const expanded = !!nuboxExpanded[p.id];
                   const detail = nuboxDetail[p.id];
