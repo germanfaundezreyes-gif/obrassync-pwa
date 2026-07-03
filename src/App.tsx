@@ -493,11 +493,31 @@ export default function App() {
     } catch { alert("Error generando informe"); } finally { setGeneratingReport(false); }
   }
 
+  // Comprime la imagen a máx 1600px lado mayor, JPEG 80% — pasa de ~8MB a ~300KB
+  async function compressImage(file: File): Promise<File> {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const maxSide = 1600;
+      const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+      const w = Math.round(bitmap.width * scale);
+      const h = Math.round(bitmap.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return file;
+      ctx.drawImage(bitmap, 0, 0, w, h);
+      const blob: Blob | null = await new Promise(res => canvas.toBlob(res, "image/jpeg", 0.8));
+      if (!blob || blob.size >= file.size) return file;
+      return new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" });
+    } catch { return file; }
+  }
+
   async function uploadPhotoWithDesc(file: File, description: string) {
     if (!selectedTask) return;
     setUploadingPhoto(true);
     try {
-      const fd = new FormData(); fd.append("photo", file); fd.append("description", description); fd.append("photo_type", photoTypeInput);
+      const compressed = await compressImage(file);
+      const fd = new FormData(); fd.append("photo", compressed); fd.append("description", description); fd.append("photo_type", photoTypeInput);
       const r = await fetch(`${API_URL}/tasks/${selectedTask.id}/photos`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
