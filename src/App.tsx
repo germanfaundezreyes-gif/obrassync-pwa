@@ -322,6 +322,28 @@ export default function App() {
   useEffect(() => { if (token) { loadProjects(); loadKpis(); if (isAdmin) { loadUsers(); loadCostCenters(); } } }, [token]);
   useEffect(() => { if (selectedProject && token) loadTasks(selectedProject.id); }, [selectedProject]);
 
+  // Auto-logout por inactividad (30 minutos)
+  useEffect(() => {
+    if (!token) return;
+    const TIMEOUT = 30 * 60 * 1000;
+    let timer: ReturnType<typeof setTimeout>;
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        setToken(null);
+        setTasks([]); setSelectedProject(null); setScreen("home");
+        alert("Sesión cerrada por inactividad.");
+      }, TIMEOUT);
+    };
+    const events = ["mousedown", "touchstart", "keydown", "scroll", "click"];
+    events.forEach(e => window.addEventListener(e, reset, { passive: true }));
+    reset();
+    return () => {
+      clearTimeout(timer);
+      events.forEach(e => window.removeEventListener(e, reset));
+    };
+  }, [token]);
+
   const inp: React.CSSProperties = { width: "100%", height: 48, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 14, padding: "0 14px", marginBottom: 10, boxSizing: "border-box", outline: "none" };
   const btnPrimary: React.CSSProperties = { width: "100%", height: 50, backgroundColor: C.orange, border: "none", borderRadius: 12, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" };
 
