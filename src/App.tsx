@@ -16,7 +16,7 @@ type Rendicion = { id: string; worker_name: string; worker_email?: string; date:
 type Quotation = { id: string; client_name?: string; client_rut?: string; reference?: string; status: string; nubox_doc_number_services?: string; nubox_doc_number_materials?: string; total_services: number; total_materials: number; source_type: string; created_at: string; created_by_name?: string };
 type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
 type AIItem = { nubox_id: number | null; name: string; unit: string; quantity: number; price_neto: number; is_new: boolean };
-type Project = { id: string; code: string; name: string; client_name?: string; start_date?: string; end_date?: string; progress_percent?: number };
+type Project = { id: string; code: string; name: string; client_name?: string; start_date?: string; end_date?: string; progress_percent?: number; project_type?: string; status?: string; jefe_id?: string; supervisor_id?: string; jefe_name?: string; supervisor_name?: string };
 type Task = { id: string; name: string; duration?: string; start_date?: string; end_date?: string; progress_percent?: number; status?: string; photo_count?: number; unit?: string; quantity?: string; codigo?: string; esquema?: string };
 type TaskPhoto = { id: string; filename: string; local_path?: string; onedrive_url?: string; created_at: string; description?: string; photo_type?: string };
 type QuoteItem = { tempId: string; name: string; codigo: string; quantity: string; unit: string; start_date: string; end_date: string; selected: boolean };
@@ -180,6 +180,13 @@ export default function App() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
+  const [newProjType, setNewProjType] = useState<"proyecto" | "mantenimiento">("proyecto");
+  const [newProjJefe, setNewProjJefe] = useState("");
+  const [newProjSupervisor, setNewProjSupervisor] = useState("");
+  const [projTab, setProjTab] = useState<"proyecto" | "mantenimiento" | "resumen">("proyecto");
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editProj, setEditProj] = useState<{ project_type: string; status: string; jefe_id: string; supervisor_id: string }>({ project_type: "proyecto", status: "activo", jefe_id: "", supervisor_id: "" });
+  const [savingProject, setSavingProject] = useState(false);
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
@@ -399,12 +406,24 @@ export default function App() {
     if (!projectCode || !projectName) { alert("Código y nombre son obligatorios"); return; }
     setCreatingProject(true);
     try {
-      const r = await fetch(`${API_URL}/projects`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ code: projectCode, name: projectName, clientName, startDate: startDate || null, endDate: endDate || null }) });
+      const r = await fetch(`${API_URL}/projects`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ code: projectCode, name: projectName, clientName, startDate: startDate || null, endDate: endDate || null, projectType: newProjType, jefeId: newProjJefe || null, supervisorId: newProjSupervisor || null }) });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
-      setProjectCode(""); setProjectName(""); setClientName(""); setStartDate(""); setEndDate("");
+      setProjectCode(""); setProjectName(""); setClientName(""); setStartDate(""); setEndDate(""); setNewProjJefe(""); setNewProjSupervisor("");
       await loadProjects(); setScreen("proyectos");
     } catch { alert("Error creando proyecto"); } finally { setCreatingProject(false); }
+  }
+
+  async function saveProjectEdit() {
+    if (!editingProject) return;
+    setSavingProject(true);
+    try {
+      const r = await fetch(`${API_URL}/projects/${editingProject.id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ project_type: editProj.project_type, status: editProj.status, jefe_id: editProj.jefe_id || null, supervisor_id: editProj.supervisor_id || null }) });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
+      setEditingProject(null);
+      await loadProjects();
+    } catch { alert("Error"); } finally { setSavingProject(false); }
   }
 
   async function deleteProject(id: string) {
@@ -1325,30 +1344,120 @@ export default function App() {
           <>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div style={{ fontSize: 18, fontWeight: 700 }}>Proyectos</div>
-              <button onClick={() => setScreen("crearProyecto")} style={{ backgroundColor: C.orange, border: "none", borderRadius: 8, padding: "7px 14px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+              {isAdmin && <button onClick={() => setScreen("crearProyecto")} style={{ backgroundColor: C.orange, border: "none", borderRadius: 8, padding: "7px 14px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
                 <Plus size={13} /> Nuevo
-              </button>
+              </button>}
             </div>
-            {projects.map(p => (
-              <div key={p.id} style={{ backgroundColor: C.card, border: `0.5px solid ${selectedProject?.id === p.id ? C.orange : C.border}`, borderRadius: 14, padding: 14, marginBottom: 8 }}>
+
+            {/* Tabs Proyectos / Mantenimiento / Resumen */}
+            <div style={{ display: "flex", backgroundColor: C.cardAlt, borderRadius: 10, padding: 4, marginBottom: 12, gap: 3 }}>
+              {([["proyecto", "🏗️ Proyectos"], ["mantenimiento", "🔧 Mantenimiento"], ["resumen", "📊 Resumen"]] as const).map(([key, label]) => (
+                <button key={key} onClick={() => setProjTab(key)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: projTab === key ? C.card : "transparent", color: projTab === key ? C.orange : C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>{label}</button>
+              ))}
+            </div>
+
+            {/* Resumen */}
+            {projTab === "resumen" && (() => {
+              const grupos: [string, string, Project[]][] = [
+                ["🏗️", "Proyectos", projects.filter(p => (p.project_type || "proyecto") === "proyecto")],
+                ["🔧", "Mantenimiento", projects.filter(p => p.project_type === "mantenimiento")],
+              ];
+              return grupos.map(([icon, label, items]) => {
+                const activos = items.filter(p => (p.status || "activo") === "activo");
+                const avance = activos.length > 0 ? activos.reduce((s, p) => s + (+(p.progress_percent || 0)), 0) / activos.length : 0;
+                return (
+                  <div key={label} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 12 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>{icon} {label}</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
+                      {[["Total", items.length, C.text], ["Activos", activos.length, C.success], ["Avance", `${Math.round(avance)}%`, C.orange]].map(([l, v, c]) => (
+                        <div key={String(l)} style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 10, textAlign: "center" }}>
+                          <div style={{ fontSize: 10, color: C.muted }}>{l}</div>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: c as string, marginTop: 2 }}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {activos.map(p => (
+                      <div key={p.id} onClick={() => { setSelectedProject(p); setScreen("partidas"); }} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: `0.5px solid ${C.border}`, cursor: "pointer" }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600 }}>{p.name}</div>
+                          <div style={{ fontSize: 10, color: C.muted }}>{p.jefe_name ? `👷 ${p.jefe_name}` : "Sin jefe"}{p.supervisor_name ? ` · 🛠 ${p.supervisor_name}` : ""}</div>
+                        </div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: C.orange, flexShrink: 0 }}>{Math.round(+(p.progress_percent || 0))}%</div>
+                      </div>
+                    ))}
+                    {activos.length === 0 && <div style={{ fontSize: 12, color: C.muted, textAlign: "center", padding: 8 }}>Sin {label.toLowerCase()} activos</div>}
+                  </div>
+                );
+              });
+            })()}
+
+            {/* Listado por tipo */}
+            {projTab !== "resumen" && projects.filter(p => (p.project_type || "proyecto") === projTab).map(p => {
+              const isFinished = (p.status || "activo") !== "activo";
+              return (
+              <div key={p.id} style={{ backgroundColor: C.card, border: `0.5px solid ${selectedProject?.id === p.id ? C.orange : C.border}`, borderRadius: 14, padding: 14, marginBottom: 8, opacity: isFinished ? 0.6 : 1 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <button onClick={() => { setSelectedProject(p); setScreen("partidas"); }} style={{ flex: 1, background: "none", border: "none", textAlign: "left", cursor: "pointer", padding: 0 }}>
-                    <div style={{ fontSize: 11, color: C.orange, fontWeight: 700, marginBottom: 4 }}>#{p.code}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                      <span style={{ fontSize: 11, color: C.orange, fontWeight: 700 }}>#{p.code}</span>
+                      {isFinished && <span style={{ fontSize: 10, fontWeight: 700, color: C.muted, backgroundColor: C.cardAlt, borderRadius: 6, padding: "2px 8px" }}>Terminado</span>}
+                    </div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{p.name}</div>
                     <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{p.client_name || "Sin cliente"}</div>
+                    {(p.jefe_name || p.supervisor_name) && (
+                      <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+                        {p.jefe_name && `👷 Jefe: ${p.jefe_name}`}{p.jefe_name && p.supervisor_name && " · "}{p.supervisor_name && `🛠 Supervisor: ${p.supervisor_name}`}
+                      </div>
+                    )}
                     {(p.start_date || p.end_date) && <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>{p.start_date && `▶ ${fmtDate(p.start_date)}`}{p.end_date && ` · 🏁 ${fmtDate(p.end_date)}`}</div>}
                     <div style={{ height: 3, background: C.border, borderRadius: 99, marginTop: 10, overflow: "hidden" }}>
                       <div style={{ width: `${p.progress_percent || 0}%`, height: "100%", background: C.orange, borderRadius: 99 }} />
                     </div>
                   </button>
                   {isAdmin && (
-                    <button onClick={() => deleteProject(p.id)} style={{ width: 34, height: 34, backgroundColor: C.dangerDim, border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", marginLeft: 10, flexShrink: 0 }}>
-                      <Trash2 size={14} color={C.danger} />
-                    </button>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginLeft: 10, flexShrink: 0 }}>
+                      <button onClick={() => { setEditingProject(p); setEditProj({ project_type: p.project_type || "proyecto", status: p.status || "activo", jefe_id: p.jefe_id || "", supervisor_id: p.supervisor_id || "" }); }} style={{ width: 34, height: 34, backgroundColor: C.orangeDim, border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✏️</button>
+                      <button onClick={() => deleteProject(p.id)} style={{ width: 34, height: 34, backgroundColor: C.dangerDim, border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Trash2 size={14} color={C.danger} />
+                      </button>
+                    </div>
                   )}
                 </div>
+
+                {/* Editor inline (admin) */}
+                {editingProject?.id === p.id && (
+                  <div style={{ borderTop: `0.5px solid ${C.border}`, marginTop: 10, paddingTop: 10 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                      <select value={editProj.project_type} onChange={e => setEditProj(f => ({ ...f, project_type: e.target.value }))} style={{ height: 38, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 12, padding: "0 8px" }}>
+                        <option value="proyecto">🏗️ Proyecto</option>
+                        <option value="mantenimiento">🔧 Mantenimiento</option>
+                      </select>
+                      <select value={editProj.status} onChange={e => setEditProj(f => ({ ...f, status: e.target.value }))} style={{ height: 38, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 12, padding: "0 8px" }}>
+                        <option value="activo">✅ Activo</option>
+                        <option value="terminado">🏁 Terminado</option>
+                      </select>
+                    </div>
+                    <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Jefe a cargo</div>
+                    <select value={editProj.jefe_id} onChange={e => setEditProj(f => ({ ...f, jefe_id: e.target.value }))} style={{ width: "100%", height: 38, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 12, padding: "0 8px", marginBottom: 8 }}>
+                      <option value="">— Sin asignar —</option>
+                      {users.filter(u => u.is_active).map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                    </select>
+                    <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Supervisor (ingeniero)</div>
+                    <select value={editProj.supervisor_id} onChange={e => setEditProj(f => ({ ...f, supervisor_id: e.target.value }))} style={{ width: "100%", height: 38, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 12, padding: "0 8px", marginBottom: 10 }}>
+                      <option value="">— Sin asignar —</option>
+                      {users.filter(u => u.is_active).map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                    </select>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={saveProjectEdit} disabled={savingProject} style={{ flex: 1, height: 36, backgroundColor: C.orange, border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{savingProject ? "Guardando..." : "Guardar"}</button>
+                      <button onClick={() => setEditingProject(null)} style={{ height: 36, padding: "0 14px", backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, color: C.muted, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
+                    </div>
+                  </div>
+                )}
               </div>
-            ))}
+            );})}
+            {projTab !== "resumen" && projects.filter(p => (p.project_type || "proyecto") === projTab).length === 0 && (
+              <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin {projTab === "proyecto" ? "proyectos" : "mantenimientos"}</div>
+            )}
           </>
         )}
 
@@ -1362,7 +1471,25 @@ export default function App() {
             <div style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>Fecha de inicio</div>
             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ ...inp, marginBottom: 10 }} />
             <div style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>Fecha de término</div>
-            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ ...inp, marginBottom: 16 }} />
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ ...inp, marginBottom: 12 }} />
+            <div style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>Tipo</div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              {([["proyecto", "🏗️ Proyecto"], ["mantenimiento", "🔧 Mantenimiento"]] as const).map(([key, label]) => (
+                <button key={key} onClick={() => setNewProjType(key)} style={{ flex: 1, height: 40, borderRadius: 10, border: `0.5px solid ${newProjType === key ? C.orange : C.border}`, backgroundColor: newProjType === key ? C.orangeDim : C.cardAlt, color: newProjType === key ? C.orange : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>{label}</button>
+              ))}
+            </div>
+            {isAdmin && <>
+              <div style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>Jefe a cargo</div>
+              <select value={newProjJefe} onChange={e => setNewProjJefe(e.target.value)} style={{ ...inp, marginBottom: 12 }}>
+                <option value="">— Sin asignar —</option>
+                {users.filter(u => u.is_active).map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+              </select>
+              <div style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>Supervisor (ingeniero)</div>
+              <select value={newProjSupervisor} onChange={e => setNewProjSupervisor(e.target.value)} style={{ ...inp, marginBottom: 16 }}>
+                <option value="">— Sin asignar —</option>
+                {users.filter(u => u.is_active).map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+              </select>
+            </>}
             <button onClick={createProject} disabled={creatingProject} style={btnPrimary}>{creatingProject ? "Creando..." : "Crear proyecto"}</button>
           </div>
         )}
