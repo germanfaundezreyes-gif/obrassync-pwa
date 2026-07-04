@@ -188,6 +188,7 @@ export default function App() {
   const [newStaffName, setNewStaffName] = useState("");
   const [newStaffRole, setNewStaffRole] = useState<"jefe" | "supervisor">("jefe");
   const [creatingStaff, setCreatingStaff] = useState(false);
+  const [projStaffFilter, setProjStaffFilter] = useState("");
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editProj, setEditProj] = useState<{ project_type: string; status: string; jefe_id: string; supervisor_id: string }>({ project_type: "proyecto", status: "activo", jefe_id: "", supervisor_id: "" });
   const [savingProject, setSavingProject] = useState(false);
@@ -332,7 +333,7 @@ export default function App() {
   const canSeeCotizaciones = canSee("cotizaciones");
   const canSeeRendiciones = canSee("rendiciones");
 
-  useEffect(() => { if (token) { loadProjects(); loadKpis(); if (isAdmin) { loadUsers(); loadCostCenters(); loadStaff(); } } }, [token]);
+  useEffect(() => { if (token) { loadProjects(); loadKpis(); loadStaff(); if (isAdmin) { loadUsers(); loadCostCenters(); } } }, [token]);
   useEffect(() => { if (selectedProject && token) loadTasks(selectedProject.id); }, [selectedProject]);
 
   // Auto-logout por inactividad (30 minutos)
@@ -1373,6 +1374,30 @@ export default function App() {
               </button>}
             </div>
 
+            {/* Filtro por jefe/supervisor */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center" }}>
+              <select
+                value={projStaffFilter}
+                onChange={e => setProjStaffFilter(e.target.value)}
+                style={{ flex: 1, height: 42, borderRadius: 10, border: `1.5px solid ${projStaffFilter ? C.orange : C.border}`, backgroundColor: projStaffFilter ? C.orangeDim : C.card, color: projStaffFilter ? C.orange : C.text, fontSize: 13, fontWeight: 700, padding: "0 12px", cursor: "pointer" }}
+              >
+                <option value="">👥 Todos — filtrar por responsable</option>
+                {staff.filter(s => s.role_type === "jefe").length > 0 && (
+                  <optgroup label="👷 Jefes a cargo">
+                    {staff.filter(s => s.role_type === "jefe").map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </optgroup>
+                )}
+                {staff.filter(s => s.role_type === "supervisor").length > 0 && (
+                  <optgroup label="🛠 Supervisores">
+                    {staff.filter(s => s.role_type === "supervisor").map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </optgroup>
+                )}
+              </select>
+              {projStaffFilter && (
+                <button onClick={() => setProjStaffFilter("")} style={{ height: 42, padding: "0 14px", backgroundColor: C.orange, border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>✕</button>
+              )}
+            </div>
+
             {/* Tabs Resumen / Proyectos / Mantenimiento / Equipo */}
             <div style={{ display: "flex", backgroundColor: C.cardAlt, borderRadius: 10, padding: 4, marginBottom: 12, gap: 3 }}>
               {([["resumen", "📊 Resumen"], ["proyecto", "🏗️ Proyectos"], ["mantenimiento", "🔧 Manten."], ...(isAdmin ? [["equipo", "👷 Equipo"]] as const : [])] as [typeof projTab, string][]).map(([key, label]) => (
@@ -1409,9 +1434,10 @@ export default function App() {
 
             {/* Resumen */}
             {projTab === "resumen" && (() => {
+              const base = projStaffFilter ? projects.filter(p => p.jefe_id === projStaffFilter || p.supervisor_id === projStaffFilter) : projects;
               const grupos: [string, string, Project[]][] = [
-                ["🏗️", "Proyectos", projects.filter(p => (p.project_type || "proyecto") === "proyecto")],
-                ["🔧", "Mantenimiento", projects.filter(p => p.project_type === "mantenimiento")],
+                ["🏗️", "Proyectos", base.filter(p => (p.project_type || "proyecto") === "proyecto")],
+                ["🔧", "Mantenimiento", base.filter(p => p.project_type === "mantenimiento")],
               ];
               return grupos.map(([icon, label, items]) => {
                 const activos = items.filter(p => (p.status || "activo") === "activo");
@@ -1443,7 +1469,7 @@ export default function App() {
             })()}
 
             {/* Listado por tipo */}
-            {projTab !== "resumen" && projects.filter(p => (p.project_type || "proyecto") === projTab).map(p => {
+            {projTab !== "resumen" && projTab !== "equipo" && projects.filter(p => (p.project_type || "proyecto") === projTab && (!projStaffFilter || ((p.jefe_id === projStaffFilter || p.supervisor_id === projStaffFilter) && (p.status || "activo") === "activo"))).map(p => {
               const isFinished = (p.status || "activo") !== "activo";
               return (
               <div key={p.id} style={{ backgroundColor: C.card, border: `0.5px solid ${selectedProject?.id === p.id ? C.orange : C.border}`, borderRadius: 14, padding: 14, marginBottom: 8, opacity: isFinished ? 0.6 : 1 }}>
@@ -1506,8 +1532,8 @@ export default function App() {
                 )}
               </div>
             );})}
-            {projTab !== "resumen" && projects.filter(p => (p.project_type || "proyecto") === projTab).length === 0 && (
-              <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin {projTab === "proyecto" ? "proyectos" : "mantenimientos"}</div>
+            {projTab !== "resumen" && projTab !== "equipo" && projects.filter(p => (p.project_type || "proyecto") === projTab && (!projStaffFilter || ((p.jefe_id === projStaffFilter || p.supervisor_id === projStaffFilter) && (p.status || "activo") === "activo"))).length === 0 && (
+              <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin {projTab === "proyecto" ? "proyectos" : "mantenimientos"}{projStaffFilter ? " para este responsable" : ""}</div>
             )}
           </>
         )}
