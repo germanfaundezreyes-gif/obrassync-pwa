@@ -1373,6 +1373,23 @@ export default function App() {
                 <div style={{ backgroundColor: C.successDim, border: `0.5px solid ${C.success}40`, borderRadius: 12, padding: 14, marginBottom: 14, textAlign: "center" }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.success }}>✅ Recepción conforme enviada</div>
                   <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Informe y correo enviados el {fmtDate(selectedProject.recepcion_conforme_at)}</div>
+                  {isAdmin && (
+                    <button
+                      onClick={async () => {
+                        if (!confirm("¿Revertir la recepción conforme? El botón volverá a quedar activo para enviar de nuevo.")) return;
+                        try {
+                          const r = await fetch(`${API_URL}/projects/${selectedProject.id}/revertir-recepcion`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+                          const d = await r.json();
+                          if (!d.ok) { alert(d.message || "Error"); return; }
+                          setSelectedProject({ ...selectedProject, recepcion_conforme_at: undefined } as Project);
+                          await loadProjects();
+                        } catch { alert("Error"); }
+                      }}
+                      style={{ marginTop: 10, height: 34, padding: "0 16px", backgroundColor: C.card, border: `0.5px solid ${C.danger}50`, borderRadius: 8, color: C.danger, fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                    >
+                      ↩️ Revertir (solo admin)
+                    </button>
+                  )}
                 </div>
               ) : (
                 <button onClick={sendRecepcionConforme} disabled={sendingRecepcion} style={{ width: "100%", height: 50, backgroundColor: C.success, border: "none", borderRadius: 12, color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", marginBottom: 14, opacity: sendingRecepcion ? 0.7 : 1 }}>
