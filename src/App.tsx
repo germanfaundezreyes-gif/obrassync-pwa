@@ -16,7 +16,7 @@ type Rendicion = { id: string; worker_name: string; worker_email?: string; date:
 type Quotation = { id: string; client_name?: string; client_rut?: string; reference?: string; status: string; nubox_doc_number_services?: string; nubox_doc_number_materials?: string; total_services: number; total_materials: number; source_type: string; created_at: string; created_by_name?: string };
 type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
 type AIItem = { nubox_id: number | null; name: string; unit: string; quantity: number; price_neto: number; is_new: boolean };
-type Project = { id: string; code: string; name: string; client_name?: string; start_date?: string; end_date?: string; progress_percent?: number; project_type?: string; status?: string; jefe_id?: string; supervisor_id?: string; jefe_name?: string; supervisor_name?: string; recepcion_conforme_at?: string };
+type Project = { id: string; code: string; name: string; client_name?: string; start_date?: string; end_date?: string; progress_percent?: number; project_type?: string; status?: string; jefe_id?: string; supervisor_id?: string; jefe_name?: string; supervisor_name?: string; recepcion_conforme_at?: string; client_email?: string; inicio_notificado_at?: string; termino_notificado_at?: string };
 type Task = { id: string; name: string; duration?: string; start_date?: string; end_date?: string; progress_percent?: number; status?: string; photo_count?: number; unit?: string; quantity?: string; codigo?: string; esquema?: string };
 type TaskPhoto = { id: string; filename: string; local_path?: string; onedrive_url?: string; created_at: string; description?: string; photo_type?: string };
 type QuoteItem = { tempId: string; name: string; codigo: string; quantity: string; unit: string; start_date: string; end_date: string; selected: boolean };
@@ -197,10 +197,12 @@ export default function App() {
   const [pendingUpload, setPendingUpload] = useState<{ files: File[]; type: "cotizacion" | "orden_compra" } | null>(null);
   const [cotVisibleTo, setCotVisibleTo] = useState<string[]>([]);
   const [sendingRecepcion, setSendingRecepcion] = useState(false);
+  const [clientEmail, setClientEmail] = useState("");
+  const [notifying, setNotifying] = useState<"" | "inicio" | "termino">("");
   const cotFileRef = useRef<HTMLInputElement>(null);
   const ocFileRef = useRef<HTMLInputElement>(null);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [editProj, setEditProj] = useState<{ project_type: string; status: string; jefe_id: string; supervisor_id: string }>({ project_type: "proyecto", status: "activo", jefe_id: "", supervisor_id: "" });
+  const [editProj, setEditProj] = useState<{ project_type: string; status: string; jefe_id: string; supervisor_id: string; client_email: string }>({ project_type: "proyecto", status: "activo", jefe_id: "", supervisor_id: "", client_email: "" });
   const [savingProject, setSavingProject] = useState(false);
 
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -422,10 +424,10 @@ export default function App() {
     if (!projectCode || !projectName) { alert("Código y nombre son obligatorios"); return; }
     setCreatingProject(true);
     try {
-      const r = await fetch(`${API_URL}/projects`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ code: projectCode, name: projectName, clientName, startDate: startDate || null, endDate: endDate || null, projectType: newProjType, jefeId: newProjJefe || null, supervisorId: newProjSupervisor || null }) });
+      const r = await fetch(`${API_URL}/projects`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ code: projectCode, name: projectName, clientName, clientEmail: clientEmail || null, startDate: startDate || null, endDate: endDate || null, projectType: newProjType, jefeId: newProjJefe || null, supervisorId: newProjSupervisor || null }) });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
-      setProjectCode(""); setProjectName(""); setClientName(""); setStartDate(""); setEndDate(""); setNewProjJefe(""); setNewProjSupervisor("");
+      setProjectCode(""); setProjectName(""); setClientName(""); setClientEmail(""); setStartDate(""); setEndDate(""); setNewProjJefe(""); setNewProjSupervisor("");
       await loadProjects(); setScreen("proyectos");
     } catch { alert("Error creando proyecto"); } finally { setCreatingProject(false); }
   }
@@ -453,6 +455,22 @@ export default function App() {
       if (errores.length > 0) alert("Algunos archivos fallaron:\n" + errores.join("\n"));
       await loadProjFiles(selectedProject.id);
     } finally { setUploadingFile(false); setPendingUpload(null); setCotVisibleTo([]); }
+  }
+
+  async function notifyClientWorks(tipo: "inicio" | "termino") {
+    if (!selectedProject) return;
+    if (!selectedProject.client_email) { alert("El proyecto no tiene correo de cliente. Edítalo (✏️ en la lista de proyectos) y agrega el correo primero."); return; }
+    if (!confirm(`¿Notificar al cliente (${selectedProject.client_email}) el ${tipo === "inicio" ? "INICIO" : "TÉRMINO"} de los trabajos con fecha de hoy?`)) return;
+    setNotifying(tipo);
+    try {
+      const r = await fetch(`${API_URL}/projects/${selectedProject.id}/notificar-${tipo}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      if (!d.ok) { alert(d.message || "Error"); return; }
+      alert("✅ " + d.message);
+      const flag = tipo === "inicio" ? "inicio_notificado_at" : "termino_notificado_at";
+      setSelectedProject({ ...selectedProject, [flag]: new Date().toISOString() } as Project);
+      await loadProjects();
+    } catch { alert("Error"); } finally { setNotifying(""); }
   }
 
   async function sendRecepcionConforme() {
@@ -513,7 +531,7 @@ export default function App() {
     if (!editingProject) return;
     setSavingProject(true);
     try {
-      const r = await fetch(`${API_URL}/projects/${editingProject.id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ project_type: editProj.project_type, status: editProj.status, jefe_id: editProj.jefe_id || null, supervisor_id: editProj.supervisor_id || null }) });
+      const r = await fetch(`${API_URL}/projects/${editingProject.id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ project_type: editProj.project_type, status: editProj.status, jefe_id: editProj.jefe_id || null, supervisor_id: editProj.supervisor_id || null, client_email: editProj.client_email || null }) });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
       setEditingProject(null);
@@ -1367,6 +1385,30 @@ export default function App() {
               </button>
             </div>
 
+            {/* Notificaciones al cliente: inicio y término de trabajos */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+              {selectedProject?.inicio_notificado_at ? (
+                <div style={{ flex: 1, height: 44, backgroundColor: C.successDim, border: `0.5px solid ${C.success}40`, borderRadius: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.success }}>🟢 Inicio notificado</div>
+                  <div style={{ fontSize: 9, color: C.muted }}>{fmtDate(selectedProject.inicio_notificado_at)}</div>
+                </div>
+              ) : (
+                <button onClick={() => notifyClientWorks("inicio")} disabled={notifying !== ""} style={{ flex: 1, height: 44, backgroundColor: C.successDim, border: `0.5px solid ${C.success}`, borderRadius: 10, color: C.success, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                  {notifying === "inicio" ? "Enviando..." : "🟢 Notificar inicio"}
+                </button>
+              )}
+              {selectedProject?.termino_notificado_at ? (
+                <div style={{ flex: 1, height: 44, backgroundColor: C.infoDim, border: `0.5px solid ${C.info}40`, borderRadius: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.info }}>🏁 Término notificado</div>
+                  <div style={{ fontSize: 9, color: C.muted }}>{fmtDate(selectedProject.termino_notificado_at)}</div>
+                </div>
+              ) : (
+                <button onClick={() => notifyClientWorks("termino")} disabled={notifying !== ""} style={{ flex: 1, height: 44, backgroundColor: C.infoDim, border: `0.5px solid ${C.info}`, borderRadius: 10, color: C.info, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                  {notifying === "termino" ? "Enviando..." : "🏁 Notificar término"}
+                </button>
+              )}
+            </div>
+
             {/* Recepción conforme — todas las partidas completadas */}
             {tasks.length > 0 && tasks.every(t => t.status === "completada") && (
               selectedProject?.recepcion_conforme_at ? (
@@ -1737,7 +1779,7 @@ export default function App() {
                   </button>
                   {isAdmin && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, marginLeft: 10, flexShrink: 0 }}>
-                      <button onClick={() => { setEditingProject(p); setEditProj({ project_type: p.project_type || "proyecto", status: p.status || "activo", jefe_id: p.jefe_id || "", supervisor_id: p.supervisor_id || "" }); }} style={{ width: 34, height: 34, backgroundColor: C.orangeDim, border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✏️</button>
+                      <button onClick={() => { setEditingProject(p); setEditProj({ project_type: p.project_type || "proyecto", status: p.status || "activo", jefe_id: p.jefe_id || "", supervisor_id: p.supervisor_id || "", client_email: p.client_email || "" }); }} style={{ width: 34, height: 34, backgroundColor: C.orangeDim, border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✏️</button>
                       <button onClick={() => deleteProject(p.id)} style={{ width: 34, height: 34, backgroundColor: C.dangerDim, border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <Trash2 size={14} color={C.danger} />
                       </button>
@@ -1758,6 +1800,8 @@ export default function App() {
                         <option value="terminado">🏁 Terminado</option>
                       </select>
                     </div>
+                    <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Correo del cliente (notificaciones)</div>
+                    <input type="email" value={editProj.client_email} onChange={e => setEditProj(f => ({ ...f, client_email: e.target.value }))} placeholder="cliente@empresa.cl" style={{ width: "100%", height: 38, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 12, padding: "0 8px", marginBottom: 8, boxSizing: "border-box" as const }} />
                     <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Jefe a cargo</div>
                     <select value={editProj.jefe_id} onChange={e => setEditProj(f => ({ ...f, jefe_id: e.target.value }))} style={{ width: "100%", height: 38, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 12, padding: "0 8px", marginBottom: 8 }}>
                       <option value="">— Sin asignar —</option>
@@ -1787,7 +1831,7 @@ export default function App() {
         {screen === "crearProyecto" && (
           <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>Nuevo proyecto</div>
-            {[{ val: projectCode, set: setProjectCode, ph: "Código *", key: "code" }, { val: projectName, set: setProjectName, ph: "Nombre *", key: "name" }, { val: clientName, set: setClientName, ph: "Cliente", key: "client" }].map(({ val, set, ph, key }) => (
+            {[{ val: projectCode, set: setProjectCode, ph: "Código *", key: "code" }, { val: projectName, set: setProjectName, ph: "Nombre *", key: "name" }, { val: clientName, set: setClientName, ph: "Cliente", key: "client" }, { val: clientEmail, set: setClientEmail, ph: "Correo del cliente (notificaciones)", key: "clientEmail" }].map(({ val, set, ph, key }) => (
               <input key={key} value={val} onChange={e => set(e.target.value)} placeholder={ph} style={inp} />
             ))}
             <div style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>Fecha de inicio</div>
