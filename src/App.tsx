@@ -190,6 +190,13 @@ export default function App() {
   const [creatingStaff, setCreatingStaff] = useState(false);
   const [projStaffFilter, setProjStaffFilter] = useState("");
   const [priorities, setPriorities] = useState<any[]>([]);
+  const [projFiles, setProjFiles] = useState<any[]>([]);
+  const [projFilesOpen, setProjFilesOpen] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [pendingCotFile, setPendingCotFile] = useState<File | null>(null);
+  const [cotVisibleTo, setCotVisibleTo] = useState<string[]>([]);
+  const cotFileRef = useRef<HTMLInputElement>(null);
+  const ocFileRef = useRef<HTMLInputElement>(null);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editProj, setEditProj] = useState<{ project_type: string; status: string; jefe_id: string; supervisor_id: string }>({ project_type: "proyecto", status: "activo", jefe_id: "", supervisor_id: "" });
   const [savingProject, setSavingProject] = useState(false);
@@ -335,7 +342,7 @@ export default function App() {
   const canSeeRendiciones = canSee("rendiciones");
 
   useEffect(() => { if (token) { loadProjects(); loadKpis(); loadStaff(); loadPriorities(); if (isAdmin) { loadUsers(); loadCostCenters(); } } }, [token]);
-  useEffect(() => { if (selectedProject && token) loadTasks(selectedProject.id); }, [selectedProject]);
+  useEffect(() => { if (selectedProject && token) { loadTasks(selectedProject.id); loadProjFiles(selectedProject.id); } }, [selectedProject]);
 
   // Auto-logout por inactividad (30 minutos)
   useEffect(() => {
@@ -418,6 +425,41 @@ export default function App() {
       setProjectCode(""); setProjectName(""); setClientName(""); setStartDate(""); setEndDate(""); setNewProjJefe(""); setNewProjSupervisor("");
       await loadProjects(); setScreen("proyectos");
     } catch { alert("Error creando proyecto"); } finally { setCreatingProject(false); }
+  }
+
+  async function loadProjFiles(projectId: string) {
+    try { const r = await fetch(`${API_URL}/projects/${projectId}/files`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setProjFiles(d.items || []); } catch {}
+  }
+
+  async function uploadProjFile(file: File, fileType: "cotizacion" | "orden_compra", visibleTo: string[]) {
+    if (!selectedProject) return;
+    setUploadingFile(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("file_type", fileType);
+      if (visibleTo.length > 0) fd.append("visible_to", JSON.stringify(visibleTo));
+      const r = await fetch(`${API_URL}/projects/${selectedProject.id}/files`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+      const d = await r.json();
+      if (!d.ok) { alert(d.message || "Error"); return; }
+      await loadProjFiles(selectedProject.id);
+    } catch { alert("Error subiendo archivo"); } finally { setUploadingFile(false); setPendingCotFile(null); setCotVisibleTo([]); }
+  }
+
+  async function downloadProjFile(f: any) {
+    try {
+      const r = await fetch(`${API_URL}/project-files/${f.id}/download`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!r.ok) { alert("Error descargando"); return; }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const newTab = window.open(url, "_blank");
+      if (!newTab) {
+        const a = document.createElement("a");
+        a.href = url; a.download = f.filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch { alert("Error"); }
   }
 
   async function loadPriorities() {
@@ -1300,6 +1342,59 @@ export default function App() {
               <button onClick={() => setShowGantt(!showGantt)} style={{ flex: 1, height: 44, backgroundColor: showGantt ? C.orangeDim : C.cardAlt, border: `0.5px solid ${showGantt ? C.orange : C.border}`, borderRadius: 10, color: showGantt ? C.orange : C.mutedSoft, fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
                 📊 Excel
               </button>
+            </div>
+
+            {/* Documentos del proyecto */}
+            <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, marginBottom: 14, overflow: "hidden" }}>
+              <div onClick={() => setProjFilesOpen(o => !o)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", cursor: "pointer" }}>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>📎 Documentos{projFiles.length > 0 ? ` (${projFiles.length})` : ""}</div>
+                <span style={{ fontSize: 11, color: C.muted }}>{projFilesOpen ? "▲" : "▼"}</span>
+              </div>
+              {projFilesOpen && (
+                <div style={{ padding: "0 14px 14px" }}>
+                  {isAdmin && (
+                    <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                      <input ref={cotFileRef} type="file" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { setPendingCotFile(f); setCotVisibleTo([]); } e.target.value = ""; }} />
+                      <input ref={ocFileRef} type="file" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadProjFile(f, "orden_compra", []); e.target.value = ""; }} />
+                      <button onClick={() => cotFileRef.current?.click()} disabled={uploadingFile} style={{ flex: 1, height: 40, backgroundColor: C.orangeDim, border: `0.5px solid ${C.orange}40`, borderRadius: 10, color: C.orange, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>📄 Subir cotización</button>
+                      <button onClick={() => ocFileRef.current?.click()} disabled={uploadingFile} style={{ flex: 1, height: 40, backgroundColor: C.infoDim, border: `0.5px solid ${C.info}40`, borderRadius: 10, color: C.info, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>🧾 Subir orden de compra</button>
+                    </div>
+                  )}
+
+                  {/* Selector de visibilidad para cotización */}
+                  {pendingCotFile && (
+                    <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>📄 {pendingCotFile.name}</div>
+                      <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>¿Quiénes pueden ver esta cotización? (nadie seleccionado = solo administradores)</div>
+                      {users.filter(u => u.is_active && u.role !== "administrador").map(u => (
+                        <label key={u.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", fontSize: 12, cursor: "pointer" }}>
+                          <input type="checkbox" checked={cotVisibleTo.includes(u.id)} onChange={e => setCotVisibleTo(prev => e.target.checked ? [...prev, u.id] : prev.filter(x => x !== u.id))} />
+                          {u.full_name}
+                        </label>
+                      ))}
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <button onClick={() => uploadProjFile(pendingCotFile, "cotizacion", cotVisibleTo)} disabled={uploadingFile} style={{ flex: 1, height: 36, backgroundColor: C.orange, border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>{uploadingFile ? "Subiendo..." : "Subir"}</button>
+                        <button onClick={() => setPendingCotFile(null)} style={{ height: 36, padding: "0 14px", backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, color: C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Cancelar</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {uploadingFile && !pendingCotFile && <div style={{ textAlign: "center", color: C.muted, fontSize: 12, padding: 8 }}>Subiendo...</div>}
+
+                  {projFiles.map(f => (
+                    <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `0.5px solid ${C.border}` }}>
+                      <span style={{ fontSize: 16 }}>{f.file_type === "cotizacion" ? "📄" : "🧾"}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{f.filename}</div>
+                        <div style={{ fontSize: 10, color: C.muted }}>{f.file_type === "cotizacion" ? "Cotización" : "Orden de compra"} · {fmtDate(f.created_at)}</div>
+                      </div>
+                      <button onClick={() => downloadProjFile(f)} style={{ backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 6, padding: "5px 10px", color: C.info, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>⬇️</button>
+                      {isAdmin && <button onClick={async () => { if (!confirm("¿Eliminar documento?")) return; await fetch(`${API_URL}/project-files/${f.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); if (selectedProject) loadProjFiles(selectedProject.id); }} style={{ backgroundColor: C.dangerDim, border: "none", borderRadius: 6, padding: "5px 10px", color: C.danger, fontSize: 11, cursor: "pointer" }}>✕</button>}
+                    </div>
+                  ))}
+                  {projFiles.length === 0 && !pendingCotFile && <div style={{ textAlign: "center", color: C.muted, fontSize: 12, padding: 8 }}>Sin documentos adjuntos</div>}
+                </div>
+              )}
             </div>
 
             {/* Panel Gantt colapsable */}
