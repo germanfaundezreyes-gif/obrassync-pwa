@@ -1441,12 +1441,11 @@ export default function App() {
               ];
               return grupos.map(([icon, label, items]) => {
                 const activos = items.filter(p => (p.status || "activo") === "activo");
-                const avance = activos.length > 0 ? activos.reduce((s, p) => s + (+(p.progress_percent || 0)), 0) / activos.length : 0;
                 return (
                   <div key={label} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 12 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>{icon} {label}</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
-                      {[["Total", items.length, C.text], ["Activos", activos.length, C.success], ["Avance", `${Math.round(avance)}%`, C.orange]].map(([l, v, c]) => (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                      {[["Total", items.length, C.text], ["Activos", activos.length, C.success]].map(([l, v, c]) => (
                         <div key={String(l)} style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 10, textAlign: "center" }}>
                           <div style={{ fontSize: 10, color: C.muted }}>{l}</div>
                           <div style={{ fontSize: 18, fontWeight: 800, color: c as string, marginTop: 2 }}>{v}</div>
@@ -1454,12 +1453,17 @@ export default function App() {
                       ))}
                     </div>
                     {activos.map(p => (
-                      <div key={p.id} onClick={() => { setSelectedProject(p); setScreen("partidas"); }} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: `0.5px solid ${C.border}`, cursor: "pointer" }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12, fontWeight: 600 }}>{p.name}</div>
-                          <div style={{ fontSize: 10, color: C.muted }}>{p.jefe_name ? `👷 ${p.jefe_name}` : "Sin jefe"}{p.supervisor_name ? ` · 🛠 ${p.supervisor_name}` : ""}</div>
+                      <div key={p.id} onClick={() => { setSelectedProject(p); setScreen("partidas"); }} style={{ padding: "8px 0", borderTop: `0.5px solid ${C.border}`, cursor: "pointer" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600 }}>{p.name}</div>
+                            <div style={{ fontSize: 10, color: C.muted }}>{p.jefe_name ? `👷 ${p.jefe_name}` : "Sin jefe"}{p.supervisor_name ? ` · 🛠 ${p.supervisor_name}` : ""}</div>
+                          </div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: C.orange, flexShrink: 0 }}>{Math.round(+(p.progress_percent || 0))}%</div>
                         </div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: C.orange, flexShrink: 0 }}>{Math.round(+(p.progress_percent || 0))}%</div>
+                        <div style={{ height: 3, background: C.border, borderRadius: 99, marginTop: 6, overflow: "hidden" }}>
+                          <div style={{ width: `${p.progress_percent || 0}%`, height: "100%", background: C.orange, borderRadius: 99 }} />
+                        </div>
                       </div>
                     ))}
                     {activos.length === 0 && <div style={{ fontSize: 12, color: C.muted, textAlign: "center", padding: 8 }}>Sin {label.toLowerCase()} activos</div>}
