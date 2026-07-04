@@ -189,6 +189,7 @@ export default function App() {
   const [newStaffRole, setNewStaffRole] = useState<"jefe" | "supervisor">("jefe");
   const [creatingStaff, setCreatingStaff] = useState(false);
   const [projStaffFilter, setProjStaffFilter] = useState("");
+  const [priorities, setPriorities] = useState<any[]>([]);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editProj, setEditProj] = useState<{ project_type: string; status: string; jefe_id: string; supervisor_id: string }>({ project_type: "proyecto", status: "activo", jefe_id: "", supervisor_id: "" });
   const [savingProject, setSavingProject] = useState(false);
@@ -333,7 +334,7 @@ export default function App() {
   const canSeeCotizaciones = canSee("cotizaciones");
   const canSeeRendiciones = canSee("rendiciones");
 
-  useEffect(() => { if (token) { loadProjects(); loadKpis(); loadStaff(); if (isAdmin) { loadUsers(); loadCostCenters(); } } }, [token]);
+  useEffect(() => { if (token) { loadProjects(); loadKpis(); loadStaff(); loadPriorities(); if (isAdmin) { loadUsers(); loadCostCenters(); } } }, [token]);
   useEffect(() => { if (selectedProject && token) loadTasks(selectedProject.id); }, [selectedProject]);
 
   // Auto-logout por inactividad (30 minutos)
@@ -417,6 +418,10 @@ export default function App() {
       setProjectCode(""); setProjectName(""); setClientName(""); setStartDate(""); setEndDate(""); setNewProjJefe(""); setNewProjSupervisor("");
       await loadProjects(); setScreen("proyectos");
     } catch { alert("Error creando proyecto"); } finally { setCreatingProject(false); }
+  }
+
+  async function loadPriorities() {
+    try { const r = await fetch(`${API_URL}/tasks/priorities`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setPriorities(d.items || []); } catch {}
   }
 
   async function loadStaff() {
@@ -1470,6 +1475,47 @@ export default function App() {
                   </div>
                 );
               });
+            })()}
+
+            {/* Prioridades: partidas atrasadas y por vencer */}
+            {projTab === "resumen" && (() => {
+              const visibleIds = new Set((projStaffFilter ? projects.filter(p => p.jefe_id === projStaffFilter || p.supervisor_id === projStaffFilter) : projects).map(p => p.id));
+              const items = priorities.filter(pr => visibleIds.has(pr.project_id));
+              const atrasadas = items.filter(pr => pr.prioridad === "atrasada");
+              const porVencer = items.filter(pr => pr.prioridad === "por_vencer");
+              if (items.length === 0) return null;
+              return (
+                <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>⚠️ Prioridades</div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {atrasadas.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: C.danger, backgroundColor: C.dangerDim, borderRadius: 6, padding: "3px 8px" }}>{atrasadas.length} atrasada{atrasadas.length !== 1 ? "s" : ""}</span>}
+                      {porVencer.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "#b45309", backgroundColor: "#fef3c7", borderRadius: 6, padding: "3px 8px" }}>{porVencer.length} por vencer</span>}
+                    </div>
+                  </div>
+                  {items.map(pr => {
+                    const proj = projects.find(p => p.id === pr.project_id);
+                    const isLate = pr.prioridad === "atrasada";
+                    return (
+                      <div key={pr.id} onClick={() => { if (proj) { setSelectedProject(proj); setScreen("partidas"); } }} style={{ padding: "8px 10px", borderRadius: 10, backgroundColor: isLate ? C.dangerDim : "#fef3c7", marginBottom: 6, cursor: "pointer" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: isLate ? C.danger : "#b45309" }}>{pr.name}</div>
+                            <div style={{ fontSize: 10, color: C.muted }}>
+                              {pr.project_type === "mantenimiento" ? "🔧" : "🏗️"} {pr.project_name}
+                              {pr.end_date && ` · 🏁 ${fmtDate(pr.end_date)}`}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: "right", flexShrink: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 800, color: isLate ? C.danger : "#b45309" }}>{Math.round(+(pr.progress_percent || 0))}%</div>
+                            <div style={{ fontSize: 9, fontWeight: 700, color: isLate ? C.danger : "#b45309" }}>{isLate ? "ATRASADA" : "POR VENCER"}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
             })()}
 
             {/* Listado por tipo */}
