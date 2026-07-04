@@ -199,6 +199,8 @@ export default function App() {
   const [sendingRecepcion, setSendingRecepcion] = useState(false);
   const [clientEmail, setClientEmail] = useState("");
   const [notifying, setNotifying] = useState<"" | "inicio" | "termino">("");
+  const [notifyPanel, setNotifyPanel] = useState<{ tipo: "inicio" | "termino"; resend: boolean } | null>(null);
+  const [notifyDate, setNotifyDate] = useState(new Date().toISOString().slice(0, 10));
   const cotFileRef = useRef<HTMLInputElement>(null);
   const ocFileRef = useRef<HTMLInputElement>(null);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -457,18 +459,25 @@ export default function App() {
     } finally { setUploadingFile(false); setPendingUpload(null); setCotVisibleTo([]); }
   }
 
-  async function notifyClientWorks(tipo: "inicio" | "termino") {
+  function openNotifyPanel(tipo: "inicio" | "termino", resend: boolean) {
     if (!selectedProject) return;
     if (!selectedProject.client_email) { alert("El proyecto no tiene correo de cliente. Edítalo (✏️ en la lista de proyectos) y agrega el correo primero."); return; }
-    if (!confirm(`¿Notificar al cliente (${selectedProject.client_email}) el ${tipo === "inicio" ? "INICIO" : "TÉRMINO"} de los trabajos con fecha de hoy?`)) return;
+    setNotifyDate(new Date().toISOString().slice(0, 10));
+    setNotifyPanel({ tipo, resend });
+  }
+
+  async function notifyClientWorks() {
+    if (!selectedProject || !notifyPanel) return;
+    const { tipo, resend } = notifyPanel;
     setNotifying(tipo);
     try {
-      const r = await fetch(`${API_URL}/projects/${selectedProject.id}/notificar-${tipo}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const r = await fetch(`${API_URL}/projects/${selectedProject.id}/notificar-${tipo}`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ fecha: notifyDate, resend }) });
       const d = await r.json();
       if (!d.ok) { alert(d.message || "Error"); return; }
       alert("✅ " + d.message);
       const flag = tipo === "inicio" ? "inicio_notificado_at" : "termino_notificado_at";
-      setSelectedProject({ ...selectedProject, [flag]: new Date().toISOString() } as Project);
+      setSelectedProject({ ...selectedProject, [flag]: notifyDate + "T12:00:00" } as Project);
+      setNotifyPanel(null);
       await loadProjects();
     } catch { alert("Error"); } finally { setNotifying(""); }
   }
@@ -1386,28 +1395,46 @@ export default function App() {
             </div>
 
             {/* Notificaciones al cliente: inicio y término de trabajos */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: notifyPanel ? 8 : 14 }}>
               {selectedProject?.inicio_notificado_at ? (
-                <div style={{ flex: 1, height: 44, backgroundColor: C.successDim, border: `0.5px solid ${C.success}40`, borderRadius: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                <div onClick={() => openNotifyPanel("inicio", true)} style={{ flex: 1, height: 44, backgroundColor: C.successDim, border: `0.5px solid ${C.success}40`, borderRadius: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: C.success }}>🟢 Inicio notificado</div>
-                  <div style={{ fontSize: 9, color: C.muted }}>{fmtDate(selectedProject.inicio_notificado_at)}</div>
+                  <div style={{ fontSize: 9, color: C.muted }}>{fmtDate(selectedProject.inicio_notificado_at)} · tocar para reenviar</div>
                 </div>
               ) : (
-                <button onClick={() => notifyClientWorks("inicio")} disabled={notifying !== ""} style={{ flex: 1, height: 44, backgroundColor: C.successDim, border: `0.5px solid ${C.success}`, borderRadius: 10, color: C.success, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                  {notifying === "inicio" ? "Enviando..." : "🟢 Notificar inicio"}
+                <button onClick={() => openNotifyPanel("inicio", false)} disabled={notifying !== ""} style={{ flex: 1, height: 44, backgroundColor: C.successDim, border: `0.5px solid ${C.success}`, borderRadius: 10, color: C.success, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                  🟢 Notificar inicio
                 </button>
               )}
               {selectedProject?.termino_notificado_at ? (
-                <div style={{ flex: 1, height: 44, backgroundColor: C.infoDim, border: `0.5px solid ${C.info}40`, borderRadius: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                <div onClick={() => openNotifyPanel("termino", true)} style={{ flex: 1, height: 44, backgroundColor: C.infoDim, border: `0.5px solid ${C.info}40`, borderRadius: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: C.info }}>🏁 Término notificado</div>
-                  <div style={{ fontSize: 9, color: C.muted }}>{fmtDate(selectedProject.termino_notificado_at)}</div>
+                  <div style={{ fontSize: 9, color: C.muted }}>{fmtDate(selectedProject.termino_notificado_at)} · tocar para reenviar</div>
                 </div>
               ) : (
-                <button onClick={() => notifyClientWorks("termino")} disabled={notifying !== ""} style={{ flex: 1, height: 44, backgroundColor: C.infoDim, border: `0.5px solid ${C.info}`, borderRadius: 10, color: C.info, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                  {notifying === "termino" ? "Enviando..." : "🏁 Notificar término"}
+                <button onClick={() => openNotifyPanel("termino", false)} disabled={notifying !== ""} style={{ flex: 1, height: 44, backgroundColor: C.infoDim, border: `0.5px solid ${C.info}`, borderRadius: 10, color: C.info, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                  🏁 Notificar término
                 </button>
               )}
             </div>
+
+            {/* Panel de fecha para la notificación */}
+            {notifyPanel && (
+              <div style={{ backgroundColor: C.card, border: `0.5px solid ${notifyPanel.tipo === "inicio" ? C.success : C.info}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
+                  {notifyPanel.tipo === "inicio" ? "🟢 Notificar inicio de trabajos" : "🏁 Notificar término de trabajos"}{notifyPanel.resend ? " (reenvío)" : ""}
+                </div>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Se enviará a {selectedProject?.client_email}</div>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Fecha de {notifyPanel.tipo === "inicio" ? "inicio" : "término"} de los trabajos</div>
+                <input type="date" value={notifyDate} onChange={e => setNotifyDate(e.target.value)} style={{ width: "100%", height: 42, borderRadius: 10, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 14, padding: "0 10px", marginBottom: 10, boxSizing: "border-box" as const }} />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={notifyClientWorks} disabled={notifying !== ""} style={{ flex: 1, height: 40, backgroundColor: notifyPanel.tipo === "inicio" ? C.success : C.info, border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                    {notifying !== "" ? "Enviando..." : "Enviar correo"}
+                  </button>
+                  <button onClick={() => setNotifyPanel(null)} style={{ height: 40, padding: "0 16px", backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.muted, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
+                </div>
+              </div>
+            )}
 
             {/* Recepción conforme — todas las partidas completadas */}
             {tasks.length > 0 && tasks.every(t => t.status === "completada") && (
