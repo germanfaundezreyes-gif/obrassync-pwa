@@ -1457,19 +1457,24 @@ export default function App() {
                         </div>
                       ))}
                     </div>
-                    {activos.map(p => (
-                      <div key={p.id} onClick={() => { setSelectedProject(p); setScreen("partidas"); }} style={{ padding: "8px 0", borderTop: `0.5px solid ${C.border}`, cursor: "pointer" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600 }}>{p.name}</div>
-                            <div style={{ fontSize: 10, color: C.muted }}>{p.jefe_name ? `👷 ${p.jefe_name}` : "Sin jefe"}{p.supervisor_name ? ` · 🛠 ${p.supervisor_name}` : ""}</div>
+                    {[...activos].sort((a, b) => label === "Mantenimiento" ? (a.client_name || "zzz").localeCompare(b.client_name || "zzz") : 0).map((p, i, arr) => (
+                      <React.Fragment key={p.id}>
+                        {label === "Mantenimiento" && (i === 0 || (arr[i - 1].client_name || "") !== (p.client_name || "")) && (
+                          <div style={{ fontSize: 11, fontWeight: 800, color: C.orange, marginTop: 8, paddingTop: 6, borderTop: `0.5px solid ${C.border}` }}>🏢 {p.client_name || "Sin cliente"}</div>
+                        )}
+                        <div onClick={() => { setSelectedProject(p); setScreen("partidas"); }} style={{ padding: "8px 0", borderTop: label === "Mantenimiento" ? "none" : `0.5px solid ${C.border}`, cursor: "pointer" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 12, fontWeight: 600 }}>{p.name}</div>
+                              <div style={{ fontSize: 10, color: C.muted }}>{p.jefe_name ? `👷 ${p.jefe_name}` : "Sin jefe"}{p.supervisor_name ? ` · 🛠 ${p.supervisor_name}` : ""}</div>
+                            </div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: C.orange, flexShrink: 0 }}>{Math.round(+(p.progress_percent || 0))}%</div>
                           </div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: C.orange, flexShrink: 0 }}>{Math.round(+(p.progress_percent || 0))}%</div>
+                          <div style={{ height: 3, background: C.border, borderRadius: 99, marginTop: 6, overflow: "hidden" }}>
+                            <div style={{ width: `${p.progress_percent || 0}%`, height: "100%", background: C.orange, borderRadius: 99 }} />
+                          </div>
                         </div>
-                        <div style={{ height: 3, background: C.border, borderRadius: 99, marginTop: 6, overflow: "hidden" }}>
-                          <div style={{ width: `${p.progress_percent || 0}%`, height: "100%", background: C.orange, borderRadius: 99 }} />
-                        </div>
-                      </div>
+                      </React.Fragment>
                     ))}
                     {activos.length === 0 && <div style={{ fontSize: 12, color: C.muted, textAlign: "center", padding: 8 }}>Sin {label.toLowerCase()} activos</div>}
                   </div>
@@ -1519,10 +1524,19 @@ export default function App() {
             })()}
 
             {/* Listado por tipo */}
-            {projTab !== "resumen" && projTab !== "equipo" && projects.filter(p => (p.project_type || "proyecto") === projTab && (!projStaffFilter || ((p.jefe_id === projStaffFilter || p.supervisor_id === projStaffFilter) && (p.status || "activo") === "activo"))).map(p => {
+            {projTab !== "resumen" && projTab !== "equipo" && projects.filter(p => (p.project_type || "proyecto") === projTab && (!projStaffFilter || ((p.jefe_id === projStaffFilter || p.supervisor_id === projStaffFilter) && (p.status || "activo") === "activo"))).sort((a, b) => projTab === "mantenimiento" ? (a.client_name || "zzz").localeCompare(b.client_name || "zzz") : 0).map((p, i, arr) => {
               const isFinished = (p.status || "activo") !== "activo";
+              const showClientHeader = projTab === "mantenimiento" && (i === 0 || (arr[i - 1].client_name || "") !== (p.client_name || ""));
               return (
-              <div key={p.id} style={{ backgroundColor: C.card, border: `0.5px solid ${selectedProject?.id === p.id ? C.orange : C.border}`, borderRadius: 14, padding: 14, marginBottom: 8, opacity: isFinished ? 0.6 : 1 }}>
+              <React.Fragment key={p.id}>
+              {showClientHeader && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "14px 0 8px", paddingBottom: 6, borderBottom: `1.5px solid ${C.orange}30` }}>
+                  <span style={{ fontSize: 14 }}>🏢</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: C.orange, textTransform: "uppercase" as const, letterSpacing: 0.5 }}>{p.client_name || "Sin cliente"}</span>
+                  <span style={{ fontSize: 11, color: C.muted, marginLeft: "auto" }}>{arr.filter(x => (x.client_name || "") === (p.client_name || "")).length} proyecto{arr.filter(x => (x.client_name || "") === (p.client_name || "")).length !== 1 ? "s" : ""}</span>
+                </div>
+              )}
+              <div style={{ backgroundColor: C.card, border: `0.5px solid ${selectedProject?.id === p.id ? C.orange : C.border}`, borderRadius: 14, padding: 14, marginBottom: 8, opacity: isFinished ? 0.6 : 1 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <button onClick={() => { setSelectedProject(p); setScreen("partidas"); }} style={{ flex: 1, background: "none", border: "none", textAlign: "left", cursor: "pointer", padding: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
@@ -1581,6 +1595,7 @@ export default function App() {
                   </div>
                 )}
               </div>
+              </React.Fragment>
             );})}
             {projTab !== "resumen" && projTab !== "equipo" && projects.filter(p => (p.project_type || "proyecto") === projTab && (!projStaffFilter || ((p.jefe_id === projStaffFilter || p.supervisor_id === projStaffFilter) && (p.status || "activo") === "activo"))).length === 0 && (
               <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin {projTab === "proyecto" ? "proyectos" : "mantenimientos"}{projStaffFilter ? " para este responsable" : ""}</div>
