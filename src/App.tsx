@@ -288,6 +288,8 @@ export default function App() {
   const [editCCName, setEditCCName] = useState("");
   const [editCCCode, setEditCCCode] = useState("");
   const [savingCC, setSavingCC] = useState(false);
+  const [trashTasks, setTrashTasks] = useState<any[]>([]);
+  const [trashOpen, setTrashOpen] = useState(false);
 
   // SII
   const [siiP12File, setSiiP12File] = useState<File | null>(null);
@@ -634,6 +636,28 @@ export default function App() {
       if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
       setNewCCName(""); setNewCCCode(""); await loadCostCenters();
     } catch { alert("Error"); } finally { setCreatingCC(false); }
+  }
+
+  async function loadTrash() {
+    try { const r = await fetch(`${API_URL}/trash/tasks`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setTrashTasks(d.items || []); } catch {}
+  }
+
+  async function restoreTask(id: string) {
+    try {
+      const r = await fetch(`${API_URL}/trash/tasks/${id}/restore`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      if (!d.ok) { alert(d.message || "Error"); return; }
+      setTrashTasks(prev => prev.filter(t => t.id !== id));
+      alert(`✅ Partida "${d.item.name}" restaurada`);
+    } catch { alert("Error"); }
+  }
+
+  async function purgeTask(id: string) {
+    if (!confirm("¿Eliminar definitivamente? Esta acción no se puede deshacer.")) return;
+    try {
+      await fetch(`${API_URL}/trash/tasks/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      setTrashTasks(prev => prev.filter(t => t.id !== id));
+    } catch { alert("Error"); }
   }
 
   async function updateCostCenter() {
@@ -1379,6 +1403,36 @@ export default function App() {
                 </div>
               );
             })}
+
+            {/* Papelera de partidas */}
+            <div style={{ marginTop: 20 }}>
+              <div
+                onClick={() => { const next = !trashOpen; setTrashOpen(next); if (next) loadTrash(); }}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, cursor: "pointer" }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 700 }}>🗑️ Papelera de partidas</div>
+                <span style={{ fontSize: 12, color: C.muted }}>{trashOpen ? "▲" : "▼"}</span>
+              </div>
+              {trashOpen && (
+                <div style={{ marginTop: 8 }}>
+                  {trashTasks.length === 0 && (
+                    <div style={{ textAlign: "center", color: C.muted, fontSize: 13, padding: 20 }}>Papelera vacía</div>
+                  )}
+                  {trashTasks.map(t => (
+                    <div key={t.id} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 12, marginBottom: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{t.name}</div>
+                      <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>
+                        {t.project_name} · {t.photo_count > 0 ? `${t.photo_count} foto${t.photo_count !== 1 ? "s" : ""} · ` : ""}Eliminada {fmtDate(t.deleted_at)}
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button onClick={() => restoreTask(t.id)} style={{ flex: 1, height: 34, backgroundColor: C.successDim, border: "none", borderRadius: 8, color: C.success, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>↩️ Restaurar</button>
+                        <button onClick={() => purgeTask(t.id)} style={{ height: 34, padding: "0 14px", backgroundColor: C.dangerDim, border: "none", borderRadius: 8, color: C.danger, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Eliminar definitivo</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </>
         )}
 
