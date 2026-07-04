@@ -183,7 +183,11 @@ export default function App() {
   const [newProjType, setNewProjType] = useState<"proyecto" | "mantenimiento">("proyecto");
   const [newProjJefe, setNewProjJefe] = useState("");
   const [newProjSupervisor, setNewProjSupervisor] = useState("");
-  const [projTab, setProjTab] = useState<"proyecto" | "mantenimiento" | "resumen">("proyecto");
+  const [projTab, setProjTab] = useState<"resumen" | "proyecto" | "mantenimiento" | "equipo">("resumen");
+  const [staff, setStaff] = useState<any[]>([]);
+  const [newStaffName, setNewStaffName] = useState("");
+  const [newStaffRole, setNewStaffRole] = useState<"jefe" | "supervisor">("jefe");
+  const [creatingStaff, setCreatingStaff] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editProj, setEditProj] = useState<{ project_type: string; status: string; jefe_id: string; supervisor_id: string }>({ project_type: "proyecto", status: "activo", jefe_id: "", supervisor_id: "" });
   const [savingProject, setSavingProject] = useState(false);
@@ -328,7 +332,7 @@ export default function App() {
   const canSeeCotizaciones = canSee("cotizaciones");
   const canSeeRendiciones = canSee("rendiciones");
 
-  useEffect(() => { if (token) { loadProjects(); loadKpis(); if (isAdmin) { loadUsers(); loadCostCenters(); } } }, [token]);
+  useEffect(() => { if (token) { loadProjects(); loadKpis(); if (isAdmin) { loadUsers(); loadCostCenters(); loadStaff(); } } }, [token]);
   useEffect(() => { if (selectedProject && token) loadTasks(selectedProject.id); }, [selectedProject]);
 
   // Auto-logout por inactividad (30 minutos)
@@ -412,6 +416,26 @@ export default function App() {
       setProjectCode(""); setProjectName(""); setClientName(""); setStartDate(""); setEndDate(""); setNewProjJefe(""); setNewProjSupervisor("");
       await loadProjects(); setScreen("proyectos");
     } catch { alert("Error creando proyecto"); } finally { setCreatingProject(false); }
+  }
+
+  async function loadStaff() {
+    try { const r = await fetch(`${API_URL}/staff`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setStaff(d.items || []); } catch {}
+  }
+
+  async function createStaff() {
+    if (!newStaffName.trim()) { alert("Ingresa un nombre"); return; }
+    setCreatingStaff(true);
+    try {
+      const r = await fetch(`${API_URL}/staff`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: newStaffName, role_type: newStaffRole }) });
+      const d = await r.json();
+      if (!d.ok) { alert(d.message || "Error"); return; }
+      setNewStaffName(""); await loadStaff();
+    } catch { alert("Error"); } finally { setCreatingStaff(false); }
+  }
+
+  async function deleteStaff(id: string) {
+    if (!confirm("¿Eliminar? Se quitará de los proyectos donde esté asignado.")) return;
+    try { await fetch(`${API_URL}/staff/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); await loadStaff(); await loadProjects(); } catch { alert("Error"); }
   }
 
   async function saveProjectEdit() {
@@ -1349,12 +1373,39 @@ export default function App() {
               </button>}
             </div>
 
-            {/* Tabs Proyectos / Mantenimiento / Resumen */}
+            {/* Tabs Resumen / Proyectos / Mantenimiento / Equipo */}
             <div style={{ display: "flex", backgroundColor: C.cardAlt, borderRadius: 10, padding: 4, marginBottom: 12, gap: 3 }}>
-              {([["proyecto", "🏗️ Proyectos"], ["mantenimiento", "🔧 Mantenimiento"], ["resumen", "📊 Resumen"]] as const).map(([key, label]) => (
-                <button key={key} onClick={() => setProjTab(key)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: projTab === key ? C.card : "transparent", color: projTab === key ? C.orange : C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>{label}</button>
+              {([["resumen", "📊 Resumen"], ["proyecto", "🏗️ Proyectos"], ["mantenimiento", "🔧 Manten."], ...(isAdmin ? [["equipo", "👷 Equipo"]] as const : [])] as [typeof projTab, string][]).map(([key, label]) => (
+                <button key={key} onClick={() => { setProjTab(key); if (key === "equipo") loadStaff(); }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: projTab === key ? C.card : "transparent", color: projTab === key ? C.orange : C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>{label}</button>
               ))}
             </div>
+
+            {/* Equipo: jefes y supervisores */}
+            {projTab === "equipo" && isAdmin && (
+              <>
+                <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Nuevo integrante</div>
+                  <input value={newStaffName} onChange={e => setNewStaffName(e.target.value)} placeholder="Nombre completo" style={inp} />
+                  <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                    {([["jefe", "👷 Jefe a cargo"], ["supervisor", "🛠 Supervisor"]] as const).map(([key, label]) => (
+                      <button key={key} onClick={() => setNewStaffRole(key)} style={{ flex: 1, height: 40, borderRadius: 10, border: `0.5px solid ${newStaffRole === key ? C.orange : C.border}`, backgroundColor: newStaffRole === key ? C.orangeDim : C.cardAlt, color: newStaffRole === key ? C.orange : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>{label}</button>
+                    ))}
+                  </div>
+                  <button onClick={createStaff} disabled={creatingStaff} style={btnPrimary}>{creatingStaff ? "Creando..." : "Agregar"}</button>
+                </div>
+                {staff.map(s => (
+                  <div key={s.id} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 12, marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 36, height: 36, background: s.role_type === "jefe" ? C.orangeDim : C.infoDim, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{s.role_type === "jefe" ? "👷" : "🛠"}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{s.name}</div>
+                      <div style={{ fontSize: 11, color: C.muted }}>{s.role_type === "jefe" ? "Jefe a cargo" : "Supervisor (ingeniero)"}</div>
+                    </div>
+                    <button onClick={() => deleteStaff(s.id)} style={{ backgroundColor: C.dangerDim, border: "none", borderRadius: 6, padding: "4px 10px", color: C.danger, fontSize: 11, cursor: "pointer" }}>✕</button>
+                  </div>
+                ))}
+                {staff.length === 0 && <div style={{ textAlign: "center", color: C.muted, padding: 30, fontSize: 13 }}>Sin integrantes aún</div>}
+              </>
+            )}
 
             {/* Resumen */}
             {projTab === "resumen" && (() => {
@@ -1440,12 +1491,12 @@ export default function App() {
                     <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Jefe a cargo</div>
                     <select value={editProj.jefe_id} onChange={e => setEditProj(f => ({ ...f, jefe_id: e.target.value }))} style={{ width: "100%", height: 38, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 12, padding: "0 8px", marginBottom: 8 }}>
                       <option value="">— Sin asignar —</option>
-                      {users.filter(u => u.is_active).map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                      {staff.filter(s => s.role_type === "jefe").map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                     <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Supervisor (ingeniero)</div>
                     <select value={editProj.supervisor_id} onChange={e => setEditProj(f => ({ ...f, supervisor_id: e.target.value }))} style={{ width: "100%", height: 38, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 12, padding: "0 8px", marginBottom: 10 }}>
                       <option value="">— Sin asignar —</option>
-                      {users.filter(u => u.is_active).map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                      {staff.filter(s => s.role_type === "supervisor").map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                     <div style={{ display: "flex", gap: 8 }}>
                       <button onClick={saveProjectEdit} disabled={savingProject} style={{ flex: 1, height: 36, backgroundColor: C.orange, border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{savingProject ? "Guardando..." : "Guardar"}</button>
@@ -1482,12 +1533,12 @@ export default function App() {
               <div style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>Jefe a cargo</div>
               <select value={newProjJefe} onChange={e => setNewProjJefe(e.target.value)} style={{ ...inp, marginBottom: 12 }}>
                 <option value="">— Sin asignar —</option>
-                {users.filter(u => u.is_active).map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                {staff.filter(s => s.role_type === "jefe").map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
               <div style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>Supervisor (ingeniero)</div>
               <select value={newProjSupervisor} onChange={e => setNewProjSupervisor(e.target.value)} style={{ ...inp, marginBottom: 16 }}>
                 <option value="">— Sin asignar —</option>
-                {users.filter(u => u.is_active).map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                {staff.filter(s => s.role_type === "supervisor").map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </>}
             <button onClick={createProject} disabled={creatingProject} style={btnPrimary}>{creatingProject ? "Creando..." : "Crear proyecto"}</button>
