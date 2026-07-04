@@ -16,7 +16,7 @@ type Rendicion = { id: string; worker_name: string; worker_email?: string; date:
 type Quotation = { id: string; client_name?: string; client_rut?: string; reference?: string; status: string; nubox_doc_number_services?: string; nubox_doc_number_materials?: string; total_services: number; total_materials: number; source_type: string; created_at: string; created_by_name?: string };
 type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
 type AIItem = { nubox_id: number | null; name: string; unit: string; quantity: number; price_neto: number; is_new: boolean };
-type Project = { id: string; code: string; name: string; client_name?: string; start_date?: string; end_date?: string; progress_percent?: number; project_type?: string; status?: string; jefe_id?: string; supervisor_id?: string; jefe_name?: string; supervisor_name?: string };
+type Project = { id: string; code: string; name: string; client_name?: string; start_date?: string; end_date?: string; progress_percent?: number; project_type?: string; status?: string; jefe_id?: string; supervisor_id?: string; jefe_name?: string; supervisor_name?: string; recepcion_conforme_at?: string };
 type Task = { id: string; name: string; duration?: string; start_date?: string; end_date?: string; progress_percent?: number; status?: string; photo_count?: number; unit?: string; quantity?: string; codigo?: string; esquema?: string };
 type TaskPhoto = { id: string; filename: string; local_path?: string; onedrive_url?: string; created_at: string; description?: string; photo_type?: string };
 type QuoteItem = { tempId: string; name: string; codigo: string; quantity: string; unit: string; start_date: string; end_date: string; selected: boolean };
@@ -193,8 +193,9 @@ export default function App() {
   const [projFiles, setProjFiles] = useState<any[]>([]);
   const [projFilesOpen, setProjFilesOpen] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
-  const [pendingCotFile, setPendingCotFile] = useState<File | null>(null);
+  const [pendingUpload, setPendingUpload] = useState<{ file: File; type: "cotizacion" | "orden_compra" } | null>(null);
   const [cotVisibleTo, setCotVisibleTo] = useState<string[]>([]);
+  const [sendingRecepcion, setSendingRecepcion] = useState(false);
   const cotFileRef = useRef<HTMLInputElement>(null);
   const ocFileRef = useRef<HTMLInputElement>(null);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -443,7 +444,21 @@ export default function App() {
       const d = await r.json();
       if (!d.ok) { alert(d.message || "Error"); return; }
       await loadProjFiles(selectedProject.id);
-    } catch { alert("Error subiendo archivo"); } finally { setUploadingFile(false); setPendingCotFile(null); setCotVisibleTo([]); }
+    } catch { alert("Error subiendo archivo"); } finally { setUploadingFile(false); setPendingUpload(null); setCotVisibleTo([]); }
+  }
+
+  async function sendRecepcionConforme() {
+    if (!selectedProject) return;
+    if (!confirm("¿Confirmar recepción conforme? Se generará el informe con IA y se enviará el correo a Paulette con la cotización y orden de compra adjuntas.")) return;
+    setSendingRecepcion(true);
+    try {
+      const r = await fetch(`${API_URL}/projects/${selectedProject.id}/recepcion-conforme`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      if (!d.ok) { alert(d.message || "Error"); return; }
+      alert("✅ " + d.message);
+      setSelectedProject({ ...selectedProject, recepcion_conforme_at: new Date().toISOString() } as Project);
+      await loadProjects();
+    } catch { alert("Error"); } finally { setSendingRecepcion(false); }
   }
 
   async function downloadProjFile(f: any) {
@@ -1344,6 +1359,20 @@ export default function App() {
               </button>
             </div>
 
+            {/* Recepción conforme — todas las partidas completadas */}
+            {tasks.length > 0 && tasks.every(t => t.status === "completada") && (
+              selectedProject?.recepcion_conforme_at ? (
+                <div style={{ backgroundColor: C.successDim, border: `0.5px solid ${C.success}40`, borderRadius: 12, padding: 14, marginBottom: 14, textAlign: "center" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.success }}>✅ Recepción conforme enviada</div>
+                  <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Informe y correo enviados el {fmtDate(selectedProject.recepcion_conforme_at)}</div>
+                </div>
+              ) : (
+                <button onClick={sendRecepcionConforme} disabled={sendingRecepcion} style={{ width: "100%", height: 50, backgroundColor: C.success, border: "none", borderRadius: 12, color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", marginBottom: 14, opacity: sendingRecepcion ? 0.7 : 1 }}>
+                  {sendingRecepcion ? "Enviando..." : "✅ Recepción conforme — Generar informe y enviar correo"}
+                </button>
+              )
+            )}
+
             {/* Documentos del proyecto */}
             <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, marginBottom: 14, overflow: "hidden" }}>
               <div onClick={() => setProjFilesOpen(o => !o)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", cursor: "pointer" }}>
@@ -1354,18 +1383,18 @@ export default function App() {
                 <div style={{ padding: "0 14px 14px" }}>
                   {isAdmin && (
                     <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                      <input ref={cotFileRef} type="file" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { setPendingCotFile(f); setCotVisibleTo([]); } e.target.value = ""; }} />
-                      <input ref={ocFileRef} type="file" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadProjFile(f, "orden_compra", []); e.target.value = ""; }} />
+                      <input ref={cotFileRef} type="file" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { setPendingUpload({ file: f, type: "cotizacion" }); setCotVisibleTo([]); } e.target.value = ""; }} />
+                      <input ref={ocFileRef} type="file" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { setPendingUpload({ file: f, type: "orden_compra" }); setCotVisibleTo([]); } e.target.value = ""; }} />
                       <button onClick={() => cotFileRef.current?.click()} disabled={uploadingFile} style={{ flex: 1, height: 40, backgroundColor: C.orangeDim, border: `0.5px solid ${C.orange}40`, borderRadius: 10, color: C.orange, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>📄 Subir cotización</button>
                       <button onClick={() => ocFileRef.current?.click()} disabled={uploadingFile} style={{ flex: 1, height: 40, backgroundColor: C.infoDim, border: `0.5px solid ${C.info}40`, borderRadius: 10, color: C.info, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>🧾 Subir orden de compra</button>
                     </div>
                   )}
 
-                  {/* Selector de visibilidad para cotización */}
-                  {pendingCotFile && (
+                  {/* Selector de visibilidad (cotización y orden de compra) */}
+                  {pendingUpload && (
                     <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 12, marginBottom: 10 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>📄 {pendingCotFile.name}</div>
-                      <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>¿Quiénes pueden ver esta cotización? (nadie seleccionado = solo administradores)</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>{pendingUpload.type === "cotizacion" ? "📄" : "🧾"} {pendingUpload.file.name}</div>
+                      <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>¿Quiénes pueden ver {pendingUpload.type === "cotizacion" ? "esta cotización" : "esta orden de compra"}? (nadie seleccionado = solo administradores)</div>
                       {users.filter(u => u.is_active && u.role !== "administrador").map(u => (
                         <label key={u.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", fontSize: 12, cursor: "pointer" }}>
                           <input type="checkbox" checked={cotVisibleTo.includes(u.id)} onChange={e => setCotVisibleTo(prev => e.target.checked ? [...prev, u.id] : prev.filter(x => x !== u.id))} />
@@ -1373,13 +1402,13 @@ export default function App() {
                         </label>
                       ))}
                       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                        <button onClick={() => uploadProjFile(pendingCotFile, "cotizacion", cotVisibleTo)} disabled={uploadingFile} style={{ flex: 1, height: 36, backgroundColor: C.orange, border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>{uploadingFile ? "Subiendo..." : "Subir"}</button>
-                        <button onClick={() => setPendingCotFile(null)} style={{ height: 36, padding: "0 14px", backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, color: C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Cancelar</button>
+                        <button onClick={() => uploadProjFile(pendingUpload.file, pendingUpload.type, cotVisibleTo)} disabled={uploadingFile} style={{ flex: 1, height: 36, backgroundColor: C.orange, border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>{uploadingFile ? "Subiendo..." : "Subir"}</button>
+                        <button onClick={() => setPendingUpload(null)} style={{ height: 36, padding: "0 14px", backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, color: C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Cancelar</button>
                       </div>
                     </div>
                   )}
 
-                  {uploadingFile && !pendingCotFile && <div style={{ textAlign: "center", color: C.muted, fontSize: 12, padding: 8 }}>Subiendo...</div>}
+                  {uploadingFile && !pendingUpload && <div style={{ textAlign: "center", color: C.muted, fontSize: 12, padding: 8 }}>Subiendo...</div>}
 
                   {projFiles.map(f => (
                     <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `0.5px solid ${C.border}` }}>
@@ -1392,7 +1421,7 @@ export default function App() {
                       {isAdmin && <button onClick={async () => { if (!confirm("¿Eliminar documento?")) return; await fetch(`${API_URL}/project-files/${f.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); if (selectedProject) loadProjFiles(selectedProject.id); }} style={{ backgroundColor: C.dangerDim, border: "none", borderRadius: 6, padding: "5px 10px", color: C.danger, fontSize: 11, cursor: "pointer" }}>✕</button>}
                     </div>
                   ))}
-                  {projFiles.length === 0 && !pendingCotFile && <div style={{ textAlign: "center", color: C.muted, fontSize: 12, padding: 8 }}>Sin documentos adjuntos</div>}
+                  {projFiles.length === 0 && !pendingUpload && <div style={{ textAlign: "center", color: C.muted, fontSize: 12, padding: 8 }}>Sin documentos adjuntos</div>}
                 </div>
               )}
             </div>
