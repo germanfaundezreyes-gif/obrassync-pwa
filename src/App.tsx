@@ -50,6 +50,7 @@ const PERMISSIONS = [
   { key: "gastos_resumen", label: "Gastos — Resumen", sub: "Ver pestaña de resumen y totales en Gastos", icon: "📊" },
   { key: "cotizaciones", label: "Cotizaciones", sub: "Crear y ver cotizaciones en Nubox", icon: "📋" },
   { key: "rendiciones", label: "Rendiciones", sub: "Subir boletas y rendir gastos", icon: "💰" },
+  { key: "recepcion_conforme", label: "Recepción conforme", sub: "Ver proyectos completados pendientes de recepción", icon: "🟢" },
   { key: "admin", label: "Administración", sub: "Gestionar usuarios y permisos", icon: "👤" },
 ];
 
@@ -341,6 +342,7 @@ export default function App() {
   const canSeeReports = canSee("reports");
   const canSeeCotizaciones = canSee("cotizaciones");
   const canSeeRendiciones = canSee("rendiciones");
+  const canSeeRecepcion = isAdmin || canSee("recepcion_conforme");
 
   useEffect(() => { if (token) { loadProjects(); loadKpis(); loadStaff(); loadPriorities(); if (isAdmin) { loadUsers(); loadCostCenters(); } } }, [token]);
   useEffect(() => { if (selectedProject && token) { loadTasks(selectedProject.id); loadProjFiles(selectedProject.id); } }, [selectedProject]);
@@ -1613,6 +1615,34 @@ export default function App() {
                   </div>
                 );
               });
+            })()}
+
+            {/* Pendientes de recepción conforme (solo supervisores/admin) */}
+            {projTab === "resumen" && canSeeRecepcion && (() => {
+              const base = projStaffFilter ? projects.filter(p => p.jefe_id === projStaffFilter || p.supervisor_id === projStaffFilter) : projects;
+              const pendientes = base.filter(p => (p.status || "activo") === "activo" && Math.round(+(p.progress_percent || 0)) >= 100 && !p.recepcion_conforme_at);
+              if (pendientes.length === 0) return null;
+              return (
+                <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.success}50`, borderRadius: 14, padding: 14, marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>🟢 Pendientes de recepción conforme</div>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: C.success, backgroundColor: C.successDim, borderRadius: 6, padding: "3px 8px" }}>{pendientes.length}</span>
+                  </div>
+                  {pendientes.map(p => (
+                    <div key={p.id} onClick={() => { setSelectedProject(p); setScreen("partidas"); }} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", borderRadius: 10, backgroundColor: C.successDim, marginBottom: 6, cursor: "pointer" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: C.success }}>{p.name}</div>
+                        <div style={{ fontSize: 10, color: C.muted }}>
+                          {p.project_type === "mantenimiento" ? "🔧" : "🏗️"} {p.client_name || "Sin cliente"}
+                          {p.jefe_name ? ` · 👷 ${p.jefe_name}` : ""}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 10, fontWeight: 800, color: C.success, flexShrink: 0 }}>100% ✓</div>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: 10, color: C.muted, textAlign: "center", marginTop: 4 }}>Toca un proyecto para enviar la recepción conforme</div>
+                </div>
+              );
             })()}
 
             {/* Prioridades: partidas atrasadas y por vencer */}
