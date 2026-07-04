@@ -193,7 +193,7 @@ export default function App() {
   const [projFiles, setProjFiles] = useState<any[]>([]);
   const [projFilesOpen, setProjFilesOpen] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
-  const [pendingUpload, setPendingUpload] = useState<{ file: File; type: "cotizacion" | "orden_compra" } | null>(null);
+  const [pendingUpload, setPendingUpload] = useState<{ files: File[]; type: "cotizacion" | "orden_compra" } | null>(null);
   const [cotVisibleTo, setCotVisibleTo] = useState<string[]>([]);
   const [sendingRecepcion, setSendingRecepcion] = useState(false);
   const cotFileRef = useRef<HTMLInputElement>(null);
@@ -432,19 +432,25 @@ export default function App() {
     try { const r = await fetch(`${API_URL}/projects/${projectId}/files`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setProjFiles(d.items || []); } catch {}
   }
 
-  async function uploadProjFile(file: File, fileType: "cotizacion" | "orden_compra", visibleTo: string[]) {
-    if (!selectedProject) return;
+  async function uploadProjFiles(files: File[], fileType: "cotizacion" | "orden_compra", visibleTo: string[]) {
+    if (!selectedProject || files.length === 0) return;
     setUploadingFile(true);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("file_type", fileType);
-      if (visibleTo.length > 0) fd.append("visible_to", JSON.stringify(visibleTo));
-      const r = await fetch(`${API_URL}/projects/${selectedProject.id}/files`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
-      const d = await r.json();
-      if (!d.ok) { alert(d.message || "Error"); return; }
+      const errores: string[] = [];
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("file_type", fileType);
+        if (visibleTo.length > 0) fd.append("visible_to", JSON.stringify(visibleTo));
+        try {
+          const r = await fetch(`${API_URL}/projects/${selectedProject.id}/files`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+          const d = await r.json();
+          if (!d.ok) errores.push(`${file.name}: ${d.message || "Error"}`);
+        } catch { errores.push(`${file.name}: error de conexión`); }
+      }
+      if (errores.length > 0) alert("Algunos archivos fallaron:\n" + errores.join("\n"));
       await loadProjFiles(selectedProject.id);
-    } catch { alert("Error subiendo archivo"); } finally { setUploadingFile(false); setPendingUpload(null); setCotVisibleTo([]); }
+    } finally { setUploadingFile(false); setPendingUpload(null); setCotVisibleTo([]); }
   }
 
   async function sendRecepcionConforme() {
@@ -1383,8 +1389,8 @@ export default function App() {
                 <div style={{ padding: "0 14px 14px" }}>
                   {isAdmin && (
                     <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                      <input ref={cotFileRef} type="file" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { setPendingUpload({ file: f, type: "cotizacion" }); setCotVisibleTo([]); } e.target.value = ""; }} />
-                      <input ref={ocFileRef} type="file" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { setPendingUpload({ file: f, type: "orden_compra" }); setCotVisibleTo([]); } e.target.value = ""; }} />
+                      <input ref={cotFileRef} type="file" multiple style={{ display: "none" }} onChange={e => { const fs = Array.from(e.target.files || []); if (fs.length > 0) { setPendingUpload({ files: fs, type: "cotizacion" }); setCotVisibleTo([]); } e.target.value = ""; }} />
+                      <input ref={ocFileRef} type="file" multiple style={{ display: "none" }} onChange={e => { const fs = Array.from(e.target.files || []); if (fs.length > 0) { setPendingUpload({ files: fs, type: "orden_compra" }); setCotVisibleTo([]); } e.target.value = ""; }} />
                       <button onClick={() => cotFileRef.current?.click()} disabled={uploadingFile} style={{ flex: 1, height: 40, backgroundColor: C.orangeDim, border: `0.5px solid ${C.orange}40`, borderRadius: 10, color: C.orange, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>📄 Subir cotización</button>
                       <button onClick={() => ocFileRef.current?.click()} disabled={uploadingFile} style={{ flex: 1, height: 40, backgroundColor: C.infoDim, border: `0.5px solid ${C.info}40`, borderRadius: 10, color: C.info, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>🧾 Subir orden de compra</button>
                     </div>
@@ -1393,7 +1399,10 @@ export default function App() {
                   {/* Selector de visibilidad (cotización y orden de compra) */}
                   {pendingUpload && (
                     <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 12, marginBottom: 10 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>{pendingUpload.type === "cotizacion" ? "📄" : "🧾"} {pendingUpload.file.name}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>{pendingUpload.type === "cotizacion" ? "📄" : "🧾"} {pendingUpload.files.length === 1 ? pendingUpload.files[0].name : `${pendingUpload.files.length} archivos seleccionados`}</div>
+                      {pendingUpload.files.length > 1 && (
+                        <div style={{ fontSize: 10, color: C.muted, marginBottom: 6 }}>{pendingUpload.files.map(f => f.name).join(" · ")}</div>
+                      )}
                       <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>¿Quiénes pueden ver {pendingUpload.type === "cotizacion" ? "esta cotización" : "esta orden de compra"}? (nadie seleccionado = solo administradores)</div>
                       {users.filter(u => u.is_active && u.role !== "administrador").map(u => (
                         <label key={u.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", fontSize: 12, cursor: "pointer" }}>
@@ -1402,7 +1411,7 @@ export default function App() {
                         </label>
                       ))}
                       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                        <button onClick={() => uploadProjFile(pendingUpload.file, pendingUpload.type, cotVisibleTo)} disabled={uploadingFile} style={{ flex: 1, height: 36, backgroundColor: C.orange, border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>{uploadingFile ? "Subiendo..." : "Subir"}</button>
+                        <button onClick={() => uploadProjFiles(pendingUpload.files, pendingUpload.type, cotVisibleTo)} disabled={uploadingFile} style={{ flex: 1, height: 36, backgroundColor: C.orange, border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>{uploadingFile ? "Subiendo..." : `Subir${pendingUpload.files.length > 1 ? ` (${pendingUpload.files.length})` : ""}`}</button>
                         <button onClick={() => setPendingUpload(null)} style={{ height: 36, padding: "0 14px", backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, color: C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Cancelar</button>
                       </div>
                     </div>
