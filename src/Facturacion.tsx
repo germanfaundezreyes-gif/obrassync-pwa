@@ -15,7 +15,7 @@ const card: React.CSSProperties = { backgroundColor: C.card, border: `0.5px soli
 function fmtCLP(n: number) { return "$" + Math.round(+n || 0).toLocaleString("es-CL"); }
 function fmtDate(iso?: string) { if (!iso) return ""; const p = String(iso).substring(0, 10).split("-"); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso; }
 
-type Item = { name: string; qty: number; price_neto: number; unit?: string; product_id?: string };
+type Item = { name: string; qty: number; price_neto: number; unit?: string; product_id?: string; code?: string; description?: string; afecto?: boolean };
 
 // ─── Editor de ítems compartido (cotización / OC / DTE) ───
 function ItemsEditor({ items, setItems, products }: { items: Item[]; setItems: (i: Item[]) => void; products: any[] }) {
@@ -95,17 +95,41 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
 
   // ─── Cotizaciones ───
   const [quotes, setQuotes] = useState<any[]>([]);
-  const [showNewQuote, setShowNewQuote] = useState(false);
-  const [qForm, setQForm] = useState({ client_name: "", client_rut: "", client_email: "", notes: "" });
-  const [qItems, setQItems] = useState<Item[]>([]);
+  const [quoteView, setQuoteView] = useState<"list" | "form">("list");
+  const [quoteSearch, setQuoteSearch] = useState("");
+  const [openActions, setOpenActions] = useState<string | null>(null);
+  const today = new Date().toISOString().slice(0, 10);
+  const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const emptyQForm = { client_name: "", client_rut: "", client_email: "", client_giro: "", client_dir: "", client_ciudad: "", client_comuna: "", client_region: "", fecha_emision: today, fecha_vencimiento: in30, vendedor: "", notes: "" };
+  const [qForm, setQForm] = useState(emptyQForm);
+  const [qItems, setQItems] = useState<Item[]>([{ name: "", qty: 1, price_neto: 0, unit: "un", afecto: true }]);
+  const [savingQuote, setSavingQuote] = useState(false);
+
   async function loadQuotes() {
     try { const d = await fetch(`${API_URL}/obs-quotes`, { headers: h }).then(r => r.json()); if (d.ok) setQuotes(d.items); } catch {}
   }
-  async function createQuote() {
-    const d = await fetch(`${API_URL}/obs-quotes`, { method: "POST", headers: hj, body: JSON.stringify({ ...qForm, items: qItems }) }).then(r => r.json());
-    if (!d.ok) { alert(d.message); return; }
-    setQForm({ client_name: "", client_rut: "", client_email: "", notes: "" }); setQItems([]); setShowNewQuote(false); loadQuotes();
+  const nextQuoteFolio = quotes.length > 0 ? Math.max(...quotes.map(q => +q.folio || 0)) + 1 : 1;
+
+  async function saveQuote(mode: "borrador" | "enviar") {
+    const items = qItems.filter(it => it.name.trim());
+    if (!qForm.client_name.trim()) { alert("Cliente requerido"); return; }
+    if (items.length === 0) { alert("Agrega al menos un ítem"); return; }
+    if (mode === "enviar" && !qForm.client_email.trim()) { alert("Para enviar, ingresa el correo del cliente"); return; }
+    setSavingQuote(true);
+    try {
+      const d = await fetch(`${API_URL}/obs-quotes`, { method: "POST", headers: hj, body: JSON.stringify({ ...qForm, items, status: mode === "borrador" ? "borrador" : "emitida" }) }).then(r => r.json());
+      if (!d.ok) { alert(d.message); return; }
+      if (mode === "enviar") {
+        const s = await fetch(`${API_URL}/obs-quotes/${d.item.id}/send`, { method: "POST", headers: hj, body: JSON.stringify({ email: qForm.client_email }) }).then(r => r.json());
+        alert(s.ok ? `✅ Cotización N°${d.item.folio} creada y enviada` : `Cotización creada pero el envío falló: ${s.message}`);
+      } else {
+        alert(`✅ Cotización N°${d.item.folio} guardada como borrador`);
+      }
+      setQForm(emptyQForm); setQItems([{ name: "", qty: 1, price_neto: 0, unit: "un", afecto: true }]);
+      setQuoteView("list"); loadQuotes();
+    } finally { setSavingQuote(false); }
   }
+
   async function sendQuote(q: any) {
     const email = q.client_email || prompt("Correo del cliente:");
     if (!email) return;
@@ -196,7 +220,8 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
     if (tab === "sii") loadSii();
   }, [tab]);
 
-  const statusColor: Record<string, string> = { borrador: C.muted, enviada: C.info, aceptada: C.success, rechazada: C.danger, recibida: C.success, generado: C.muted, enviado: C.info, aceptado: C.success, rechazado: C.danger };
+  const statusColor: Record<string, string> = { borrador: C.muted, emitida: C.success, enviada: C.info, aceptada: C.success, rechazada: C.danger, recibida: C.success, generado: C.muted, enviado: C.info, aceptado: C.success, rechazado: C.danger };
+  const statusBg: Record<string, string> = { borrador: C.cardAlt, emitida: C.successDim, enviada: C.infoDim, aceptada: C.successDim, rechazada: C.dangerDim };
   const TIPOS: Record<number, string> = { 33: "Factura", 52: "Guía Despacho", 56: "N. Débito", 61: "N. Crédito" };
 
   return (
@@ -272,45 +297,150 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
           ))}
         </>}
 
-        {/* ── COTIZACIONES ── */}
-        {tab === "cotizaciones" && <>
-          <button onClick={() => setShowNewQuote(!showNewQuote)} style={{ ...btnP, marginBottom: 12 }}>{showNewQuote ? "Cancelar" : "＋ Nueva cotización"}</button>
-          {showNewQuote && (
-            <div style={card}>
-              <input value={qForm.client_name} onChange={e => setQForm(f => ({ ...f, client_name: e.target.value }))} placeholder="Cliente *" style={inp} />
-              <div style={{ display: "flex", gap: 8 }}>
-                <input value={qForm.client_rut} onChange={e => setQForm(f => ({ ...f, client_rut: e.target.value }))} placeholder="RUT" style={{ ...inp, flex: 1 }} />
-                <input value={qForm.client_email} onChange={e => setQForm(f => ({ ...f, client_email: e.target.value }))} placeholder="Correo" style={{ ...inp, flex: 2 }} />
+        {/* ── COTIZACIONES: LISTADO ── */}
+        {tab === "cotizaciones" && quoteView === "list" && <>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ fontSize: 17, fontWeight: 800 }}>Cotizaciones</div>
+            <button onClick={() => setQuoteView("form")} style={{ backgroundColor: "#1e293b", border: "none", borderRadius: 10, padding: "10px 16px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Crear cotización</button>
+          </div>
+          <input value={quoteSearch} onChange={e => setQuoteSearch(e.target.value)} placeholder="🔍 Buscar por cliente o número…" style={inp} />
+
+          {/* Encabezado tabla */}
+          <div style={{ display: "flex", padding: "8px 12px", fontSize: 10, fontWeight: 800, color: C.muted, textTransform: "uppercase", letterSpacing: 0.5 }}>
+            <div style={{ width: 42 }}>N°</div>
+            <div style={{ width: 68 }}>Estado</div>
+            <div style={{ flex: 1 }}>Cliente</div>
+            <div style={{ width: 78, textAlign: "right" }}>Total</div>
+            <div style={{ width: 30 }}></div>
+          </div>
+          {quotes
+            .filter(q => !quoteSearch || (q.client_name || "").toLowerCase().includes(quoteSearch.toLowerCase()) || String(q.folio).includes(quoteSearch))
+            .map(q => (
+              <div key={q.id} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: "10px 12px", marginBottom: 6 }}>
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <div style={{ width: 42, fontSize: 13, fontWeight: 700 }}>{q.folio}</div>
+                  <div style={{ width: 68 }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: statusColor[q.status] || C.muted, backgroundColor: statusBg[q.status] || C.cardAlt, borderRadius: 12, padding: "3px 8px" }}>{(q.status === "emitida" ? "Emitido" : q.status).charAt(0).toUpperCase() + (q.status === "emitida" ? "Emitido" : q.status).slice(1)}</span>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.client_name}</div>
+                    <div style={{ fontSize: 10, color: C.muted }}>{fmtDate(q.fecha_emision || q.created_at)}{q.fecha_vencimiento ? ` → ${fmtDate(q.fecha_vencimiento)}` : ""}</div>
+                  </div>
+                  <div style={{ width: 78, textAlign: "right", fontSize: 13, fontWeight: 800 }}>{fmtCLP(+q.total)}</div>
+                  <button onClick={() => setOpenActions(openActions === q.id ? null : q.id)} style={{ width: 30, background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 16 }}>⌄</button>
+                </div>
+                {openActions === q.id && (
+                  <div style={{ display: "flex", gap: 6, marginTop: 8, paddingTop: 8, borderTop: `0.5px solid ${C.border}` }}>
+                    <button onClick={() => sendQuote(q)} style={{ flex: 1, height: 34, backgroundColor: C.infoDim, border: "none", borderRadius: 8, color: C.info, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>📧 Enviar</button>
+                    <button onClick={async () => { await fetch(`${API_URL}/obs-quotes/${q.id}`, { method: "PUT", headers: hj, body: JSON.stringify({ status: "aceptada" }) }); setOpenActions(null); loadQuotes(); }} style={{ height: 34, padding: "0 12px", backgroundColor: C.successDim, border: "none", borderRadius: 8, color: C.success, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>✓ Aceptada</button>
+                    <button onClick={async () => { await fetch(`${API_URL}/obs-quotes/${q.id}`, { method: "PUT", headers: hj, body: JSON.stringify({ status: "rechazada" }) }); setOpenActions(null); loadQuotes(); }} style={{ height: 34, padding: "0 12px", backgroundColor: C.dangerDim, border: "none", borderRadius: 8, color: C.danger, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>✗</button>
+                    {isAdmin && <button onClick={async () => { if (!confirm("¿Eliminar cotización?")) return; await fetch(`${API_URL}/obs-quotes/${q.id}`, { method: "DELETE", headers: h }); setOpenActions(null); loadQuotes(); }} style={{ height: 34, padding: "0 12px", backgroundColor: C.cardAlt, border: "none", borderRadius: 8, color: C.muted, fontSize: 12, cursor: "pointer" }}>🗑</button>}
+                  </div>
+                )}
               </div>
-              <ItemsEditor items={qItems} setItems={setQItems} products={products} />
-              <input value={qForm.notes} onChange={e => setQForm(f => ({ ...f, notes: e.target.value }))} placeholder="Notas / condiciones" style={inp} />
-              <button onClick={createQuote} style={btnP}>Crear cotización</button>
-            </div>
-          )}
-          {quotes.map(q => (
-            <div key={q.id} style={card}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+            ))}
+          {quotes.length === 0 && <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin cotizaciones aún</div>}
+        </>}
+
+        {/* ── COTIZACIONES: FORMULARIO (estilo Nubox) ── */}
+        {tab === "cotizaciones" && quoteView === "form" && (() => {
+          const validItems = qItems.filter(it => it.name.trim());
+          let neto = 0, exento = 0;
+          for (const it of validItems) {
+            const m = Math.round(it.qty * it.price_neto);
+            if (it.afecto === false) exento += m; else neto += m;
+          }
+          const iva = Math.round(neto * 0.19);
+          const total = neto + exento + iva;
+          return (
+            <div style={{ ...card, padding: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>COT N°{q.folio} — {q.client_name}</div>
-                  <div style={{ fontSize: 11, color: C.muted }}>{fmtDate(q.created_at)} · {(q.items || []).length} ítems</div>
+                  <div style={{ fontSize: 18, fontWeight: 800 }}>Nueva Cotización</div>
+                  <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>N° <b style={{ color: C.text }}>{nextQuoteFolio}</b> · automático</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 14, fontWeight: 800 }}>{fmtCLP(+q.total)}</div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: statusColor[q.status] || C.muted }}>{q.status.toUpperCase()}</div>
+                  <div style={{ fontSize: 10, color: C.muted }}>Total</div>
+                  <div style={{ fontSize: 20, fontWeight: 800 }}>{fmtCLP(total)}</div>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => sendQuote(q)} style={{ flex: 1, height: 34, backgroundColor: C.infoDim, border: "none", borderRadius: 8, color: C.info, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>📧 Enviar</button>
-                {q.status === "enviada" && <>
-                  <button onClick={async () => { await fetch(`${API_URL}/obs-quotes/${q.id}`, { method: "PUT", headers: hj, body: JSON.stringify({ status: "aceptada" }) }); loadQuotes(); }} style={{ height: 34, padding: "0 12px", backgroundColor: C.successDim, border: "none", borderRadius: 8, color: C.success, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>✓</button>
-                  <button onClick={async () => { await fetch(`${API_URL}/obs-quotes/${q.id}`, { method: "PUT", headers: hj, body: JSON.stringify({ status: "rechazada" }) }); loadQuotes(); }} style={{ height: 34, padding: "0 12px", backgroundColor: C.dangerDim, border: "none", borderRadius: 8, color: C.danger, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>✗</button>
-                </>}
-                {isAdmin && <button onClick={async () => { if (!confirm("¿Eliminar?")) return; await fetch(`${API_URL}/obs-quotes/${q.id}`, { method: "DELETE", headers: h }); loadQuotes(); }} style={{ height: 34, padding: "0 12px", backgroundColor: C.cardAlt, border: "none", borderRadius: 8, color: C.muted, fontSize: 12, cursor: "pointer" }}>🗑</button>}
+
+              {/* Cliente */}
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginBottom: 4 }}>Cliente *</div>
+              <input value={qForm.client_name} onChange={e => setQForm(f => ({ ...f, client_name: e.target.value }))} placeholder="Elige o agrega el cliente" style={inp} list="clientes-prev" />
+              <datalist id="clientes-prev">
+                {[...new Set(quotes.map(q => q.client_name).filter(Boolean))].map(n => <option key={n} value={n} />)}
+              </datalist>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input value={qForm.client_rut} onChange={e => setQForm(f => ({ ...f, client_rut: e.target.value }))} placeholder="RUT" style={{ ...inp, flex: 1 }} />
+                <input value={qForm.client_giro} onChange={e => setQForm(f => ({ ...f, client_giro: e.target.value }))} placeholder="Giro" style={{ ...inp, flex: 2 }} />
+              </div>
+              <input value={qForm.client_email} onChange={e => setQForm(f => ({ ...f, client_email: e.target.value }))} placeholder="Correo electrónico" style={inp} />
+              <input value={qForm.client_dir} onChange={e => setQForm(f => ({ ...f, client_dir: e.target.value }))} placeholder="Dirección" style={inp} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <input value={qForm.client_ciudad} onChange={e => setQForm(f => ({ ...f, client_ciudad: e.target.value }))} placeholder="Ciudad" style={{ ...inp, flex: 1 }} />
+                <input value={qForm.client_comuna} onChange={e => setQForm(f => ({ ...f, client_comuna: e.target.value }))} placeholder="Comuna" style={{ ...inp, flex: 1 }} />
+                <input value={qForm.client_region} onChange={e => setQForm(f => ({ ...f, client_region: e.target.value }))} placeholder="Región" style={{ ...inp, flex: 1 }} />
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginBottom: 4 }}>Fecha emisión</div>
+                  <input type="date" value={qForm.fecha_emision} onChange={e => setQForm(f => ({ ...f, fecha_emision: e.target.value }))} style={inp} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginBottom: 4 }}>Fecha vencimiento</div>
+                  <input type="date" value={qForm.fecha_vencimiento} onChange={e => setQForm(f => ({ ...f, fecha_vencimiento: e.target.value }))} style={inp} />
+                </div>
+              </div>
+              <input value={qForm.vendedor} onChange={e => setQForm(f => ({ ...f, vendedor: e.target.value }))} placeholder="Vendedor (opcional)" style={inp} />
+
+              {/* Ítems */}
+              <div style={{ fontSize: 12, fontWeight: 800, color: C.text, margin: "10px 0 6px" }}>Ítems ({validItems.length})</div>
+              {qItems.map((it, i) => (
+                <div key={i} style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 10, marginBottom: 8 }}>
+                  <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                    <input value={it.code || ""} onChange={e => setQItems(qItems.map((x, j) => j === i ? { ...x, code: e.target.value } : x))} placeholder="Código" style={{ ...inp, height: 38, marginBottom: 0, width: 90, backgroundColor: C.card }} />
+                    <select value={it.product_id || ""} onChange={e => {
+                      const p = products.find(x => x.id === e.target.value);
+                      if (p) setQItems(qItems.map((x, j) => j === i ? { ...x, product_id: p.id, name: p.name, price_neto: +p.price_neto, unit: p.unit, code: p.sku || x.code } : x));
+                    }} style={{ ...inp, height: 38, marginBottom: 0, flex: 1, backgroundColor: C.card }}>
+                      <option value="">Producto/servicio…</option>
+                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <input value={it.name} onChange={e => setQItems(qItems.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} placeholder="Nombre producto / servicio *" style={{ ...inp, height: 38, marginBottom: 6, backgroundColor: C.card }} />
+                  <input value={it.description || ""} onChange={e => setQItems(qItems.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} placeholder="Descripción (opcional)" style={{ ...inp, height: 38, marginBottom: 6, backgroundColor: C.card }} />
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <input type="number" value={it.qty} onChange={e => setQItems(qItems.map((x, j) => j === i ? { ...x, qty: +e.target.value } : x))} style={{ ...inp, height: 38, marginBottom: 0, width: 64, backgroundColor: C.card }} />
+                    <input value={it.unit || ""} onChange={e => setQItems(qItems.map((x, j) => j === i ? { ...x, unit: e.target.value } : x))} placeholder="un" style={{ ...inp, height: 38, marginBottom: 0, width: 52, backgroundColor: C.card }} />
+                    <input type="number" value={it.price_neto || ""} onChange={e => setQItems(qItems.map((x, j) => j === i ? { ...x, price_neto: +e.target.value } : x))} placeholder="Precio" style={{ ...inp, height: 38, marginBottom: 0, flex: 1, backgroundColor: C.card }} />
+                    <button onClick={() => setQItems(qItems.map((x, j) => j === i ? { ...x, afecto: x.afecto === false } : x))} style={{ height: 38, padding: "0 10px", borderRadius: 8, backgroundColor: it.afecto === false ? C.cardAlt : C.successDim, color: it.afecto === false ? C.muted : C.success, fontWeight: 700, fontSize: 10, cursor: "pointer", border: `0.5px solid ${it.afecto === false ? C.border : C.success + "50"}` }}>{it.afecto === false ? "Exento" : "Afecto"}</button>
+                    <div style={{ fontSize: 12, fontWeight: 800, minWidth: 70, textAlign: "right" }}>{fmtCLP(it.qty * it.price_neto)}</div>
+                    <button onClick={() => setQItems(qItems.length === 1 ? [{ name: "", qty: 1, price_neto: 0, unit: "un", afecto: true }] : qItems.filter((_, j) => j !== i))} style={{ background: "none", border: "none", color: C.danger, cursor: "pointer", fontSize: 15 }}>🗑</button>
+                  </div>
+                </div>
+              ))}
+              <button onClick={() => setQItems([...qItems, { name: "", qty: 1, price_neto: 0, unit: "un", afecto: true }])} style={{ width: "100%", height: 38, backgroundColor: C.card, border: `1px dashed ${C.border}`, borderRadius: 10, color: C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer", marginBottom: 12 }}>＋ Agregar ítem</button>
+
+              {/* Observaciones + totales */}
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginBottom: 4 }}>Observaciones (se incluyen en el documento)</div>
+              <textarea value={qForm.notes} onChange={e => setQForm(f => ({ ...f, notes: e.target.value }))} style={{ ...inp, height: 70, paddingTop: 10, resize: "vertical" } as React.CSSProperties} />
+
+              <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: "10px 14px", marginBottom: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}><span style={{ color: C.muted }}>Neto</span><span>{fmtCLP(neto)}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}><span style={{ color: C.muted }}>Exento</span><span>{fmtCLP(exento)}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}><span style={{ color: C.muted }}>IVA 19%</span><span>{fmtCLP(iva)}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 800, paddingTop: 6, borderTop: `0.5px solid ${C.border}` }}><span>Total</span><span>{fmtCLP(total)}</span></div>
+              </div>
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => { setQuoteView("list"); setQForm(emptyQForm); setQItems([{ name: "", qty: 1, price_neto: 0, unit: "un", afecto: true }]); }} style={{ height: 46, padding: "0 16px", backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, color: C.text, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
+                <button onClick={() => saveQuote("borrador")} disabled={savingQuote} style={{ flex: 1, height: 46, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 12, color: C.text, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{savingQuote ? "..." : "Guardar borrador"}</button>
+                <button onClick={() => saveQuote("enviar")} disabled={savingQuote} style={{ flex: 1, height: 46, backgroundColor: "#1e293b", border: "none", borderRadius: 12, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{savingQuote ? "Guardando..." : "Guardar y enviar"}</button>
               </div>
             </div>
-          ))}
-          {quotes.length === 0 && !showNewQuote && <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin cotizaciones aún</div>}
-        </>}
+          );
+        })()}
 
         {/* ── ÓRDENES DE COMPRA ── */}
         {tab === "ordenes" && <>
