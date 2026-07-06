@@ -15,7 +15,8 @@ const card: React.CSSProperties = { backgroundColor: C.card, border: `0.5px soli
 function fmtCLP(n: number) { return "$" + Math.round(+n || 0).toLocaleString("es-CL"); }
 function fmtDate(iso?: string) { if (!iso) return ""; const p = String(iso).substring(0, 10).split("-"); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso; }
 
-type Item = { name: string; qty: number; price_neto: number; unit?: string; product_id?: string; code?: string; description?: string; afecto?: boolean };
+type Item = { name: string; qty: number; price_neto: number; unit?: string; product_id?: string; code?: string; description?: string; afecto?: boolean; desc_pct?: number };
+type Ref = { tipo_doc: string; folio: string; fecha?: string; cod?: string; razon?: string };
 
 // ─── Editor de ítems compartido (cotización / OC / DTE) ───
 function ItemsEditor({ items, setItems, products }: { items: Item[]; setItems: (i: Item[]) => void; products: any[] }) {
@@ -43,7 +44,9 @@ function ItemsEditor({ items, setItems, products }: { items: Item[]; setItems: (
             <input type="number" value={it.qty} onChange={e => setItems(items.map((x, j) => j === i ? { ...x, qty: +e.target.value } : x))} placeholder="Cant." style={{ ...inp, height: 38, marginBottom: 0, width: 70, backgroundColor: C.card }} />
             <input value={it.unit || ""} onChange={e => setItems(items.map((x, j) => j === i ? { ...x, unit: e.target.value } : x))} placeholder="un" style={{ ...inp, height: 38, marginBottom: 0, width: 60, backgroundColor: C.card }} />
             <input type="number" value={it.price_neto} onChange={e => setItems(items.map((x, j) => j === i ? { ...x, price_neto: +e.target.value } : x))} placeholder="P. neto" style={{ ...inp, height: 38, marginBottom: 0, flex: 1, backgroundColor: C.card }} />
-            <div style={{ fontSize: 12, fontWeight: 700, minWidth: 70, textAlign: "right" }}>{fmtCLP(it.qty * it.price_neto)}</div>
+            <input type="number" value={it.desc_pct || ""} onChange={e => setItems(items.map((x, j) => j === i ? { ...x, desc_pct: +e.target.value } : x))} placeholder="D%" style={{ ...inp, height: 38, marginBottom: 0, width: 52, backgroundColor: C.card }} />
+            <button onClick={() => setItems(items.map((x, j) => j === i ? { ...x, afecto: x.afecto === false } : x))} style={{ height: 38, padding: "0 8px", borderRadius: 8, backgroundColor: it.afecto === false ? C.cardAlt : C.successDim, color: it.afecto === false ? C.muted : C.success, fontWeight: 700, fontSize: 9, cursor: "pointer", border: `0.5px solid ${it.afecto === false ? C.border : C.success + "50"}` }}>{it.afecto === false ? "EX" : "AF"}</button>
+            <div style={{ fontSize: 12, fontWeight: 700, minWidth: 64, textAlign: "right" }}>{fmtCLP(it.qty * it.price_neto * (1 - (it.desc_pct || 0) / 100))}</div>
             <button onClick={() => setItems(items.filter((_, j) => j !== i))} style={{ background: "none", border: "none", color: C.danger, cursor: "pointer", fontSize: 14 }}>✕</button>
           </div>
         </div>
@@ -164,7 +167,8 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
   const [cfgForm, setCfgForm] = useState({ dte_giro: "", dte_acteco: "", dte_direccion: "", dte_comuna: "", dte_fono: "", dte_email: "", dte_web: "" });
   const cafRef = useRef<HTMLInputElement>(null);
   const [showEmitir, setShowEmitir] = useState(false);
-  const [dForm, setDForm] = useState({ tipo_dte: "33", rut: "", rs: "", giro: "", dir: "", comuna: "", fecha_vencimiento: "", forma_pago: "CRÉDITO", observaciones: "" });
+  const [dForm, setDForm] = useState({ tipo_dte: "33", rut: "", rs: "", giro: "", dir: "", comuna: "", fecha_vencimiento: "", forma_pago: "CRÉDITO", observaciones: "", ind_traslado: "1", descuento_global_pct: "" });
+  const [dRefs, setDRefs] = useState<Ref[]>([]);
   const [dItems, setDItems] = useState<Item[]>([]);
   const [emitiendo, setEmitiendo] = useState(false);
 
@@ -194,10 +198,10 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
     if (!dForm.rut || !dForm.rs || dItems.length === 0) { alert("Receptor e ítems requeridos"); return; }
     setEmitiendo(true);
     try {
-      const d = await fetch(`${API_URL}/dte/emitir`, { method: "POST", headers: hj, body: JSON.stringify({ tipo_dte: +dForm.tipo_dte, receptor: { rut: dForm.rut, rs: dForm.rs, giro: dForm.giro, dir: dForm.dir, comuna: dForm.comuna }, items: dItems, fecha_vencimiento: dForm.fecha_vencimiento || null, forma_pago: dForm.forma_pago || null, observaciones: dForm.observaciones || null }) }).then(r => r.json());
+      const d = await fetch(`${API_URL}/dte/emitir`, { method: "POST", headers: hj, body: JSON.stringify({ tipo_dte: +dForm.tipo_dte, receptor: { rut: dForm.rut, rs: dForm.rs, giro: dForm.giro, dir: dForm.dir, comuna: dForm.comuna }, items: dItems, fecha_vencimiento: dForm.fecha_vencimiento || null, forma_pago: dForm.forma_pago || null, observaciones: dForm.observaciones || null, ind_traslado: dForm.tipo_dte === "52" ? +dForm.ind_traslado : undefined, descuento_global_pct: +dForm.descuento_global_pct || 0, referencias: dRefs.filter(r => r.tipo_doc && r.folio) }) }).then(r => r.json());
       if (!d.ok) { alert(d.message); return; }
       alert(`✅ DTE tipo ${d.item.tipo_dte} folio ${d.item.folio} generado (${d.firma})`);
-      setShowEmitir(false); setDItems([]); loadSii();
+      setShowEmitir(false); setDItems([]); setDRefs([]); loadSii();
     } finally { setEmitiendo(false); }
   }
   async function enviarDte(id: string) {
@@ -597,10 +601,21 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
             <div style={card}>
               <select value={dForm.tipo_dte} onChange={e => setDForm(f => ({ ...f, tipo_dte: e.target.value }))} style={inp}>
                 <option value="33">Factura Electrónica (33)</option>
+                <option value="34">Factura Exenta (34)</option>
+                <option value="46">Factura de Compra (46)</option>
                 <option value="52">Guía de Despacho (52)</option>
                 <option value="61">Nota de Crédito (61)</option>
                 <option value="56">Nota de Débito (56)</option>
               </select>
+              {dForm.tipo_dte === "52" && (
+                <select value={dForm.ind_traslado} onChange={e => setDForm(f => ({ ...f, ind_traslado: e.target.value }))} style={inp}>
+                  <option value="1">Traslado: Operación constituye venta</option>
+                  <option value="2">Traslado: Venta por efectuar</option>
+                  <option value="3">Traslado: Consignación</option>
+                  <option value="5">Traslado interno (entre bodegas)</option>
+                  <option value="6">Traslado: Otros no venta</option>
+                </select>
+              )}
               <div style={{ display: "flex", gap: 8 }}>
                 <input value={dForm.rut} onChange={e => setDForm(f => ({ ...f, rut: e.target.value }))} placeholder="RUT receptor *" style={{ ...inp, flex: 1 }} />
                 <input value={dForm.rs} onChange={e => setDForm(f => ({ ...f, rs: e.target.value }))} placeholder="Razón social *" style={{ ...inp, flex: 2 }} />
@@ -625,6 +640,38 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
                 </div>
               </div>
               <input value={dForm.observaciones} onChange={e => setDForm(f => ({ ...f, observaciones: e.target.value }))} placeholder="Observaciones (van en el PDF)" style={inp} />
+              <input type="number" value={dForm.descuento_global_pct} onChange={e => setDForm(f => ({ ...f, descuento_global_pct: e.target.value }))} placeholder="Descuento global % (ítems afectos)" style={inp} />
+
+              {/* Referencias a otros documentos */}
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginBottom: 4 }}>Referencias (SET de pruebas, NC/ND → documento original)</div>
+              {dRefs.map((r, i) => (
+                <div key={i} style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 8, marginBottom: 6 }}>
+                  <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                    <select value={r.tipo_doc} onChange={e => setDRefs(dRefs.map((x, j) => j === i ? { ...x, tipo_doc: e.target.value } : x))} style={{ ...inp, height: 38, marginBottom: 0, flex: 2, backgroundColor: C.card }}>
+                      <option value="">Tipo doc…</option>
+                      <option value="SET">SET (caso de pruebas)</option>
+                      <option value="33">Factura Electrónica (33)</option>
+                      <option value="34">Factura Exenta (34)</option>
+                      <option value="46">Factura de Compra (46)</option>
+                      <option value="52">Guía Despacho (52)</option>
+                      <option value="56">Nota Débito (56)</option>
+                      <option value="61">Nota Crédito (61)</option>
+                      <option value="801">Orden de compra (801)</option>
+                    </select>
+                    <input value={r.folio} onChange={e => setDRefs(dRefs.map((x, j) => j === i ? { ...x, folio: e.target.value } : x))} placeholder="Folio" style={{ ...inp, height: 38, marginBottom: 0, flex: 1, backgroundColor: C.card }} />
+                    <select value={r.cod || ""} onChange={e => setDRefs(dRefs.map((x, j) => j === i ? { ...x, cod: e.target.value } : x))} style={{ ...inp, height: 38, marginBottom: 0, flex: 1, backgroundColor: C.card }}>
+                      <option value="">Cód…</option>
+                      <option value="1">1 Anula</option>
+                      <option value="2">2 Corrige texto</option>
+                      <option value="3">3 Corrige montos</option>
+                    </select>
+                    <button onClick={() => setDRefs(dRefs.filter((_, j) => j !== i))} style={{ background: "none", border: "none", color: C.danger, cursor: "pointer" }}>✕</button>
+                  </div>
+                  <input value={r.razon || ""} onChange={e => setDRefs(dRefs.map((x, j) => j === i ? { ...x, razon: e.target.value } : x))} placeholder="Razón referencia (ej: CASO 4938250-1)" style={{ ...inp, height: 38, marginBottom: 0, backgroundColor: C.card }} />
+                </div>
+              ))}
+              <button onClick={() => setDRefs([...dRefs, { tipo_doc: "", folio: "" }])} style={{ width: "100%", height: 36, backgroundColor: C.card, border: `1px dashed ${C.border}`, borderRadius: 10, color: C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer", marginBottom: 10 }}>＋ Agregar referencia</button>
+
               <ItemsEditor items={dItems} setItems={setDItems} products={products} />
               <button onClick={emitirDte} disabled={emitiendo} style={btnP}>{emitiendo ? "Generando..." : "Generar DTE (XML + timbre + firma)"}</button>
             </div>
