@@ -58,7 +58,7 @@ function ItemsEditor({ items, setItems, products }: { items: Item[]; setItems: (
 }
 
 export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL: string; token: string; isAdmin: boolean }) {
-  const [tab, setTab] = useState<"productos" | "inventario" | "cotizaciones" | "ordenes" | "sii">("productos");
+  const [tab, setTab] = useState<"productos" | "inventario" | "cotizaciones" | "ventas" | "ordenes" | "sii">("productos");
   const h = { Authorization: `Bearer ${token}` };
   const hj = { ...h, "Content-Type": "application/json" };
 
@@ -161,10 +161,10 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
   const [dteConfig, setDteConfig] = useState<any>(null);
   const [cafs, setCafs] = useState<any[]>([]);
   const [dtes, setDtes] = useState<any[]>([]);
-  const [cfgForm, setCfgForm] = useState({ dte_giro: "", dte_acteco: "", dte_direccion: "", dte_comuna: "" });
+  const [cfgForm, setCfgForm] = useState({ dte_giro: "", dte_acteco: "", dte_direccion: "", dte_comuna: "", dte_fono: "", dte_email: "", dte_web: "" });
   const cafRef = useRef<HTMLInputElement>(null);
   const [showEmitir, setShowEmitir] = useState(false);
-  const [dForm, setDForm] = useState({ tipo_dte: "33", rut: "", rs: "", giro: "", dir: "", comuna: "" });
+  const [dForm, setDForm] = useState({ tipo_dte: "33", rut: "", rs: "", giro: "", dir: "", comuna: "", fecha_vencimiento: "", forma_pago: "CRÉDITO", observaciones: "" });
   const [dItems, setDItems] = useState<Item[]>([]);
   const [emitiendo, setEmitiendo] = useState(false);
 
@@ -175,7 +175,7 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
         fetch(`${API_URL}/dte/cafs`, { headers: h }).then(r => r.json()),
         fetch(`${API_URL}/dte`, { headers: h }).then(r => r.json()),
       ]);
-      if (c.ok) { setDteConfig(c.config); setCfgForm({ dte_giro: c.config.dte_giro || "", dte_acteco: c.config.dte_acteco || "", dte_direccion: c.config.dte_direccion || "", dte_comuna: c.config.dte_comuna || "" }); }
+      if (c.ok) { setDteConfig(c.config); setCfgForm({ dte_giro: c.config.dte_giro || "", dte_acteco: c.config.dte_acteco || "", dte_direccion: c.config.dte_direccion || "", dte_comuna: c.config.dte_comuna || "", dte_fono: c.config.dte_fono || "", dte_email: c.config.dte_email || "", dte_web: c.config.dte_web || "" }); }
       if (f.ok) setCafs(f.items);
       if (d.ok) setDtes(d.items);
     } catch {}
@@ -194,7 +194,7 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
     if (!dForm.rut || !dForm.rs || dItems.length === 0) { alert("Receptor e ítems requeridos"); return; }
     setEmitiendo(true);
     try {
-      const d = await fetch(`${API_URL}/dte/emitir`, { method: "POST", headers: hj, body: JSON.stringify({ tipo_dte: +dForm.tipo_dte, receptor: { rut: dForm.rut, rs: dForm.rs, giro: dForm.giro, dir: dForm.dir, comuna: dForm.comuna }, items: dItems }) }).then(r => r.json());
+      const d = await fetch(`${API_URL}/dte/emitir`, { method: "POST", headers: hj, body: JSON.stringify({ tipo_dte: +dForm.tipo_dte, receptor: { rut: dForm.rut, rs: dForm.rs, giro: dForm.giro, dir: dForm.dir, comuna: dForm.comuna }, items: dItems, fecha_vencimiento: dForm.fecha_vencimiento || null, forma_pago: dForm.forma_pago || null, observaciones: dForm.observaciones || null }) }).then(r => r.json());
       if (!d.ok) { alert(d.message); return; }
       alert(`✅ DTE tipo ${d.item.tipo_dte} folio ${d.item.folio} generado (${d.firma})`);
       setShowEmitir(false); setDItems([]); loadSii();
@@ -217,8 +217,26 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
     if (tab === "inventario") loadMovs();
     if (tab === "cotizaciones") loadQuotes();
     if (tab === "ordenes") loadOrders();
-    if (tab === "sii") loadSii();
+    if (tab === "sii" || tab === "ventas") loadSii();
   }, [tab]);
+
+  async function openPdf(url: string) {
+    try {
+      const r = await fetch(url, { headers: h });
+      if (!r.ok) { const d = await r.json().catch(() => ({}));  alert((d as any).message || "Error generando PDF"); return; }
+      const blob = await r.blob();
+      const u = URL.createObjectURL(blob);
+      const tab2 = window.open(u, "_blank");
+      if (!tab2) { const a = document.createElement("a"); a.href = u; a.download = "documento.pdf"; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
+      setTimeout(() => URL.revokeObjectURL(u), 10000);
+    } catch { alert("Error"); }
+  }
+
+  function diasVenc(fv?: string) {
+    if (!fv) return null;
+    const d = Math.ceil((new Date(String(fv).substring(0, 10) + "T12:00:00").getTime() - Date.now()) / 86400000);
+    return d;
+  }
 
   const statusColor: Record<string, string> = { borrador: C.muted, emitida: C.success, enviada: C.info, aceptada: C.success, rechazada: C.danger, recibida: C.success, generado: C.muted, enviado: C.info, aceptado: C.success, rechazado: C.danger };
   const statusBg: Record<string, string> = { borrador: C.cardAlt, emitida: C.successDim, enviada: C.infoDim, aceptada: C.successDim, rechazada: C.dangerDim };
@@ -231,7 +249,7 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
         <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 12 }}>Facturación</div>
 
         <div style={{ display: "flex", backgroundColor: C.cardAlt, borderRadius: 10, padding: 4, marginBottom: 14, gap: 3, overflowX: "auto" }}>
-          {([["productos", "📦 Productos"], ["inventario", "📊 Inventario"], ["cotizaciones", "📋 Cotizaciones"], ["ordenes", "🧾 Órdenes"], ...(isAdmin ? [["sii", "🏛 SII"]] as const : [])] as [typeof tab, string][]).map(([k, l]) => (
+          {([["productos", "📦 Productos"], ["inventario", "📊 Inventario"], ["cotizaciones", "📋 Cotizaciones"], ...(isAdmin ? [["ventas", "💵 Ventas"]] as const : []), ["ordenes", "🧾 Órdenes"], ...(isAdmin ? [["sii", "🏛 SII"]] as const : [])] as [typeof tab, string][]).map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} style={{ flex: 1, padding: "8px 6px", borderRadius: 8, border: "none", backgroundColor: tab === k ? C.card : "transparent", color: tab === k ? C.orange : C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>{l}</button>
           ))}
         </div>
@@ -331,6 +349,7 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
                 </div>
                 {openActions === q.id && (
                   <div style={{ display: "flex", gap: 6, marginTop: 8, paddingTop: 8, borderTop: `0.5px solid ${C.border}` }}>
+                    <button onClick={() => openPdf(`${API_URL}/obs-quotes/${q.id}/pdf`)} style={{ height: 34, padding: "0 12px", backgroundColor: C.orangeDim, border: "none", borderRadius: 8, color: C.orange, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>📄 PDF</button>
                     <button onClick={() => sendQuote(q)} style={{ flex: 1, height: 34, backgroundColor: C.infoDim, border: "none", borderRadius: 8, color: C.info, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>📧 Enviar</button>
                     <button onClick={async () => { await fetch(`${API_URL}/obs-quotes/${q.id}`, { method: "PUT", headers: hj, body: JSON.stringify({ status: "aceptada" }) }); setOpenActions(null); loadQuotes(); }} style={{ height: 34, padding: "0 12px", backgroundColor: C.successDim, border: "none", borderRadius: 8, color: C.success, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>✓ Aceptada</button>
                     <button onClick={async () => { await fetch(`${API_URL}/obs-quotes/${q.id}`, { method: "PUT", headers: hj, body: JSON.stringify({ status: "rechazada" }) }); setOpenActions(null); loadQuotes(); }} style={{ height: 34, padding: "0 12px", backgroundColor: C.dangerDim, border: "none", borderRadius: 8, color: C.danger, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>✗</button>
@@ -442,6 +461,59 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
           );
         })()}
 
+        {/* ── DOCUMENTOS DE VENTA ── */}
+        {tab === "ventas" && isAdmin && (() => {
+          const now = Date.now();
+          const last30 = dtes.filter(d => now - new Date(d.created_at).getTime() < 30 * 86400000);
+          const vencidos = dtes.filter(d => !d.cobrado_at && d.fecha_vencimiento && (diasVenc(d.fecha_vencimiento)! < 0));
+          const porVencer = dtes.filter(d => !d.cobrado_at && d.fecha_vencimiento && (diasVenc(d.fecha_vencimiento)! >= 0) && (diasVenc(d.fecha_vencimiento)! <= 30));
+          const sum = (arr: any[]) => arr.reduce((s, d) => s + (+d.total || 0), 0);
+          return <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ fontSize: 17, fontWeight: 800 }}>Documentos de venta</div>
+              <button onClick={() => { setTab("sii"); setShowEmitir(true); }} style={{ backgroundColor: "#1e293b", border: "none", borderRadius: 10, padding: "10px 14px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Registrar documento</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+              {[["Emitidos", sum(last30), last30.length, C.text, "Últimos 30 días"], ["Vencidos", sum(vencidos), vencidos.length, C.danger, "Sin cobro"], ["Por vencer", sum(porVencer), porVencer.length, "#b45309", "Próximos 30 días"]].map(([l, v, n, c, sub]) => (
+                <div key={String(l)} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 10 }}>
+                  <div style={{ fontSize: 10, color: C.muted }}>{l}</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: c as string }}>{fmtCLP(v as number)}</div>
+                  <div style={{ fontSize: 9, color: C.muted }}>{n} doc · {sub}</div>
+                </div>
+              ))}
+            </div>
+            {dtes.map(d => {
+              const dv = diasVenc(d.fecha_vencimiento);
+              const abrev: Record<number, string> = { 33: "FAC-EL", 52: "GD-EL", 56: "ND-EL", 61: "NC-EL" };
+              return (
+                <div key={d.id} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: "10px 12px", marginBottom: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800 }}>{abrev[d.tipo_dte] || d.tipo_dte} - {d.folio}</div>
+                      <div style={{ fontSize: 11, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.receptor_rs}</div>
+                      <div style={{ fontSize: 10, color: C.muted }}>{fmtDate(d.fecha_emision || d.created_at)}
+                        {dv != null && !d.cobrado_at && <span style={{ fontWeight: 700, color: dv < 0 ? C.danger : dv <= 11 ? "#b45309" : C.muted }}> · {dv < 0 ? `Vencido hace ${-dv} día${-dv !== 1 ? "s" : ""}` : `Vence en ${dv} día${dv !== 1 ? "s" : ""}`}</span>}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800 }}>{fmtCLP(+d.total)}</div>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: statusColor[d.estado] || C.muted }}>{d.estado.toUpperCase()}</div>
+                      {d.cobrado_at && <div style={{ fontSize: 9, fontWeight: 700, color: C.success }}>💰 COBRADO</div>}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                    {!d.cobrado_at && <button onClick={async () => { if (!confirm("¿Registrar cobro de este documento?")) return; await fetch(`${API_URL}/dte/${d.id}/cobro`, { method: "POST", headers: h }); loadSii(); }} style={{ flex: 1, height: 32, backgroundColor: "#1e293b", border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>Registrar cobro</button>}
+                    <button onClick={() => openPdf(`${API_URL}/dte/${d.id}/pdf`)} style={{ height: 32, padding: "0 12px", backgroundColor: C.orangeDim, border: "none", borderRadius: 8, color: C.orange, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>📄 PDF</button>
+                    {d.estado === "generado" && <button onClick={() => enviarDte(d.id)} style={{ height: 32, padding: "0 12px", backgroundColor: C.infoDim, border: "none", borderRadius: 8, color: C.info, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>📤 SII</button>}
+                    {d.track_id && <button onClick={() => estadoDte(d.id)} style={{ height: 32, padding: "0 12px", backgroundColor: C.cardAlt, border: "none", borderRadius: 8, color: C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>🔍</button>}
+                  </div>
+                </div>
+              );
+            })}
+            {dtes.length === 0 && <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin documentos emitidos aún</div>}
+          </>;
+        })()}
+
         {/* ── ÓRDENES DE COMPRA ── */}
         {tab === "ordenes" && <>
           <button onClick={() => setShowNewOrder(!showNewOrder)} style={{ ...btnP, marginBottom: 12 }}>{showNewOrder ? "Cancelar" : "＋ Nueva orden de compra"}</button>
@@ -497,6 +569,11 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
               <input value={cfgForm.dte_comuna} onChange={e => setCfgForm(f => ({ ...f, dte_comuna: e.target.value }))} placeholder="Comuna" style={{ ...inp, flex: 1 }} />
             </div>
             <input value={cfgForm.dte_direccion} onChange={e => setCfgForm(f => ({ ...f, dte_direccion: e.target.value }))} placeholder="Dirección casa matriz" style={inp} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <input value={cfgForm.dte_fono} onChange={e => setCfgForm(f => ({ ...f, dte_fono: e.target.value }))} placeholder="Fono" style={{ ...inp, flex: 1 }} />
+              <input value={cfgForm.dte_web} onChange={e => setCfgForm(f => ({ ...f, dte_web: e.target.value }))} placeholder="www.matfau.cl" style={{ ...inp, flex: 1 }} />
+            </div>
+            <input value={cfgForm.dte_email} onChange={e => setCfgForm(f => ({ ...f, dte_email: e.target.value }))} placeholder="Email (aparece en el documento)" style={inp} />
             <button onClick={saveCfg} style={btnP}>Guardar configuración</button>
           </div>
 
@@ -533,6 +610,21 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
                 <input value={dForm.comuna} onChange={e => setDForm(f => ({ ...f, comuna: e.target.value }))} placeholder="Comuna" style={{ ...inp, flex: 1 }} />
               </div>
               <input value={dForm.dir} onChange={e => setDForm(f => ({ ...f, dir: e.target.value }))} placeholder="Dirección receptor" style={inp} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginBottom: 4 }}>Vencimiento</div>
+                  <input type="date" value={dForm.fecha_vencimiento} onChange={e => setDForm(f => ({ ...f, fecha_vencimiento: e.target.value }))} style={inp} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginBottom: 4 }}>Forma de pago</div>
+                  <select value={dForm.forma_pago} onChange={e => setDForm(f => ({ ...f, forma_pago: e.target.value }))} style={inp}>
+                    <option value="CRÉDITO">Crédito</option>
+                    <option value="CONTADO">Contado</option>
+                    <option value="">Sin especificar</option>
+                  </select>
+                </div>
+              </div>
+              <input value={dForm.observaciones} onChange={e => setDForm(f => ({ ...f, observaciones: e.target.value }))} placeholder="Observaciones (van en el PDF)" style={inp} />
               <ItemsEditor items={dItems} setItems={setDItems} products={products} />
               <button onClick={emitirDte} disabled={emitiendo} style={btnP}>{emitiendo ? "Generando..." : "Generar DTE (XML + timbre + firma)"}</button>
             </div>
