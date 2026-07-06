@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Shield, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle, Receipt } from "lucide-react";
+import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Shield, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle, Receipt, Calculator } from "lucide-react";
+import FacturacionScreen from "./Facturacion";
 
 const API_URL = "https://obrassync-backend-production.up.railway.app";
 
@@ -11,7 +12,7 @@ const C = {
   info: "#2563EB", infoDim: "#EFF6FF", purple: "#7C3AED", purpleDim: "#F5F3FF",
 };
 
-type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones" | "rendiciones";
+type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones" | "rendiciones" | "facturacion";
 type Rendicion = { id: string; worker_name: string; worker_email?: string; date: string; boleta_date?: string; boleta_number?: string; amount: number; vendor: string; description: string; rut_vendor?: string; category: string; image_data?: string; onedrive_url?: string; onedrive_path?: string; cost_center_id?: string; cost_center_name?: string; cost_center_code?: string; tipo?: string; doc_firmado_data?: string; doc_firmado_onedrive_url?: string; reembolso_status?: string; folio?: number; status: string; submitted_at?: string; created_at: string };
 type Quotation = { id: string; client_name?: string; client_rut?: string; reference?: string; status: string; nubox_doc_number_services?: string; nubox_doc_number_materials?: string; total_services: number; total_materials: number; source_type: string; created_at: string; created_by_name?: string };
 type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
@@ -51,6 +52,7 @@ const PERMISSIONS = [
   { key: "cotizaciones", label: "Cotizaciones", sub: "Crear y ver cotizaciones en Nubox", icon: "📋" },
   { key: "rendiciones", label: "Rendiciones", sub: "Subir boletas y rendir gastos", icon: "💰" },
   { key: "recepcion_conforme", label: "Recepción conforme", sub: "Ver proyectos completados pendientes de recepción", icon: "🟢" },
+  { key: "facturacion", label: "Facturación", sub: "Productos, inventario, cotizaciones y OC", icon: "🧮" },
   { key: "admin", label: "Administración", sub: "Gestionar usuarios y permisos", icon: "👤" },
 ];
 
@@ -347,6 +349,7 @@ export default function App() {
   const canSeeCotizaciones = canSee("cotizaciones");
   const canSeeRendiciones = canSee("rendiciones");
   const canSeeRecepcion = isAdmin || canSee("recepcion_conforme");
+  const canSeeFacturacion = isAdmin || canSee("facturacion");
 
   useEffect(() => { if (token) { loadProjects(); loadKpis(); loadStaff(); loadPriorities(); if (isAdmin) { loadUsers(); loadCostCenters(); } } }, [token]);
   useEffect(() => { if (selectedProject && token) { loadTasks(selectedProject.id); loadProjFiles(selectedProject.id); } }, [selectedProject]);
@@ -2916,6 +2919,9 @@ export default function App() {
       {/* ── PANTALLA RENDICIONES ──────────────────────────────────────────────── */}
       {screen === "rendiciones" && canSeeRendiciones && <RendicionesScreen token={token} userName={userName} />}
 
+      {/* ── PANTALLA FACTURACIÓN ──────────────────────────────────────────────── */}
+      {screen === "facturacion" && canSeeFacturacion && <FacturacionScreen API_URL={API_URL} token={token!} isAdmin={isAdmin} />}
+
       {/* Nav inferior */}
       {/* Barra de navegación — sin botón Crear */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: C.card, borderTop: `0.5px solid ${C.border}`, display: "flex", padding: "6px 0 14px", zIndex: 100 }}>
@@ -2925,6 +2931,7 @@ export default function App() {
           ...(canSeeGastos ? [{ sc: "gastos" as Screen, icon: <DollarSign size={19} />, label: "Gastos" }] : []),
           ...(canSeeCotizaciones ? [{ sc: "cotizaciones" as Screen, icon: <FileText size={19} />, label: "Cotizar" }] : []),
           ...(canSeeRendiciones ? [{ sc: "rendiciones" as Screen, icon: <Receipt size={19} />, label: "Rendir" }] : []),
+          ...(canSeeFacturacion ? [{ sc: "facturacion" as Screen, icon: <Calculator size={19} />, label: "Facturar" }] : []),
           ...(isAdmin ? [{ sc: "admin" as Screen, icon: <Shield size={19} />, label: "Admin" }] : []),
           { sc: "configuracion" as Screen, icon: <Av name={userName} size={20} />, label: "Perfil" },
         ] as { sc: Screen; icon: React.ReactNode; label: string }[]).map(({ sc, icon, label }) => {
