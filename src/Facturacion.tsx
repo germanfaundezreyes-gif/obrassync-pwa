@@ -236,6 +236,21 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
     } catch { alert("Error"); }
   }
 
+  // Abre el XML como texto en una pestaña nueva (evita el flujo de descarga forzada,
+  // que en iOS Safari/PWA dispara prompts del sistema inconsistentes)
+  async function openXml(url: string, filename: string) {
+    try {
+      const r = await fetch(url, { headers: h });
+      if (!r.ok) { const d = await r.json().catch(() => ({}));  alert((d as any).message || "Error obteniendo XML"); return; }
+      const text = await r.text();
+      const blob = new Blob([text], { type: "text/plain" });
+      const u = URL.createObjectURL(blob);
+      const tab2 = window.open(u, "_blank");
+      if (!tab2) { const a = document.createElement("a"); a.href = u; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
+      setTimeout(() => URL.revokeObjectURL(u), 10000);
+    } catch { alert("Error"); }
+  }
+
   function diasVenc(fv?: string) {
     if (!fv) return null;
     const d = Math.ceil((new Date(String(fv).substring(0, 10) + "T12:00:00").getTime() - Date.now()) / 86400000);
@@ -694,13 +709,8 @@ export default function FacturacionScreen({ API_URL, token, isAdmin }: { API_URL
               <div style={{ display: "flex", gap: 6 }}>
                 {d.estado === "generado" && <button onClick={() => enviarDte(d.id)} style={{ flex: 1, height: 34, backgroundColor: C.orangeDim, border: "none", borderRadius: 8, color: C.orange, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>📤 Enviar al SII</button>}
                 {d.track_id && <button onClick={() => estadoDte(d.id)} style={{ flex: 1, height: 34, backgroundColor: C.infoDim, border: "none", borderRadius: 8, color: C.info, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>🔍 Consultar estado</button>}
-                <button onClick={async () => {
-                  const r = await fetch(`${API_URL}/dte/${d.id}/xml`, { headers: h });
-                  const blob = await r.blob(); const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a"); a.href = url; a.download = `DTE_${d.tipo_dte}_${d.folio}.xml`;
-                  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                  setTimeout(() => URL.revokeObjectURL(url), 3000);
-                }} style={{ height: 34, padding: "0 12px", backgroundColor: C.cardAlt, border: "none", borderRadius: 8, color: C.muted, fontSize: 12, cursor: "pointer" }}>⬇️ XML</button>
+                <button onClick={() => openPdf(`${API_URL}/dte/${d.id}/pdf`)} style={{ height: 34, padding: "0 12px", backgroundColor: C.orangeDim, border: "none", borderRadius: 8, color: C.orange, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>📄 PDF</button>
+                <button onClick={() => openXml(`${API_URL}/dte/${d.id}/xml`, `DTE_${d.tipo_dte}_${d.folio}.xml`)} style={{ height: 34, padding: "0 12px", backgroundColor: C.cardAlt, border: "none", borderRadius: 8, color: C.muted, fontSize: 12, cursor: "pointer" }}>⬇️ XML</button>
               </div>
             </div>
           ))}
