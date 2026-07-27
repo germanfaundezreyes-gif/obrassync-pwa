@@ -3548,7 +3548,9 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
           category: d.category || "otros",
         }));
         setFormReady(true);
-        showMsg("✅ IA leyó la boleta. Revisa y ajusta los datos.");
+        showMsg(r.aiFailed
+          ? "📷 Boleta guardada. La IA no pudo leerla — completa los datos manualmente."
+          : "✅ IA leyó la boleta. Revisa y ajusta los datos.");
       } else { showMsg("❌ " + r.message); }
     } catch { showMsg("❌ Error al analizar la imagen"); }
     setScanning(false);
@@ -3939,7 +3941,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
           )}
 
           {/* Si no ha escaneado boleta aún, mostrar indicación */}
-          {!imagePreview && !scanning && (
+          {!imagePreview && !scanning && !formReady && (
             <div style={{ textAlign: "center", padding: "20px 0", color: C.muted, fontSize: 13 }}>
               Toca <strong style={{ color: C.orange }}>📷 Foto boleta</strong> para comenzar.<br/>
               <span style={{ fontSize: 12 }}>La IA leerá los datos automáticamente.</span>
