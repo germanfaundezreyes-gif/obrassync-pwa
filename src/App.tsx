@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Shield, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle, Receipt, Calculator } from "lucide-react";
+import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Shield, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle, Receipt, Calculator, TrendingUp } from "lucide-react";
 import FacturacionScreen from "./Facturacion";
 
 const API_URL = "https://obrassync-backend-production.up.railway.app";
@@ -12,7 +12,7 @@ const C = {
   info: "#2563EB", infoDim: "#EFF6FF", purple: "#7C3AED", purpleDim: "#F5F3FF",
 };
 
-type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones" | "rendiciones" | "facturacion";
+type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones" | "rendiciones" | "facturacion" | "estadoResultado";
 type Rendicion = { id: string; worker_name: string; worker_email?: string; date: string; boleta_date?: string; boleta_number?: string; amount: number; vendor: string; description: string; rut_vendor?: string; category: string; image_data?: string; onedrive_url?: string; onedrive_path?: string; cost_center_id?: string; cost_center_name?: string; cost_center_code?: string; tipo?: string; doc_firmado_data?: string; doc_firmado_onedrive_url?: string; reembolso_status?: string; folio?: number; status: string; submitted_at?: string; created_at: string };
 type Quotation = { id: string; client_name?: string; client_rut?: string; reference?: string; status: string; nubox_doc_number_services?: string; nubox_doc_number_materials?: string; total_services: number; total_materials: number; source_type: string; created_at: string; created_by_name?: string };
 type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
@@ -53,6 +53,7 @@ const PERMISSIONS = [
   { key: "rendiciones", label: "Rendiciones", sub: "Subir boletas y rendir gastos", icon: "💰" },
   { key: "recepcion_conforme", label: "Recepción conforme", sub: "Ver proyectos completados pendientes de recepción", icon: "🟢" },
   { key: "facturacion", label: "Facturación", sub: "Productos, inventario, cotizaciones y OC", icon: "🧮" },
+  { key: "estado_resultado", label: "Estado de Resultado", sub: "Ver márgenes por centro de costo (ingresos, gastos, remuneraciones)", icon: "📈" },
   { key: "admin", label: "Administración", sub: "Gestionar usuarios y permisos", icon: "👤" },
 ];
 
@@ -203,6 +204,8 @@ export default function App() {
   const [notifying, setNotifying] = useState<"" | "inicio" | "termino">("");
   const [notifyPanel, setNotifyPanel] = useState<{ tipo: "inicio" | "termino"; resend: boolean } | null>(null);
   const [notifyDate, setNotifyDate] = useState(new Date().toISOString().slice(0, 10));
+  const [projectResultado, setProjectResultado] = useState<{ items: ERCenter[] } | null>(null);
+  const [loadingProjectResultado, setLoadingProjectResultado] = useState(false);
   const cotFileRef = useRef<HTMLInputElement>(null);
   const ocFileRef = useRef<HTMLInputElement>(null);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -350,6 +353,7 @@ export default function App() {
   const canSeeRendiciones = canSee("rendiciones");
   const canSeeRecepcion = isAdmin || canSee("recepcion_conforme");
   const canSeeFacturacion = isAdmin || canSee("facturacion");
+  const canSeeEstadoResultado = isAdmin || canSee("estado_resultado");
 
   useEffect(() => { if (token) { loadProjects(); loadKpis(); loadStaff(); loadPriorities(); if (isAdmin) { loadUsers(); loadCostCenters(); } } }, [token]);
   useEffect(() => { if (selectedProject && token) { loadTasks(selectedProject.id); loadProjFiles(selectedProject.id); } }, [selectedProject]);
@@ -1461,6 +1465,38 @@ export default function App() {
                     >
                       ↩️ Revertir (solo admin)
                     </button>
+                  )}
+                  {canSeeEstadoResultado && (
+                    <button
+                      onClick={async () => {
+                        setLoadingProjectResultado(true); setProjectResultado(null);
+                        try {
+                          const r = await fetch(`${API_URL}/projects/${selectedProject.id}/resultado`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json());
+                          if (r.ok) setProjectResultado({ items: r.items || [] }); else alert(r.message || "Error");
+                        } catch { alert("Error"); } finally { setLoadingProjectResultado(false); }
+                      }}
+                      style={{ marginTop: 10, marginLeft: 8, height: 34, padding: "0 16px", backgroundColor: C.card, border: `0.5px solid ${C.orange}50`, borderRadius: 8, color: C.orange, fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                    >
+                      {loadingProjectResultado ? "Cargando..." : "📈 Ver resultado del proyecto"}
+                    </button>
+                  )}
+                  {projectResultado && (
+                    <div style={{ marginTop: 12, textAlign: "left" }}>
+                      {projectResultado.items.length === 0 ? (
+                        <div style={{ fontSize: 12, color: C.muted, textAlign: "center" }}>Sin movimientos registrados en el centro de costo de este proyecto.</div>
+                      ) : projectResultado.items.map(cc => (
+                        <div key={cc.cost_center_id || "sin_centro"} style={{ backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Resultado completo del proyecto</div>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 12 }}>
+                            <div>Ingresos: <b>{fmtCLP(cc.total.ingresos)}</b></div>
+                            <div>Gastos: <b>{fmtCLP(cc.total.gastos)}</b></div>
+                            <div>Boletas: <b>{fmtCLP(cc.total.boletas)}</b></div>
+                            <div>Remuneraciones: <b>{fmtCLP(cc.total.remuneraciones)}</b></div>
+                          </div>
+                          <div style={{ marginTop: 8, fontSize: 15, fontWeight: 800, color: cc.total.margen >= 0 ? "#15803d" : "#dc2626" }}>Margen: {fmtCLP(cc.total.margen)}</div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               ) : (
@@ -2922,6 +2958,9 @@ export default function App() {
       {/* ── PANTALLA FACTURACIÓN ──────────────────────────────────────────────── */}
       {screen === "facturacion" && canSeeFacturacion && <FacturacionScreen API_URL={API_URL} token={token!} isAdmin={isAdmin} />}
 
+      {/* ── PANTALLA ESTADO DE RESULTADO ──────────────────────────────────────── */}
+      {screen === "estadoResultado" && canSeeEstadoResultado && <EstadoResultadoScreen token={token!} />}
+
       {/* Nav inferior */}
       {/* Barra de navegación — sin botón Crear */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: C.card, borderTop: `0.5px solid ${C.border}`, display: "flex", padding: "6px 0 14px", zIndex: 100 }}>
@@ -2932,6 +2971,7 @@ export default function App() {
           ...(canSeeCotizaciones ? [{ sc: "cotizaciones" as Screen, icon: <FileText size={19} />, label: "Cotizar" }] : []),
           ...(canSeeRendiciones ? [{ sc: "rendiciones" as Screen, icon: <Receipt size={19} />, label: "Rendir" }] : []),
           ...(canSeeFacturacion ? [{ sc: "facturacion" as Screen, icon: <Calculator size={19} />, label: "Facturar" }] : []),
+          ...(canSeeEstadoResultado ? [{ sc: "estadoResultado" as Screen, icon: <TrendingUp size={19} />, label: "Resultado" }] : []),
           ...(isAdmin ? [{ sc: "admin" as Screen, icon: <Shield size={19} />, label: "Admin" }] : []),
           { sc: "configuracion" as Screen, icon: <Av name={userName} size={20} />, label: "Perfil" },
         ] as { sc: Screen; icon: React.ReactNode; label: string }[]).map(({ sc, icon, label }) => {
@@ -3948,6 +3988,148 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
             </div>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── ESTADO DE RESULTADO ──────────────────────────────────────────────────────
+type ERMonth = { ingresos: number; gastos: number; boletas: number; remuneraciones: number; margen: number };
+type ERCenter = { cost_center_id: string | null; name: string; code: string | null; months: Record<string, ERMonth>; total: ERMonth };
+
+const ER_MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const erMonthKeys = (year: number) => Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
+
+function EstadoResultadoScreen({ token }: { token: string }) {
+  const h = { Authorization: `Bearer ${token}` };
+  const currentYear = new Date().getFullYear();
+  const [year, setYear] = useState(currentYear);
+  const [items, setItems] = useState<ERCenter[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => { load(); }, [year]);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const r = await fetch(`${API_URL}/estado-resultado?year=${year}`, { headers: h }).then(r => r.json());
+      if (r.ok) setItems(r.items || []);
+      else setMsg(r.message || "Error");
+    } catch { setMsg("Error al cargar"); }
+    setLoading(false);
+  }
+
+  async function exportExcel() {
+    setExporting(true);
+    try {
+      const r = await fetch(`${API_URL}/estado-resultado/export?year=${year}`, { headers: h });
+      if (!r.ok) { alert("No se pudo generar el Excel"); return; }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const newTab = window.open(url, "_blank");
+      if (!newTab) {
+        const a = document.createElement("a");
+        a.href = url; a.download = `Estado_Resultado_${year}.xlsx`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch { alert("Error al descargar"); } finally { setExporting(false); }
+  }
+
+  const months = erMonthKeys(year);
+  const totalGeneral = items.reduce((acc, c) => ({
+    ingresos: acc.ingresos + c.total.ingresos, gastos: acc.gastos + c.total.gastos,
+    boletas: acc.boletas + c.total.boletas, remuneraciones: acc.remuneraciones + c.total.remuneraciones,
+    margen: acc.margen + c.total.margen,
+  }), { ingresos: 0, gastos: 0, boletas: 0, remuneraciones: 0, margen: 0 });
+
+  return (
+    <div style={{ padding: 16, paddingBottom: 90 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <div style={{ fontSize: 18, fontWeight: 700 }}>📈 Estado de Resultado</div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center" }}>
+        <button onClick={() => setYear(y => y - 1)} style={{ width: 34, height: 34, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.card, cursor: "pointer", fontSize: 15 }}>‹</button>
+        <div style={{ flex: 1, textAlign: "center", fontSize: 16, fontWeight: 700, backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "7px 0" }}>{year}</div>
+        <button onClick={() => setYear(y => y + 1)} disabled={year >= currentYear} style={{ width: 34, height: 34, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.card, cursor: year >= currentYear ? "not-allowed" : "pointer", opacity: year >= currentYear ? 0.4 : 1, fontSize: 15 }}>›</button>
+        <button onClick={exportExcel} disabled={exporting || loading} style={{ height: 34, padding: "0 14px", borderRadius: 8, border: "none", backgroundColor: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: exporting ? 0.6 : 1, whiteSpace: "nowrap" }}>
+          {exporting ? "..." : "📊 Excel"}
+        </button>
+      </div>
+
+      {msg && <div style={{ color: C.danger, fontSize: 12, marginBottom: 10 }}>{msg}</div>}
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 30, color: C.muted }}>Cargando...</div>
+      ) : items.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 30, color: C.muted, fontSize: 13 }}>Sin datos para {year}.</div>
+      ) : (
+        <>
+          {/* Resumen general */}
+          <div style={{ backgroundColor: totalGeneral.margen >= 0 ? "#f0fdf4" : "#fef2f2", border: `0.5px solid ${totalGeneral.margen >= 0 ? "#86efac" : "#fecaca"}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+            <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Margen total {year}</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: totalGeneral.margen >= 0 ? "#15803d" : "#dc2626" }}>{fmtCLP(totalGeneral.margen)}</div>
+            <div style={{ display: "flex", gap: 14, marginTop: 8, flexWrap: "wrap", fontSize: 11, color: C.muted }}>
+              <span>Ingresos: <b style={{ color: C.text }}>{fmtCLP(totalGeneral.ingresos)}</b></span>
+              <span>Gastos: <b style={{ color: C.text }}>{fmtCLP(totalGeneral.gastos)}</b></span>
+              <span>Boletas: <b style={{ color: C.text }}>{fmtCLP(totalGeneral.boletas)}</b></span>
+              <span>Remuneraciones: <b style={{ color: C.text }}>{fmtCLP(totalGeneral.remuneraciones)}</b></span>
+            </div>
+          </div>
+
+          {/* Por centro de costo */}
+          {items.map(cc => {
+            const key = cc.cost_center_id || "sin_centro";
+            const isOpen = expanded === key;
+            return (
+              <div key={key} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, marginBottom: 10, overflow: "hidden" }}>
+                <div onClick={() => setExpanded(isOpen ? null : key)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 14, cursor: "pointer" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>{cc.code ? `[${cc.code}] ` : ""}{cc.name}</div>
+                    <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Toca para {isOpen ? "cerrar" : "ver detalle mensual"}</div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 10 }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: cc.total.margen >= 0 ? "#15803d" : "#dc2626" }}>{fmtCLP(cc.total.margen)}</div>
+                    <div style={{ fontSize: 10, color: C.muted }}>margen</div>
+                  </div>
+                </div>
+                {isOpen && (
+                  <div style={{ padding: "0 14px 14px", overflowX: "auto" }}>
+                    <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11, minWidth: 640 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: "left", padding: "4px 6px", color: C.muted, borderBottom: `1px solid ${C.border}` }}>Concepto</th>
+                          {ER_MESES.map(m => <th key={m} style={{ textAlign: "right", padding: "4px 6px", color: C.muted, borderBottom: `1px solid ${C.border}` }}>{m}</th>)}
+                          <th style={{ textAlign: "right", padding: "4px 6px", color: C.muted, borderBottom: `1px solid ${C.border}`, fontWeight: 800 }}>Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {([["Ingresos","ingresos"],["Gastos","gastos"],["Boletas","boletas"],["Remuneraciones","remuneraciones"]] as [string, keyof ERMonth][]).map(([label, k]) => (
+                          <tr key={k}>
+                            <td style={{ padding: "4px 6px", color: C.muted }}>{label}</td>
+                            {months.map(ym => <td key={ym} style={{ textAlign: "right", padding: "4px 6px" }}>{fmtCLP(cc.months[ym]?.[k] || 0)}</td>)}
+                            <td style={{ textAlign: "right", padding: "4px 6px", fontWeight: 700 }}>{fmtCLP(cc.total[k])}</td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td style={{ padding: "6px 6px", fontWeight: 800, borderTop: `1px solid ${C.border}` }}>Margen</td>
+                          {months.map(ym => {
+                            const v = cc.months[ym]?.margen || 0;
+                            return <td key={ym} style={{ textAlign: "right", padding: "6px 6px", fontWeight: 800, borderTop: `1px solid ${C.border}`, color: v >= 0 ? "#15803d" : "#dc2626" }}>{fmtCLP(v)}</td>;
+                          })}
+                          <td style={{ textAlign: "right", padding: "6px 6px", fontWeight: 800, borderTop: `1px solid ${C.border}`, color: cc.total.margen >= 0 ? "#15803d" : "#dc2626" }}>{fmtCLP(cc.total.margen)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </>
       )}
     </div>
   );
