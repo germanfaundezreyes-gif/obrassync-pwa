@@ -889,12 +889,13 @@ export default function App() {
 
   async function assignNuboxSale(nuboxId: number | string, projectId: string, sale: any) {
     setNuboxSalesAssigning(String(nuboxId));
+    const isUnassigned = projectId === "__sin_centro__";
     try {
       const r = await fetch(`${API_URL}/nubox/sales/${nuboxId}/assign`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          project_id: projectId,
+          ...(isUnassigned ? { unassigned: true } : { project_id: projectId }),
           client_name: sale.client_name,
           client_rut: sale.client_rut,
           number: sale.number,
@@ -957,11 +958,12 @@ export default function App() {
   async function assignNuboxPurchase(nuboxId: number | string, selectedValue: string, force = false) {
     setNuboxAssigning(String(nuboxId));
     try {
+      const isUnassigned = selectedValue === "__sin_centro__";
       const cc = costCenters.find(c => c.project_id === selectedValue);
       const isProject = !!cc;
       const purchase = nuboxPurchases.find(p => p.id === nuboxId);
       const body = {
-        ...(isProject ? { project_id: selectedValue } : { cost_center_id: selectedValue }),
+        ...(isUnassigned ? { unassigned: true } : isProject ? { project_id: selectedValue } : { cost_center_id: selectedValue }),
         supplier_name: purchase?.supplier?.tradeName || null,
         supplier_rut: purchase?.supplier?.identification?.value || null,
         number: purchase?.number || null,
@@ -985,8 +987,8 @@ export default function App() {
         return;
       }
       if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
-      const ccName = cc?.name || costCenters.find(c => c.id === selectedValue)?.name || "";
-      const assignedData = cc ? { project_id: cc.project_id, cost_center_id: cc.id, project_name: ccName, cc_name: ccName } : { cost_center_id: selectedValue, cc_name: ccName };
+      const ccName = isUnassigned ? "Sin centro de costo" : cc?.name || costCenters.find(c => c.id === selectedValue)?.name || "";
+      const assignedData = isUnassigned ? { cost_center_id: null, cc_name: ccName } : cc ? { project_id: cc.project_id, cost_center_id: cc.id, project_name: ccName, cc_name: ccName } : { cost_center_id: selectedValue, cc_name: ccName };
       setNuboxPurchases(prev => prev.map(p => p.id === nuboxId ? { ...p, assigned: assignedData } : p));
       setNuboxSelectedProject(prev => { const n = { ...prev }; delete n[String(nuboxId)]; return n; });
       await Promise.all([loadKpis(), loadNuboxSummary()]);
@@ -2818,6 +2820,7 @@ export default function App() {
                               style={{ flex: 1, height: 36, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 12, padding: "0 8px" }}
                             >
                               <option value="">— Seleccionar centro de costo —</option>
+                              <option value="__sin_centro__">🚫 Sin centro de costo (igual queda en el informe)</option>
                               {costCenters.filter(cc => cc.project_id).length > 0 && (
                                 <optgroup label="🏗️ Proyectos">
                                   {costCenters.filter(cc => cc.project_id).map(cc => (
@@ -2885,6 +2888,7 @@ export default function App() {
                             style={{ flex: 1, height: 36, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 12, padding: "0 8px" }}
                           >
                             <option value="">— Seleccionar proyecto —</option>
+                            <option value="__sin_centro__">🚫 Sin centro de costo (igual queda en el informe)</option>
                             {projects.map(pr => <option key={pr.id} value={pr.id}>{pr.code ? `[${pr.code}] ` : ""}{pr.name}</option>)}
                           </select>
                           <button
