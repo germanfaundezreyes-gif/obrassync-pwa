@@ -4219,6 +4219,26 @@ function EstadoResultadoScreen({ token, isAdmin }: { token: string; isAdmin: boo
             </div>
           </div>
 
+          {/* EBITDA mensual (toda la empresa, suma de todos los centros) */}
+          <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 14, marginBottom: 14, overflowX: "auto" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>EBITDA mensual {year}</div>
+            <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11, minWidth: 560 }}>
+              <thead>
+                <tr>
+                  {ER_MESES.map(m => <th key={m} style={{ textAlign: "right", padding: "4px 6px", color: C.muted, borderBottom: `1px solid ${C.border}` }}>{m}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {months.map(ym => {
+                    const v = items.reduce((s, cc) => s + (cc.months[ym]?.margen || 0), 0);
+                    return <td key={ym} style={{ textAlign: "right", padding: "6px 6px", fontWeight: 700, color: v >= 0 ? "#15803d" : "#dc2626" }}>{fmtCLP(v)}</td>;
+                  })}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
           {/* Por centro de costo */}
           {items.map(cc => {
             const key = cc.cost_center_id || "sin_centro";
