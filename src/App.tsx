@@ -908,9 +908,12 @@ export default function App() {
       });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
+      const assignedInfo = isUnassigned
+        ? { project_id: null, cost_center_id: null, project_name: null, cc_name: "Sin centro de costo" }
+        : { project_id: projectId, cost_center_id: d.expense?.cost_center_id || null, project_name: projects.find(p => p.id === projectId)?.name || "", cc_name: null };
       setNuboxSalesSummary((prev: any) => prev ? {
         ...prev,
-        items: prev.items.map((s: any) => s.id === nuboxId ? { ...s, assigned_project: projectId } : s)
+        items: prev.items.map((s: any) => s.id === nuboxId ? { ...s, assigned: assignedInfo } : s)
       } : prev);
       setNuboxSalesProject(prev => { const n = { ...prev }; delete n[String(nuboxId)]; return n; });
     } catch { alert("Error"); } finally { setNuboxSalesAssigning(null); }
@@ -2864,7 +2867,9 @@ export default function App() {
                     const isNC = sale.total_amount < 0;
                     const amtColor = isNC ? C.danger : C.success;
                     return (
-                    <div key={sale.id} style={{ backgroundColor: C.card, border: `0.5px solid ${isNC ? C.danger : sale.assigned_project ? C.success : C.border}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
+                    const currentSelection = nuboxSalesProject[sale.id] !== undefined ? nuboxSalesProject[sale.id] : (sale.assigned?.project_id || (sale.assigned ? "__sin_centro__" : ""));
+                    return (
+                    <div key={sale.id} style={{ backgroundColor: C.card, border: `0.5px solid ${isNC ? C.danger : sale.assigned ? C.success : C.border}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -2879,11 +2884,11 @@ export default function App() {
                           <div style={{ fontSize: 10, color: C.muted }}>Neto {isNC ? "-" : ""}{fmtCLP(Math.abs(sale.total_net))}</div>
                         </div>
                       </div>
-                      {sale.assigned_project && <div style={{ fontSize: 11, color: C.success, fontWeight: 600, marginBottom: 6 }}>✅ Asignado</div>}
+                      {sale.assigned && <div style={{ fontSize: 11, color: C.success, fontWeight: 600, marginBottom: 6 }}>✅ Asignado a {sale.assigned.project_name || sale.assigned.cc_name || "Sin centro de costo"}</div>}
                       {isAdmin && (
                         <div style={{ display: "flex", gap: 8 }}>
                           <select
-                            value={nuboxSalesProject[sale.id] || ""}
+                            value={currentSelection}
                             onChange={e => setNuboxSalesProject(prev => ({ ...prev, [sale.id]: e.target.value }))}
                             style={{ flex: 1, height: 36, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 12, padding: "0 8px" }}
                           >
@@ -2892,11 +2897,11 @@ export default function App() {
                             {projects.map(pr => <option key={pr.id} value={pr.id}>{pr.code ? `[${pr.code}] ` : ""}{pr.name}</option>)}
                           </select>
                           <button
-                            onClick={() => { const pid = nuboxSalesProject[sale.id]; if (!pid) return; assignNuboxSale(sale.id, pid, sale); }}
-                            disabled={nuboxSalesAssigning === String(sale.id) || !nuboxSalesProject[sale.id]}
-                            style={{ height: 36, padding: "0 14px", borderRadius: 8, border: "none", backgroundColor: nuboxSalesProject[sale.id] ? C.success : C.cardAlt, color: nuboxSalesProject[sale.id] ? "#fff" : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                            onClick={() => { if (!currentSelection) return; assignNuboxSale(sale.id, currentSelection, sale); }}
+                            disabled={nuboxSalesAssigning === String(sale.id) || !currentSelection}
+                            style={{ height: 36, padding: "0 14px", borderRadius: 8, border: "none", backgroundColor: currentSelection ? C.success : C.cardAlt, color: currentSelection ? "#fff" : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}
                           >
-                            {nuboxSalesAssigning === String(sale.id) ? "..." : sale.assigned_project ? "Cambiar" : "Asignar"}
+                            {nuboxSalesAssigning === String(sale.id) ? "..." : sale.assigned ? "Cambiar" : "Asignar"}
                           </button>
                         </div>
                       )}
