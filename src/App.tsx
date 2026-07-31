@@ -4023,6 +4023,8 @@ function EstadoResultadoScreen({ token, isAdmin }: { token: string; isAdmin: boo
   const [payrollMonth, setPayrollMonth] = useState(new Date().toISOString().slice(0, 7));
   const [entries, setEntries] = useState<PayrollEntryRow[]>([]);
   const [savingEntries, setSavingEntries] = useState(false);
+  const [uploadingLibro, setUploadingLibro] = useState(false);
+  const libroRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { load(); }, [year]);
   useEffect(() => { if (isAdmin && payrollTab === "nomina") { loadWorkers(); loadCostCentersLite(); } }, [isAdmin, payrollTab]);
@@ -4062,6 +4064,24 @@ function EstadoResultadoScreen({ token, isAdmin }: { token: string; isAdmin: boo
       await fetch(`${API_URL}/payroll-entries/bulk`, { method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify({ year_month: payrollMonth, entries: entries.map(e => ({ worker_id: e.worker_id, amount: e.amount })) }) });
       setMsg(""); await load();
     } catch { alert("Error al guardar"); } finally { setSavingEntries(false); }
+  }
+
+  async function uploadLibro(file: File) {
+    setUploadingLibro(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("year_month", payrollMonth);
+      const r = await fetch(`${API_URL}/payroll/upload-pdf`, { method: "POST", headers: h, body: fd }).then(r => r.json());
+      if (!r.ok) { alert(r.message || "Error leyendo archivo"); return; }
+      if (r.trabajadores_leidos > 0) {
+        alert(`✅ Se leyeron ${r.trabajadores_leidos} trabajador(es) del libro (${r.trabajadores_nuevos} nuevos). Asígnales un centro de costo abajo.`);
+        if (r.mes_guardado) setPayrollMonth(r.mes_guardado);
+        await loadWorkers(); await loadEntries();
+      } else {
+        alert(`El libro no traía desglose por trabajador — se guardó solo el total ($${(r.total_guardado || 0).toLocaleString("es-CL")}) sin asignar a un centro específico. Para repartirlo por proyecto, agrega los trabajadores manualmente arriba.`);
+      }
+    } catch { alert("Error subiendo el archivo"); } finally { setUploadingLibro(false); }
   }
 
   async function load() {
@@ -4115,7 +4135,16 @@ function EstadoResultadoScreen({ token, isAdmin }: { token: string; isAdmin: boo
       {payrollTab === "nomina" && isAdmin ? (
         <div>
           <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Trabajadores</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>Trabajadores</div>
+              <div>
+                <input ref={libroRef} type="file" accept=".xlsx,.xls,.pdf" style={{ display: "none" }} onChange={e => { if (e.target.files?.[0]) uploadLibro(e.target.files[0]); e.target.value = ""; }} />
+                <button onClick={() => libroRef.current?.click()} disabled={uploadingLibro} style={{ backgroundColor: C.infoDim, border: `0.5px solid ${C.info}`, borderRadius: 8, padding: "5px 10px", color: C.info, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
+                  {uploadingLibro ? "Leyendo..." : "📥 Subir libro (IA)"}
+                </button>
+              </div>
+            </div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 10 }}>Sube el libro de remuneraciones (Excel/PDF) y la IA crea aquí a cada trabajador con su sueldo del mes. Solo falta asignarles el centro de costo.</div>
             {workers.map(w => (
               <div key={w.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                 <div style={{ flex: 1, fontSize: 12 }}>{w.full_name}</div>
