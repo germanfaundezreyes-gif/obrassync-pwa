@@ -2959,7 +2959,7 @@ export default function App() {
       {screen === "facturacion" && canSeeFacturacion && <FacturacionScreen API_URL={API_URL} token={token!} isAdmin={isAdmin} />}
 
       {/* ── PANTALLA ESTADO DE RESULTADO ──────────────────────────────────────── */}
-      {screen === "estadoResultado" && canSeeEstadoResultado && <EstadoResultadoScreen token={token!} />}
+      {screen === "estadoResultado" && canSeeEstadoResultado && <EstadoResultadoScreen token={token!} isAdmin={isAdmin} />}
 
       {/* Nav inferior */}
       {/* Barra de navegación — sin botón Crear */}
@@ -4000,7 +4000,10 @@ type ERCenter = { cost_center_id: string | null; name: string; code: string | nu
 const ER_MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const erMonthKeys = (year: number) => Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
 
-function EstadoResultadoScreen({ token }: { token: string }) {
+type PayrollWorker = { id: string; full_name: string; cost_center_id: string | null; cost_center_name?: string; is_active: boolean };
+type PayrollEntryRow = { worker_id: string; full_name: string; cost_center_id: string | null; cost_center_name?: string; amount: number };
+
+function EstadoResultadoScreen({ token, isAdmin }: { token: string; isAdmin: boolean }) {
   const h = { Authorization: `Bearer ${token}` };
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
@@ -4010,7 +4013,56 @@ function EstadoResultadoScreen({ token }: { token: string }) {
   const [exporting, setExporting] = useState(false);
   const [msg, setMsg] = useState("");
 
+  // Nómina de trabajadores (admin)
+  const [payrollTab, setPayrollTab] = useState<"resumen" | "nomina">("resumen");
+  const [costCenters, setCostCenters] = useState<{ id: string; name: string; code: string | null }[]>([]);
+  const [workers, setWorkers] = useState<PayrollWorker[]>([]);
+  const [newWorkerName, setNewWorkerName] = useState("");
+  const [newWorkerCC, setNewWorkerCC] = useState("");
+  const [savingWorker, setSavingWorker] = useState(false);
+  const [payrollMonth, setPayrollMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [entries, setEntries] = useState<PayrollEntryRow[]>([]);
+  const [savingEntries, setSavingEntries] = useState(false);
+
   useEffect(() => { load(); }, [year]);
+  useEffect(() => { if (isAdmin && payrollTab === "nomina") { loadWorkers(); loadCostCentersLite(); } }, [isAdmin, payrollTab]);
+  useEffect(() => { if (isAdmin && payrollTab === "nomina") loadEntries(); }, [payrollMonth, payrollTab]);
+
+  async function loadCostCentersLite() {
+    try { const r = await fetch(`${API_URL}/cost-centers`, { headers: h }).then(r => r.json()); if (r.ok) setCostCenters(r.items || []); } catch {}
+  }
+  async function loadWorkers() {
+    try { const r = await fetch(`${API_URL}/payroll-workers`, { headers: h }).then(r => r.json()); if (r.ok) setWorkers(r.items || []); } catch {}
+  }
+  async function addWorker() {
+    if (!newWorkerName.trim()) return;
+    setSavingWorker(true);
+    try {
+      await fetch(`${API_URL}/payroll-workers`, { method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify({ full_name: newWorkerName.trim(), cost_center_id: newWorkerCC || null }) });
+      setNewWorkerName(""); setNewWorkerCC(""); await loadWorkers();
+    } catch { alert("Error"); } finally { setSavingWorker(false); }
+  }
+  async function updateWorkerCC(workerId: string, ccId: string) {
+    setWorkers(ws => ws.map(w => w.id === workerId ? { ...w, cost_center_id: ccId || null } : w));
+    try { await fetch(`${API_URL}/payroll-workers/${workerId}`, { method: "PUT", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify({ cost_center_id: ccId || null }) }); } catch {}
+  }
+  async function removeWorker(workerId: string) {
+    if (!confirm("¿Quitar este trabajador de la nómina?")) return;
+    try { await fetch(`${API_URL}/payroll-workers/${workerId}`, { method: "DELETE", headers: h }); await loadWorkers(); await loadEntries(); } catch {}
+  }
+  async function loadEntries() {
+    try {
+      const r = await fetch(`${API_URL}/payroll-entries?month=${payrollMonth}`, { headers: h }).then(r => r.json());
+      if (r.ok) setEntries((r.items || []).map((it: any) => ({ worker_id: it.worker_id, full_name: it.full_name, cost_center_id: it.cost_center_id, cost_center_name: it.cost_center_name, amount: Number(it.amount) || 0 })));
+    } catch {}
+  }
+  async function saveEntries() {
+    setSavingEntries(true);
+    try {
+      await fetch(`${API_URL}/payroll-entries/bulk`, { method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify({ year_month: payrollMonth, entries: entries.map(e => ({ worker_id: e.worker_id, amount: e.amount })) }) });
+      setMsg(""); await load();
+    } catch { alert("Error al guardar"); } finally { setSavingEntries(false); }
+  }
 
   async function load() {
     setLoading(true);
@@ -4052,6 +4104,64 @@ function EstadoResultadoScreen({ token }: { token: string }) {
         <div style={{ fontSize: 18, fontWeight: 700 }}>📈 Estado de Resultado</div>
       </div>
 
+      {isAdmin && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 14, backgroundColor: C.cardAlt, borderRadius: 10, padding: 4 }}>
+          {([["resumen", "📊 Resumen"], ["nomina", "👷 Nómina"]] as [typeof payrollTab, string][]).map(([t, label]) => (
+            <button key={t} onClick={() => setPayrollTab(t)} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", cursor: "pointer", backgroundColor: payrollTab === t ? C.orange : "transparent", color: payrollTab === t ? "#fff" : C.muted, fontWeight: 700, fontSize: 12 }}>{label}</button>
+          ))}
+        </div>
+      )}
+
+      {payrollTab === "nomina" && isAdmin ? (
+        <div>
+          <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Trabajadores</div>
+            {workers.map(w => (
+              <div key={w.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <div style={{ flex: 1, fontSize: 12 }}>{w.full_name}</div>
+                <select value={w.cost_center_id || ""} onChange={e => updateWorkerCC(w.id, e.target.value)} style={{ fontSize: 11, padding: "5px 6px", borderRadius: 6, border: `1px solid ${C.border}`, backgroundColor: C.bg, color: C.text, maxWidth: 140 }}>
+                  <option value="">— Sin centro —</option>
+                  {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.code ? `[${cc.code}] ` : ""}{cc.name}</option>)}
+                </select>
+                <button onClick={() => removeWorker(w.id)} style={{ background: "none", border: "none", color: C.danger, cursor: "pointer", fontSize: 14 }}>✕</button>
+              </div>
+            ))}
+            <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+              <input value={newWorkerName} onChange={e => setNewWorkerName(e.target.value)} placeholder="Nombre del trabajador" style={{ flex: 1, fontSize: 12, padding: "8px 10px", borderRadius: 8, border: `1px solid ${C.border}`, backgroundColor: C.bg, color: C.text }} />
+              <select value={newWorkerCC} onChange={e => setNewWorkerCC(e.target.value)} style={{ fontSize: 11, padding: "8px 6px", borderRadius: 8, border: `1px solid ${C.border}`, backgroundColor: C.bg, color: C.text, maxWidth: 130 }}>
+                <option value="">— Sin centro —</option>
+                {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.code ? `[${cc.code}] ` : ""}{cc.name}</option>)}
+              </select>
+              <button onClick={addWorker} disabled={savingWorker || !newWorkerName.trim()} style={{ padding: "0 14px", borderRadius: 8, border: "none", backgroundColor: C.orange, color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>+</button>
+            </div>
+          </div>
+
+          <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>Sueldos del mes</div>
+              <input type="month" value={payrollMonth} onChange={e => setPayrollMonth(e.target.value)} style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: `1px solid ${C.border}`, backgroundColor: C.bg, color: C.text }} />
+            </div>
+            {entries.length === 0 ? (
+              <div style={{ fontSize: 12, color: C.muted, textAlign: "center", padding: 10 }}>Agrega trabajadores arriba primero.</div>
+            ) : entries.map((e, i) => (
+              <div key={e.worker_id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12 }}>{e.full_name}</div>
+                  <div style={{ fontSize: 10, color: C.muted }}>{e.cost_center_name || "Sin centro de costo"}</div>
+                </div>
+                <input type="number" value={e.amount || ""} onChange={ev => setEntries(rows => rows.map((r, j) => j === i ? { ...r, amount: +ev.target.value } : r))}
+                  placeholder="0" style={{ width: 110, fontSize: 12, padding: "7px 8px", borderRadius: 6, border: `1px solid ${C.border}`, backgroundColor: C.bg, color: C.text, textAlign: "right" }} />
+              </div>
+            ))}
+            {entries.length > 0 && (
+              <button onClick={saveEntries} disabled={savingEntries} style={{ width: "100%", marginTop: 10, height: 40, backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: savingEntries ? 0.6 : 1 }}>
+                {savingEntries ? "Guardando..." : "💾 Guardar sueldos del mes"}
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+      <>
       <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center" }}>
         <button onClick={() => setYear(y => y - 1)} style={{ width: 34, height: 34, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.card, cursor: "pointer", fontSize: 15 }}>‹</button>
         <div style={{ flex: 1, textAlign: "center", fontSize: 16, fontWeight: 700, backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "7px 0" }}>{year}</div>
@@ -4130,6 +4240,8 @@ function EstadoResultadoScreen({ token }: { token: string }) {
             );
           })}
         </>
+      )}
+      </>
       )}
     </div>
   );
