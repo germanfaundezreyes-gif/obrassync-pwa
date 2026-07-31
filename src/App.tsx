@@ -2985,8 +2985,8 @@ export default function App() {
         })}
       </div>
 
-      {/* Botón Crear flotante y arrastrable */}
-      <DraggableCreateButton onPress={() => setScreen("crearProyecto")} cardColor={C.card} orangeColor={C.orange} />
+      {/* Botón Crear flotante y arrastrable — oculto en Estado de Resultado: no hay nada que "crear" ahí y tapaba los montos de margen al hacer scroll */}
+      {screen !== "estadoResultado" && <DraggableCreateButton onPress={() => setScreen("crearProyecto")} cardColor={C.card} orangeColor={C.orange} />}
     </div>
   );
 }
