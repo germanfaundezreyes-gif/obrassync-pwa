@@ -179,6 +179,7 @@ export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectCode, setProjectCode] = useState("");
+  const [clientSuggestions, setClientSuggestions] = useState<{ name: string; rut: string | null; email: string | null; usos: number }[]>([]);
   const [projectName, setProjectName] = useState("");
   const [clientName, setClientName] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -356,6 +357,16 @@ export default function App() {
   const canSeeEstadoResultado = isAdmin || canSee("estado_resultado");
 
   useEffect(() => { if (token) { loadProjects(); loadKpis(); loadStaff(); loadPriorities(); if (isAdmin) { loadUsers(); loadCostCenters(); } } }, [token]);
+  // Al abrir "nuevo proyecto": sugiere el siguiente correlativo y trae los clientes ya usados.
+  // Solo rellena el código si está vacío, para no pisar lo que el usuario haya escrito.
+  useEffect(() => {
+    if (screen !== "crearProyecto" || !token) return;
+    const h = { Authorization: `Bearer ${token}` };
+    fetch(`${API_URL}/projects/next-code`, { headers: h }).then(r => r.json())
+      .then(r => { if (r.ok) setProjectCode(prev => prev || r.code); }).catch(() => {});
+    fetch(`${API_URL}/clients/suggestions`, { headers: h }).then(r => r.json())
+      .then(r => { if (r.ok) setClientSuggestions(r.items || []); }).catch(() => {});
+  }, [screen, token]);
   useEffect(() => { if (selectedProject && token) { loadTasks(selectedProject.id); loadProjFiles(selectedProject.id); } }, [selectedProject]);
 
   // Auto-logout por inactividad (30 minutos)
@@ -1902,9 +1913,39 @@ export default function App() {
         {screen === "crearProyecto" && (
           <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>Nuevo proyecto</div>
-            {[{ val: projectCode, set: setProjectCode, ph: "Código *", key: "code" }, { val: projectName, set: setProjectName, ph: "Nombre *", key: "name" }, { val: clientName, set: setClientName, ph: "Cliente", key: "client" }, { val: clientEmail, set: setClientEmail, ph: "Correo del cliente (notificaciones)", key: "clientEmail" }].map(({ val, set, ph, key }) => (
+            {[{ val: projectCode, set: setProjectCode, ph: "Código *", key: "code" }, { val: projectName, set: setProjectName, ph: "Nombre *", key: "name" }].map(({ val, set, ph, key }) => (
               <input key={key} value={val} onChange={e => set(e.target.value)} placeholder={ph} style={inp} />
             ))}
+
+            {/* Cliente y correo: se puede elegir uno ya usado o escribir uno nuevo */}
+            <input
+              value={clientName}
+              onChange={e => {
+                const v = e.target.value;
+                setClientName(v);
+                // Al elegir un cliente conocido, autocompleta su correo si aún no hay uno escrito
+                const match = clientSuggestions.find(c => c.name === v);
+                if (match?.email) setClientEmail(prev => prev || match.email!);
+              }}
+              placeholder="Cliente"
+              list="client-suggestions"
+              style={inp}
+            />
+            <datalist id="client-suggestions">
+              {clientSuggestions.map(c => <option key={c.name} value={c.name}>{c.rut ? `${c.rut}` : ""}</option>)}
+            </datalist>
+
+            <input
+              value={clientEmail}
+              onChange={e => setClientEmail(e.target.value)}
+              placeholder="Correo del cliente (notificaciones)"
+              type="email"
+              list="client-email-suggestions"
+              style={inp}
+            />
+            <datalist id="client-email-suggestions">
+              {Array.from(new Set(clientSuggestions.map(c => c.email).filter(Boolean))).map(em => <option key={em!} value={em!} />)}
+            </datalist>
             <div style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>Fecha de inicio</div>
             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ ...inp, marginBottom: 10 }} />
             <div style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>Fecha de término</div>
