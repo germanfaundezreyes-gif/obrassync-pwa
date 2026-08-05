@@ -2907,7 +2907,6 @@ export default function App() {
                   {nuboxSalesSummary?.items?.filter((s: any) => !s.annulled).map((sale: any) => {
                     const isNC = sale.total_amount < 0;
                     const amtColor = isNC ? C.danger : C.success;
-                    return (
                     const currentSelection = nuboxSalesProject[sale.id] !== undefined ? nuboxSalesProject[sale.id] : (sale.assigned?.project_id || (sale.assigned ? "__sin_centro__" : ""));
                     return (
                     <div key={sale.id} style={{ backgroundColor: C.card, border: `0.5px solid ${isNC ? C.danger : sale.assigned ? C.success : C.border}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
