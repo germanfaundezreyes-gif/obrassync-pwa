@@ -628,6 +628,20 @@ export default function App() {
 
   async function generateReport() {
     if (!selectedProject) return;
+    // En proyectos grandes generar y descargar en el momento tarda minutos y se corta
+    // (el servidor corta a los 5). Sobre ~25 partidas con fotos se genera en segundo plano
+    // y llega por correo, sin espera ni recortar las descripciones con IA.
+    const partidasConFotos = tasks.filter(t => (t.photo_count || 0) > 0).length;
+    if (partidasConFotos > 25) {
+      if (!confirm(`Este proyecto tiene ${partidasConFotos} partidas con fotos, así que el informe demora varios minutos.\n\n¿Generarlo en segundo plano y enviarlo a tu correo cuando esté listo?`)) return;
+      setGeneratingReport(true);
+      try {
+        const r = await fetch(`${API_URL}/projects/${selectedProject.id}/reports/generate-word-async`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+        const d = await r.json();
+        alert(d.ok ? `✅ ${d.message}` : `❌ ${d.message || "Error"}`);
+      } catch { alert("Error solicitando el informe"); } finally { setGeneratingReport(false); }
+      return;
+    }
     setGeneratingReport(true);
     try {
       const r = await fetch(`${API_URL}/projects/${selectedProject.id}/reports/generate-word`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
