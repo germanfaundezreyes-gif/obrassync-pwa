@@ -668,6 +668,54 @@ export default function App() {
     } catch { alert("Error generando informe"); } finally { setGeneratingReport(false); }
   }
 
+  // Lee la fecha de captura del EXIF. Hay que hacerlo ANTES de comprimir: el canvas
+  // descarta todos los metadatos, así que la foto que llega al servidor ya no la trae
+  // y el informe terminaba mostrando la fecha de subida en vez de la de terreno.
+  async function readCaptureDate(file: File): Promise<string | null> {
+    try {
+      const buf = new DataView(await file.slice(0, 256 * 1024).arrayBuffer());
+      if (buf.byteLength < 4 || buf.getUint16(0) !== 0xffd8) return null; // no es JPEG
+      let off = 2;
+      while (off + 4 < buf.byteLength) {
+        if (buf.getUint8(off) !== 0xff) break;
+        const marker = buf.getUint8(off + 1);
+        const size = buf.getUint16(off + 2);
+        if (marker === 0xe1) {
+          const tiff = off + 10; // salta "Exif\0\0"
+          if (tiff + 8 > buf.byteLength) return null;
+          const le = buf.getUint16(tiff) === 0x4949;
+          const ifd0 = tiff + buf.getUint32(tiff + 4, le);
+          const findTag = (dir: number, tag: number): number | null => {
+            if (dir + 2 > buf.byteLength) return null;
+            const n = buf.getUint16(dir, le);
+            for (let i = 0; i < n; i++) {
+              const e = dir + 2 + i * 12;
+              if (e + 12 > buf.byteLength) return null;
+              if (buf.getUint16(e, le) === tag) return buf.getUint32(e + 8, le);
+            }
+            return null;
+          };
+          // DateTimeOriginal (0x9003) vive en el sub-IFD Exif, apuntado por 0x8769.
+          const exifPtr = findTag(ifd0, 0x8769);
+          const dtOff = exifPtr != null ? findTag(tiff + exifPtr, 0x9003) : null;
+          if (dtOff == null) return null;
+          let str = "";
+          for (let i = 0; i < 19 && tiff + dtOff + i < buf.byteLength; i++) {
+            str += String.fromCharCode(buf.getUint8(tiff + dtOff + i));
+          }
+          // Formato EXIF "2026:08:06 14:30:00" -> ISO
+          const m = str.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+          if (!m) return null;
+          const d = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+          if (isNaN(d.getTime()) || d.getFullYear() < 2000 || d.getTime() > Date.now() + 86400000) return null;
+          return d.toISOString();
+        }
+        off += 2 + size;
+      }
+      return null;
+    } catch { return null; }
+  }
+
   // Comprime la imagen a máx 1600px lado mayor, JPEG 80% — pasa de ~8MB a ~300KB
   async function compressImage(file: File): Promise<File> {
     try {
@@ -691,8 +739,10 @@ export default function App() {
     if (!selectedTask) return;
     setUploadingPhoto(true);
     try {
+      const takenAt = await readCaptureDate(file);
       const compressed = await compressImage(file);
       const fd = new FormData(); fd.append("photo", compressed); fd.append("description", description); fd.append("photo_type", photoTypeInput);
+      if (takenAt) fd.append("taken_at", takenAt);
       const r = await fetch(`${API_URL}/tasks/${selectedTask.id}/photos`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
