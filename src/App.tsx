@@ -340,6 +340,7 @@ export default function App() {
   const [photoTypeInput, setPhotoTypeInput] = useState<"previa" | "trabajo">("trabajo");
   const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
   const [editingPhotoDesc, setEditingPhotoDesc] = useState("");
+  const [editingPhotoDate, setEditingPhotoDate] = useState("");
   const [savingPhotoDesc, setSavingPhotoDesc] = useState(false);
 
   const isAdmin = userRole === "administrador" || userRole === "admin";
@@ -751,12 +752,16 @@ export default function App() {
     } catch { alert("Error"); } finally { setUploadingPhoto(false); }
   }
 
-  async function savePhotoDesc(photoId: string, desc: string) {
+  async function savePhotoDesc(photoId: string, desc: string, fecha: string) {
     setSavingPhotoDesc(true);
     try {
-      const r = await fetch(`${API_URL}/photos/${photoId}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ description: desc }) });
+      // La fecha va como mediodía local: guardarla a las 00:00 hacía que el informe la
+      // mostrara un día antes al convertir a UTC.
+      const takenAt = fecha ? new Date(`${fecha}T12:00:00`).toISOString() : "";
+      const r = await fetch(`${API_URL}/photos/${photoId}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ description: desc, taken_at: takenAt }) });
       const d = await r.json();
-      if (d.ok) setPhotos(ps => ps.map(p => p.id === photoId ? { ...p, description: desc } : p));
+      if (!d.ok) { alert(d.message || "Error"); return; }
+      setPhotos(ps => ps.map(p => p.id === photoId ? { ...p, description: desc, taken_at: d.photo?.taken_at ?? null } : p));
       setEditingPhotoId(null);
     } catch { alert("Error"); } finally { setSavingPhotoDesc(false); }
   }
@@ -1345,13 +1350,15 @@ export default function App() {
                       {editingPhotoId === photo.id ? (
                         <div style={{ marginTop: 8 }}>
                           <textarea value={editingPhotoDesc} onChange={e => setEditingPhotoDesc(e.target.value)} rows={2} style={{ width: "100%", backgroundColor: C.cardAlt, border: `0.5px solid ${C.orange}`, borderRadius: 8, color: C.text, fontSize: 12, padding: 8, resize: "none", boxSizing: "border-box", outline: "none", marginBottom: 6 }} />
+                          <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>Fecha en que se tomó la fotografía</div>
+                          <input type="date" value={editingPhotoDate} onChange={e => setEditingPhotoDate(e.target.value)} style={{ width: "100%", backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 12, padding: 8, boxSizing: "border-box", outline: "none", marginBottom: 6 }} />
                           <div style={{ display: "flex", gap: 6 }}>
                             <button onClick={() => setEditingPhotoId(null)} style={{ flex: 1, height: 32, background: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, color: C.muted, fontSize: 11, cursor: "pointer" }}>Cancelar</button>
-                            <button onClick={() => savePhotoDesc(photo.id, editingPhotoDesc)} disabled={savingPhotoDesc} style={{ flex: 2, height: 32, background: C.orange, border: "none", borderRadius: 8, color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{savingPhotoDesc ? "Guardando..." : "Guardar"}</button>
+                            <button onClick={() => savePhotoDesc(photo.id, editingPhotoDesc, editingPhotoDate)} disabled={savingPhotoDesc} style={{ flex: 2, height: 32, background: C.orange, border: "none", borderRadius: 8, color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{savingPhotoDesc ? "Guardando..." : "Guardar"}</button>
                           </div>
                         </div>
                       ) : (
-                        <div onClick={() => { setEditingPhotoId(photo.id); setEditingPhotoDesc(photo.description || ""); }} style={{ marginTop: 8, padding: "6px 10px", borderLeft: `3px solid ${C.orange}`, backgroundColor: C.cardAlt, borderRadius: "0 6px 6px 0", cursor: "pointer" }}>
+                        <div onClick={() => { setEditingPhotoId(photo.id); setEditingPhotoDesc(photo.description || ""); setEditingPhotoDate(photo.taken_at ? String(photo.taken_at).slice(0, 10) : ""); }} style={{ marginTop: 8, padding: "6px 10px", borderLeft: `3px solid ${C.orange}`, backgroundColor: C.cardAlt, borderRadius: "0 6px 6px 0", cursor: "pointer" }}>
                           {photo.description ? (
                             <div style={{ fontSize: 12, color: C.text, fontStyle: "italic", lineHeight: 1.4 }}>{photo.description}</div>
                           ) : (
