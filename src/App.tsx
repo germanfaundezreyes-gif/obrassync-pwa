@@ -3845,9 +3845,9 @@ const fmtCLP = (n: number) => {
                     style={{ width: "100%", padding: 10, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" }}
                   />
                   <div style={{ marginTop: 10 }}>
-                    <input ref={fileRef} type="file" multiple accept="image/*,.pdf" style={{ display: "none" }} onChange={e => setUploadFiles(Array.from(e.target.files || []))} />
+                    <input ref={fileRef} type="file" multiple accept="image/*,.pdf,.xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => setUploadFiles(Array.from(e.target.files || []))} />
                     <button onClick={() => fileRef.current?.click()} style={{ backgroundColor: C.cardAlt, border: `1px dashed ${C.border}`, borderRadius: 8, padding: "10px 16px", width: "100%", cursor: "pointer", fontSize: 13, color: C.muted }}>
-                      Adjuntar fotos o PDF {uploadFiles.length > 0 && `(${uploadFiles.length} archivos)`}
+                      Adjuntar itemizado, PDF o fotos {uploadFiles.length > 0 && `(${uploadFiles.length} archivos)`}
                     </button>
                   </div>
                 </div>
