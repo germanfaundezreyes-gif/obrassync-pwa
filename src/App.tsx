@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle, HardHat, CreditCard, Receipt, ClipboardList, Calculator, TrendingUp, Users, Settings, ChevronRight } from "lucide-react";
 import FacturacionScreen from "./Facturacion";
 
 const API_URL = "https://obrassync-backend-production.up.railway.app";
@@ -39,7 +39,12 @@ const EXPENSE_CATEGORIES = [
   { value: "admin", label: "Administración", icon: "🏢" },
   { value: "otros", label: "Otros", icon: "📦" },
 ];
-const fmtCLP = (n: number) => new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", minimumFractionDigits: 0 }).format(n);
+// Intl con es-CL entrega "$-52.485.416", con el signo entre el peso y la cifra, que se
+// lee como error tipográfico. En contabilidad chilena el menos va delante del símbolo.
+const fmtCLP = (n: number) => {
+  const v = Math.round(+n || 0);
+  return (v < 0 ? "-$" : "$") + Math.abs(v).toLocaleString("es-CL");
+};
 
 const PERMISSIONS = [
   { key: "photos", label: "Fotos", sub: "Subir y ver fotos de partidas", icon: "📷" },
@@ -1492,7 +1497,7 @@ export default function App() {
               <div onClick={() => setScreen("proyectos")} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 16, padding: 16, cursor: "pointer" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div style={{ width: 36, height: 36, background: C.orangeDim, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}><FolderOpen size={18} color={C.orange} /></div>
-                  {(kpis?.proyectos.atrasados || 0) > 0 && <div style={{ background: C.dangerDim, border: `0.5px solid ${C.danger}`, borderRadius: 6, padding: "2px 7px", fontSize: 10, color: C.danger, fontWeight: 700 }}>{kpis?.proyectos.atrasados} atr.</div>}
+                  {(kpis?.proyectos.atrasados || 0) > 0 && <div style={{ background: C.dangerDim, border: `0.5px solid ${C.danger}`, borderRadius: 6, padding: "2px 7px", fontSize: 10, color: C.danger, fontWeight: 700 }}>{kpis?.proyectos.atrasados} atrasados</div>}
                 </div>
                 <div style={{ fontSize: 28, fontWeight: 800, color: C.orange, marginTop: 10 }}>{kpis?.proyectos.total ?? projects.length}</div>
                 <div style={{ fontSize: 11, color: C.mutedSoft, marginTop: 2 }}>Proyectos activos</div>
@@ -1505,10 +1510,10 @@ export default function App() {
               <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
                 <div style={{ width: 36, height: 36, background: C.infoDim, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}><BarChart2 size={18} color={C.info} /></div>
                 <div style={{ fontSize: 28, fontWeight: 800, color: C.info, marginTop: 10 }}>{kpis?.tareas.en_curso ?? 0}</div>
-                <div style={{ fontSize: 11, color: C.mutedSoft, marginTop: 2 }}>Partidas en curso</div>
+                <div style={{ fontSize: 11, color: C.mutedSoft, marginTop: 2 }}>{(kpis?.tareas.en_curso || 0) === 1 ? "Partida en curso" : "Partidas en curso"}</div>
                 <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                   <div style={{ background: C.successDim, borderRadius: 5, padding: "2px 7px", fontSize: 10, color: C.success }}><CheckCircle2 size={9} style={{ marginRight: 3 }} />{kpis?.tareas.completadas ?? 0} ok</div>
-                  {(kpis?.tareas.atrasadas || 0) > 0 && <div style={{ background: C.dangerDim, borderRadius: 5, padding: "2px 7px", fontSize: 10, color: C.danger }}><AlertTriangle size={9} style={{ marginRight: 3 }} />{kpis?.tareas.atrasadas} atr.</div>}
+                  {(kpis?.tareas.atrasadas || 0) > 0 && <div style={{ background: C.dangerDim, borderRadius: 5, padding: "2px 7px", fontSize: 10, color: C.danger }}><AlertTriangle size={9} style={{ marginRight: 3 }} />{kpis?.tareas.atrasadas} atrasadas</div>}
                 </div>
               </div>
 
@@ -1581,16 +1586,16 @@ export default function App() {
                 <FileText size={15} /> {generatingReport ? "Generando..." : "Informe Word"}
               </button>}
               <button onClick={() => setShowQuoteImport(true)} style={{ flex: 1, height: 44, backgroundColor: C.orangeDim, border: `0.5px solid ${C.orange}40`, borderRadius: 10, color: C.orange, fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
-                📄 Cotización PDF
+                Cotización PDF
               </button>
               <button onClick={() => setShowGantt(!showGantt)} style={{ flex: 1, height: 44, backgroundColor: showGantt ? C.orangeDim : C.cardAlt, border: `0.5px solid ${showGantt ? C.orange : C.border}`, borderRadius: 10, color: showGantt ? C.orange : C.mutedSoft, fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
-                📊 Excel
+                Excel
               </button>
             </div>
 
             {/* Visita a terreno: video + nota de voz -> análisis de riesgo */}
             <button onClick={() => setShowVisita(!showVisita)} style={{ width: "100%", height: 44, marginBottom: 14, backgroundColor: showVisita ? C.orangeDim : C.cardAlt, border: `0.5px solid ${showVisita ? C.orange : C.border}`, borderRadius: 10, color: showVisita ? C.orange : C.mutedSoft, fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
-              🦺 Visita a terreno · Prevención
+              Visita a terreno
             </button>
 
             {showVisita && (
@@ -1602,11 +1607,11 @@ export default function App() {
                 <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Video {visitaVideo ? "✓" : "(opcional)"}</div>
                 <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
                   <label style={{ flex: 1, height: 40, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                    🎥 Grabar
+                    Grabar video
                     <input type="file" accept="video/*" capture="environment" onChange={e => setVisitaVideo(e.target.files?.[0] || null)} style={{ display: "none" }} />
                   </label>
                   <label style={{ flex: 1, height: 40, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                    📁 Subir
+                    Subir
                     <input type="file" accept="video/*" onChange={e => setVisitaVideo(e.target.files?.[0] || null)} style={{ display: "none" }} />
                   </label>
                 </div>
@@ -1615,10 +1620,10 @@ export default function App() {
                 <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Nota de voz {visitaAudio ? "✓" : "(obligatoria)"}</div>
                 <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                   <button onClick={toggleGrabacion} style={{ flex: 1, height: 40, backgroundColor: grabandoAudio ? C.dangerDim : C.cardAlt, border: `0.5px solid ${grabandoAudio ? C.danger : C.border}`, borderRadius: 10, color: grabandoAudio ? C.danger : C.text, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                    {grabandoAudio ? "⏹ Detener" : "🎙 Grabar"}
+                    {grabandoAudio ? "Detener" : "Grabar audio"}
                   </button>
                   <label style={{ flex: 1, height: 40, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                    📁 Subir
+                    Subir
                     <input type="file" accept="audio/*" onChange={e => setVisitaAudio(e.target.files?.[0] || null)} style={{ display: "none" }} />
                   </label>
                 </div>
@@ -1888,7 +1893,7 @@ export default function App() {
                 onChange={e => setProjStaffFilter(e.target.value)}
                 style={{ flex: 1, height: 42, borderRadius: 10, border: `1.5px solid ${projStaffFilter ? C.orange : C.border}`, backgroundColor: projStaffFilter ? C.orangeDim : C.card, color: projStaffFilter ? C.orange : C.text, fontSize: 13, fontWeight: 700, padding: "0 12px", cursor: "pointer" }}
               >
-                <option value="">👥 Todos — filtrar por responsable</option>
+                <option value="">Todos — filtrar por responsable</option>
                 {staff.filter(s => s.role_type === "jefe").length > 0 && (
                   <optgroup label="👷 Jefes a cargo">
                     {staff.filter(s => s.role_type === "jefe").map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -1907,7 +1912,7 @@ export default function App() {
 
             {/* Tabs Resumen / Proyectos / Mantenimiento / Equipo */}
             <div style={{ display: "flex", backgroundColor: C.cardAlt, borderRadius: 10, padding: 4, marginBottom: 12, gap: 3 }}>
-              {([["resumen", "📊 Resumen"], ["proyecto", "🏗️ Proyectos"], ["mantenimiento", "🔧 Manten."], ...(isAdmin ? [["equipo", "👷 Equipo"]] as const : [])] as [typeof projTab, string][]).map(([key, label]) => (
+              {([["resumen", "Resumen"], ["proyecto", "Proyectos"], ["mantenimiento", "Mantenciones"], ...(isAdmin ? [["equipo", "Equipo"]] as const : [])] as [typeof projTab, string][]).map(([key, label]) => (
                 <button key={key} onClick={() => { setProjTab(key); if (key === "equipo") loadStaff(); }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: projTab === key ? C.card : "transparent", color: projTab === key ? C.orange : C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>{label}</button>
               ))}
             </div>
@@ -2597,7 +2602,7 @@ export default function App() {
                   <div style={{ fontSize: 13, fontWeight: 700 }}>👥 Remuneraciones — {fmtMonth(gastosMonth)}</div>
                   <div style={{ display: "flex", gap: 6 }}>
                     <button onClick={() => payrollPdfRef.current?.click()} disabled={uploadingPayrollPdf} style={{ backgroundColor: C.infoDim, border: `0.5px solid ${C.info}`, borderRadius: 8, padding: "5px 10px", color: C.info, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
-                      {uploadingPayrollPdf ? "Leyendo..." : "📊 Excel/PDF"}
+                      {uploadingPayrollPdf ? "Leyendo..." : "Excel/PDF"}
                     </button>
                     <button onClick={() => { setShowPayrollForm(true); setPayrollAmount(payroll ? String(payroll.total_amount) : ""); setPayrollNote(payroll?.note || ""); }} style={{ backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "5px 10px", color: C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
                       {payroll ? "Editar" : "+ Manual"}
@@ -3092,7 +3097,7 @@ export default function App() {
                               <option value="">— Seleccionar centro de costo —</option>
                               <option value="__sin_centro__">🚫 Sin centro de costo (igual queda en el informe)</option>
                               {costCenters.filter(cc => cc.project_id).length > 0 && (
-                                <optgroup label="🏗️ Proyectos">
+                                <optgroup label="Proyectos">
                                   {costCenters.filter(cc => cc.project_id).map(cc => (
                                     <option key={cc.id} value={cc.project_id!}>{cc.code ? `[${cc.code}] ` : ""}{cc.name}</option>
                                   ))}
@@ -3259,11 +3264,11 @@ export default function App() {
             <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 14, marginBottom: 16 }}>
               <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
                 <label style={{ flex: 1, height: 42, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                  📷 Tomar foto
+                  Tomar foto
                   <input type="file" accept="image/*" capture="environment" onChange={e => setCharlaFoto(e.target.files?.[0] || null)} style={{ display: "none" }} />
                 </label>
                 <label style={{ flex: 1, height: 42, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                  📁 Subir
+                  Subir
                   <input type="file" accept="image/*" onChange={e => setCharlaFoto(e.target.files?.[0] || null)} style={{ display: "none" }} />
                 </label>
               </div>
@@ -3295,7 +3300,7 @@ export default function App() {
                           {pr.borradores > 0 ? ` · ${pr.borradores} sin enviar` : ""}
                         </span>
                       </span>
-                      <span style={{ color: C.muted, fontSize: 18 }}>›</span>
+                      <ChevronRight size={17} color={C.muted} />
                     </button>
                   );
                 })}
@@ -3352,20 +3357,20 @@ export default function App() {
               {/* El menú lista todo, incluido lo que está en la barra: abajo son atajos,
                   acá está el índice completo de lo que el usuario puede abrir. */}
               {([
-                { sc: "home" as Screen, icon: "🏠", label: "Inicio", sub: "Panel de control y resumen", ver: true },
-                { sc: "proyectos" as Screen, icon: "📁", label: "Proyectos", sub: "Obras, partidas y fotografías", ver: true },
-                { sc: "charlas" as Screen, icon: "🦺", label: "Prevención de riesgos", sub: "Charla diaria y visitas a terreno", ver: true },
-                { sc: "gastos" as Screen, icon: "💳", label: "Gastos", sub: "Registrar y revisar gastos", ver: canSeeGastos },
-                { sc: "rendiciones" as Screen, icon: "🧾", label: "Rendiciones", sub: "Subir boletas y rendir", ver: canSeeRendiciones },
-                { sc: "cotizaciones" as Screen, icon: "📋", label: "Cotizaciones", sub: "Cotizar en Nubox", ver: canSeeCotizaciones },
-                { sc: "facturacion" as Screen, icon: "🧮", label: "Facturación", sub: "Productos, inventario y OC", ver: canSeeFacturacion },
-                { sc: "estadoResultado" as Screen, icon: "📈", label: "Estado de Resultado", sub: "Márgenes por centro de costo", ver: canSeeEstadoResultado },
-                { sc: "admin" as Screen, icon: "👤", label: "Administración", sub: "Usuarios y permisos", ver: isAdmin },
-                { sc: "configuracion" as Screen, icon: "⚙️", label: "Mi perfil", sub: "Datos de la cuenta y cerrar sesión", ver: true },
+                { sc: "home" as Screen, icon: <Home size={20} />, label: "Inicio", sub: "Panel de control y resumen", ver: true },
+                { sc: "proyectos" as Screen, icon: <FolderOpen size={20} />, label: "Proyectos", sub: "Obras, partidas y fotografías", ver: true },
+                { sc: "charlas" as Screen, icon: <HardHat size={20} />, label: "Prevención de riesgos", sub: "Charla diaria y visitas a terreno", ver: true },
+                { sc: "gastos" as Screen, icon: <CreditCard size={20} />, label: "Gastos", sub: "Registrar y revisar gastos", ver: canSeeGastos },
+                { sc: "rendiciones" as Screen, icon: <Receipt size={20} />, label: "Rendiciones", sub: "Subir boletas y rendir", ver: canSeeRendiciones },
+                { sc: "cotizaciones" as Screen, icon: <ClipboardList size={20} />, label: "Cotizaciones", sub: "Cotizar en Nubox", ver: canSeeCotizaciones },
+                { sc: "facturacion" as Screen, icon: <Calculator size={20} />, label: "Facturación", sub: "Productos, inventario y OC", ver: canSeeFacturacion },
+                { sc: "estadoResultado" as Screen, icon: <TrendingUp size={20} />, label: "Estado de Resultado", sub: "Márgenes por centro de costo", ver: canSeeEstadoResultado },
+                { sc: "admin" as Screen, icon: <Users size={20} />, label: "Administración", sub: "Usuarios y permisos", ver: isAdmin },
+                { sc: "configuracion" as Screen, icon: <Settings size={20} />, label: "Mi perfil", sub: "Datos de la cuenta y cerrar sesión", ver: true },
               ]).filter(x => x.ver).map(({ sc, icon, label, sub }) => (
                 <button key={sc} onClick={() => { setMenuAbierto(false); setScreen(sc); if (sc === "charlas") { loadCharlas(); loadPrevencion(); } if (sc === "gastos") { setGastosTab(canSeeGastosResumen ? "resumen" : "lista"); setExpenseSummary(null); setNuboxSummary(null); loadCostCenters(); loadExpenses(); loadNuboxSummary(); } }}
                   style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "14px 12px", marginBottom: 8, backgroundColor: screen === sc ? C.orangeDim : C.cardAlt, border: `0.5px solid ${screen === sc ? C.orange : C.border}`, borderRadius: 12, cursor: "pointer", textAlign: "left" }}>
-                  <span style={{ fontSize: 22 }}>{icon}</span>
+                  <span style={{ color: screen === sc ? C.orange : C.mutedSoft, display: "flex" }}>{icon}</span>
                   <span style={{ flex: 1 }}>
                     <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: screen === sc ? C.orange : C.text }}>{label}</span>
                     <span style={{ display: "block", fontSize: 11, color: C.muted, marginTop: 1 }}>{sub}</span>
@@ -3385,7 +3390,7 @@ export default function App() {
       </div>
 
       {/* Botón Crear flotante y arrastrable — oculto en Estado de Resultado: no hay nada que "crear" ahí y tapaba los montos de margen al hacer scroll */}
-      {screen !== "estadoResultado" && <DraggableCreateButton onPress={() => setScreen("crearProyecto")} cardColor={C.card} orangeColor={C.orange} />}
+      {(screen === "home" || screen === "proyectos") && <DraggableCreateButton onPress={() => setScreen("crearProyecto")} cardColor={C.card} orangeColor={C.orange} />}
     </div>
   );
 }
@@ -3596,7 +3601,12 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
     setCreating(false);
   }
 
-  const fmtCLP = (n: number) => new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", minimumFractionDigits: 0 }).format(n);
+  // Intl con es-CL entrega "$-52.485.416", con el signo entre el peso y la cifra, que se
+// lee como error tipográfico. En contabilidad chilena el menos va delante del símbolo.
+const fmtCLP = (n: number) => {
+  const v = Math.round(+n || 0);
+  return (v < 0 ? "-$" : "$") + Math.abs(v).toLocaleString("es-CL");
+};
   const statusColor = (s: string) => s === "created" ? C.info : s === "sent" ? C.orange : s === "approved" ? C.success : C.muted;
   const statusLabel = (s: string) => ({ created: "Creada", sent: "Enviada", approved: "Aprobada", rejected: "Rechazada" }[s] || s);
 
@@ -3614,7 +3624,7 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
       <div style={{ display: "flex", backgroundColor: C.card, borderBottom: `1px solid ${C.border}` }}>
         {(["lista", "nueva", ...(isAdmin ? ["config"] : [])] as ("lista" | "nueva" | "config")[]).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "12px 0", border: "none", background: "none", cursor: "pointer", fontSize: 13, fontWeight: tab === t ? 700 : 400, color: tab === t ? C.orange : C.muted, borderBottom: tab === t ? `2px solid ${C.orange}` : "2px solid transparent" }}>
-            {t === "lista" ? "Historial" : t === "nueva" ? "+ Nueva" : "⚙️ Config"}
+            {t === "lista" ? "Historial" : t === "nueva" ? "+ Nueva" : "Configuración"}
           </button>
         ))}
       </div>
@@ -4106,13 +4116,13 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
     <div style={{ paddingBottom: 80, minHeight: "100vh", backgroundColor: C.bg }}>
       {/* Header */}
       <div style={{ backgroundColor: C.card, borderBottom: `0.5px solid ${C.border}`, padding: "16px 16px 0" }}>
-        <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 12 }}>💰 Rendiciones</div>
+        <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 12 }}>Rendiciones</div>
         <div style={{ display: "flex", gap: 0 }}>
           {(["lista","nueva"] as const).map(t => (
             <button key={t} onClick={() => { setTab(t); if (t === "nueva") resetForm(); }}
               style={{ flex: 1, padding: "10px 0", border: "none", background: "none", fontSize: 13, fontWeight: tab === t ? 700 : 400,
                 color: tab === t ? C.orange : C.muted, borderBottom: tab === t ? `2px solid ${C.orange}` : "2px solid transparent", cursor: "pointer" }}>
-              {t === "lista" ? "📋 Historial" : "➕ Nueva rendición"}
+              {t === "lista" ? "Historial" : "Nueva rendición"}
             </button>
           ))}
         </div>
@@ -4124,7 +4134,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
       {tab === "lista" && (
         <div style={{ padding: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <div style={{ fontSize: 13, color: C.muted }}>{rendiciones.length} rendición(es)</div>
+            <div style={{ fontSize: 13, color: C.muted }}>{rendiciones.length === 1 ? "1 rendición" : `${rendiciones.length} rendiciones`}</div>
             <button onClick={async () => {
                 const r = await fetch(`${API_URL}/rendiciones/excel`, { headers: h });
                 const b = await r.blob();
@@ -4133,7 +4143,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                 a.download = `rendiciones_${new Date().toISOString().split("T")[0]}.xlsx`; a.click();
               }}
               style={{ fontSize: 12, backgroundColor: "#16a34a", color: "#fff", padding: "7px 12px", borderRadius: 8, border: "none", fontWeight: 700, cursor: "pointer" }}>
-              📥 Excel
+              Excel
             </button>
           </div>
 
@@ -4520,12 +4530,12 @@ function EstadoResultadoScreen({ token, isAdmin }: { token: string; isAdmin: boo
   return (
     <div style={{ padding: 16, paddingBottom: 90 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <div style={{ fontSize: 18, fontWeight: 700 }}>📈 Estado de Resultado</div>
+        <div style={{ fontSize: 18, fontWeight: 700 }}>Estado de Resultado</div>
       </div>
 
       {isAdmin && (
         <div style={{ display: "flex", gap: 6, marginBottom: 14, backgroundColor: C.cardAlt, borderRadius: 10, padding: 4 }}>
-          {([["resumen", "📊 Resumen"], ["nomina", "👷 Nómina"]] as [typeof payrollTab, string][]).map(([t, label]) => (
+          {([["resumen", "Resumen"], ["nomina", "Nómina"]] as [typeof payrollTab, string][]).map(([t, label]) => (
             <button key={t} onClick={() => setPayrollTab(t)} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", cursor: "pointer", backgroundColor: payrollTab === t ? C.orange : "transparent", color: payrollTab === t ? "#fff" : C.muted, fontWeight: 700, fontSize: 12 }}>{label}</button>
           ))}
         </div>
@@ -4595,7 +4605,7 @@ function EstadoResultadoScreen({ token, isAdmin }: { token: string; isAdmin: boo
         <div style={{ flex: 1, textAlign: "center", fontSize: 16, fontWeight: 700, backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "7px 0" }}>{year}</div>
         <button onClick={() => setYear(y => y + 1)} disabled={year >= currentYear} style={{ width: 34, height: 34, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.card, cursor: year >= currentYear ? "not-allowed" : "pointer", opacity: year >= currentYear ? 0.4 : 1, fontSize: 15 }}>›</button>
         <button onClick={exportExcel} disabled={exporting || loading} style={{ height: 34, padding: "0 14px", borderRadius: 8, border: "none", backgroundColor: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: exporting ? 0.6 : 1, whiteSpace: "nowrap" }}>
-          {exporting ? "..." : "📊 Excel"}
+          {exporting ? "..." : "Excel"}
         </button>
       </div>
 
