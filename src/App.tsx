@@ -1232,7 +1232,7 @@ export default function App() {
           <div style={{ color: C.muted, fontSize: 13, marginTop: 6 }}>Control de obra inteligente</div>
         </div>
 
-        {/* ── VISTA RESET PASSWORD ── */}
+        {/* ─VISTA RESET PASSWORD ── */}
         {loginView === "reset" && (
           resetDone ? (
             <div style={{ textAlign: "center" }}>
@@ -1259,7 +1259,7 @@ export default function App() {
           )
         )}
 
-        {/* ── VISTA FORGOT PASSWORD ── */}
+        {/* ─VISTA FORGOT PASSWORD ── */}
         {loginView === "forgot" && (
           forgotSent ? (
             <div style={{ textAlign: "center" }}>
@@ -1282,7 +1282,7 @@ export default function App() {
           )
         )}
 
-        {/* ── VISTA LOGIN NORMAL ── */}
+        {/* ─VISTA LOGIN NORMAL ── */}
         {loginView === "login" && (<>
         <div style={{ display: "flex", alignItems: "center", gap: 10, backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: "0 14px", marginBottom: 10, height: 50 }}>
           <Mail size={16} color={C.orange} />
@@ -1342,7 +1342,7 @@ export default function App() {
                 <input type="range" min={0} max={100} value={taskProgress} onChange={e => setTaskProgress(Number(e.target.value))} style={{ width: "100%", marginBottom: 16, accentColor: C.orange }} />
               </>
             )}
-            {taskStatus === "completada" && <div style={{ textAlign: "center", color: C.success, fontWeight: 700, fontSize: 13, marginBottom: 16 }}>✅ Avance automático: 100%</div>}
+            {taskStatus === "completada" && <div style={{ textAlign: "center", color: C.success, fontWeight: 700, fontSize: 13, marginBottom: 16 }}>Avance automático: 100%</div>}
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setEditingTask(null)} style={{ flex: 1, height: 46, background: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 12, color: C.muted, fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
               <button onClick={saveTask} disabled={savingTask} style={{ flex: 2, height: 46, background: C.orange, border: "none", borderRadius: 12, color: "#fff", fontWeight: 700, cursor: "pointer" }}>{savingTask ? "Guardando..." : "Guardar"}</button>
@@ -1399,7 +1399,7 @@ export default function App() {
                   <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                     {(["previa", "trabajo"] as const).map(t => (
                       <button key={t} onClick={() => setPhotoTypeInput(t)} style={{ flex: 1, height: 38, borderRadius: 10, border: `1.5px solid ${photoTypeInput === t ? C.orange : C.border}`, backgroundColor: photoTypeInput === t ? C.orangeDim : C.cardAlt, color: photoTypeInput === t ? C.orange : C.muted, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                        {t === "previa" ? "📷 Foto Previa" : "🔨 En Ejecución"}
+                        {t === "previa" ? "Foto Previa" : "En Ejecución"}
                       </button>
                     ))}
                   </div>
@@ -1432,7 +1432,7 @@ export default function App() {
                   if (fotosTipo.length === 0) return null;
                   return <div key={tipo}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: tipo === "previa" ? "#60a5fa" : C.orange, marginBottom: 8, marginTop: tipo === "trabajo" ? 16 : 0, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                      {tipo === "previa" ? "📷 Fotos Previas" : "🔨 En Ejecución"}
+                      {tipo === "previa" ? "Fotos Previas" : "En Ejecución"}
                     </div>
                     {fotosTipo.map((photo, idx) => (
                   <div key={photo.id} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, marginBottom: 14, overflow: "hidden" }}>
@@ -1445,7 +1445,7 @@ export default function App() {
                             {new Date(photo.created_at).toLocaleString("es-CL")} · Foto {idx + 1}
                             {selectedTask.progress_percent ? ` · ${selectedTask.progress_percent}% avance` : ""}
                           </div>
-                          {photo.onedrive_url && <div style={{ fontSize: 11, color: C.info, marginTop: 2 }}>☁️ OneDrive</div>}
+                          {photo.onedrive_url && <div style={{ fontSize: 11, color: C.info, marginTop: 2 }}>OneDrive</div>}
                         </div>
                         <button onClick={() => deletePhoto(photo.id)} style={{ width: 30, height: 30, backgroundColor: C.dangerDim, border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginLeft: 8 }}>
                           <Trash2 size={12} color={C.danger} />
@@ -1640,7 +1640,7 @@ export default function App() {
                     <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Análisis (borrador)</div>
                     <div style={{ fontSize: 12, color: C.text, lineHeight: 1.5, whiteSpace: "pre-wrap", marginBottom: 12, maxHeight: 260, overflowY: "auto" }}>{visitaResultado.analisis}</div>
                     <button onClick={() => aprobarVisita(visitaResultado.id)} style={{ width: "100%", height: 44, backgroundColor: C.success, border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                      ✓ Aprobar y enviar a prevención
+                      Aprobar y enviar a prevención
                     </button>
                     <div style={{ fontSize: 10, color: C.muted, marginTop: 6, textAlign: "center" }}>Revisa el análisis antes de enviarlo. Se manda con el video y el audio adjuntos.</div>
                   </div>
@@ -1652,22 +1652,22 @@ export default function App() {
             <div style={{ display: "flex", gap: 8, marginBottom: notifyPanel ? 8 : 14 }}>
               {selectedProject?.inicio_notificado_at ? (
                 <div onClick={() => openNotifyPanel("inicio", true)} style={{ flex: 1, height: 44, backgroundColor: C.successDim, border: `0.5px solid ${C.success}40`, borderRadius: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.success }}>🟢 Inicio notificado</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.success }}>Inicio notificado</div>
                   <div style={{ fontSize: 9, color: C.muted }}>{fmtDate(selectedProject.inicio_notificado_at)} · tocar para reenviar</div>
                 </div>
               ) : (
                 <button onClick={() => openNotifyPanel("inicio", false)} disabled={notifying !== ""} style={{ flex: 1, height: 44, backgroundColor: C.successDim, border: `0.5px solid ${C.success}`, borderRadius: 10, color: C.success, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                  🟢 Notificar inicio
+                  Notificar inicio
                 </button>
               )}
               {selectedProject?.termino_notificado_at ? (
                 <div onClick={() => openNotifyPanel("termino", true)} style={{ flex: 1, height: 44, backgroundColor: C.infoDim, border: `0.5px solid ${C.info}40`, borderRadius: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.info }}>🏁 Término notificado</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.info }}>Término notificado</div>
                   <div style={{ fontSize: 9, color: C.muted }}>{fmtDate(selectedProject.termino_notificado_at)} · tocar para reenviar</div>
                 </div>
               ) : (
                 <button onClick={() => openNotifyPanel("termino", false)} disabled={notifying !== ""} style={{ flex: 1, height: 44, backgroundColor: C.infoDim, border: `0.5px solid ${C.info}`, borderRadius: 10, color: C.info, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                  🏁 Notificar término
+                  Notificar término
                 </button>
               )}
             </div>
@@ -1676,7 +1676,7 @@ export default function App() {
             {notifyPanel && (
               <div style={{ backgroundColor: C.card, border: `0.5px solid ${notifyPanel.tipo === "inicio" ? C.success : C.info}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
-                  {notifyPanel.tipo === "inicio" ? "🟢 Notificar inicio de trabajos" : "🏁 Notificar término de trabajos"}{notifyPanel.resend ? " (reenvío)" : ""}
+                  {notifyPanel.tipo === "inicio" ? "Notificar inicio de trabajos" : "Notificar término de trabajos"}{notifyPanel.resend ? " (reenvío)" : ""}
                 </div>
                 <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Se enviará a {selectedProject?.client_email}</div>
                 <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Fecha de {notifyPanel.tipo === "inicio" ? "inicio" : "término"} de los trabajos</div>
@@ -1694,7 +1694,7 @@ export default function App() {
             {tasks.length > 0 && tasks.every(t => t.status === "completada") && (
               selectedProject?.recepcion_conforme_at ? (
                 <div style={{ backgroundColor: C.successDim, border: `0.5px solid ${C.success}40`, borderRadius: 12, padding: 14, marginBottom: 14, textAlign: "center" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: C.success }}>✅ Recepción conforme enviada</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.success }}>Recepción conforme enviada</div>
                   <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Informe y correo enviados el {fmtDate(selectedProject.recepcion_conforme_at)}</div>
                   {isAdmin && (
                     <button
@@ -1724,7 +1724,7 @@ export default function App() {
                       }}
                       style={{ marginTop: 10, marginLeft: 8, height: 34, padding: "0 16px", backgroundColor: C.card, border: `0.5px solid ${C.orange}50`, borderRadius: 8, color: C.orange, fontWeight: 700, fontSize: 12, cursor: "pointer" }}
                     >
-                      {loadingProjectResultado ? "Cargando..." : "📈 Ver resultado del proyecto"}
+                      {loadingProjectResultado ? "Cargando..." : "Ver resultado del proyecto"}
                     </button>
                   )}
                   {projectResultado && (
@@ -1748,7 +1748,7 @@ export default function App() {
                 </div>
               ) : (
                 <button onClick={sendRecepcionConforme} disabled={sendingRecepcion} style={{ width: "100%", height: 50, backgroundColor: C.success, border: "none", borderRadius: 12, color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", marginBottom: 14, opacity: sendingRecepcion ? 0.7 : 1 }}>
-                  {sendingRecepcion ? "Enviando..." : "✅ Recepción conforme — Generar informe y enviar correo"}
+                  {sendingRecepcion ? "Enviando..." : "Recepción conforme — Generar informe y enviar correo"}
                 </button>
               )
             )}
@@ -1756,7 +1756,7 @@ export default function App() {
             {/* Documentos del proyecto */}
             <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, marginBottom: 14, overflow: "hidden" }}>
               <div onClick={() => setProjFilesOpen(o => !o)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", cursor: "pointer" }}>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>📎 Documentos{projFiles.length > 0 ? ` (${projFiles.length})` : ""}</div>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>Documentos{projFiles.length > 0 ? ` (${projFiles.length})` : ""}</div>
                 <span style={{ fontSize: 11, color: C.muted }}>{projFilesOpen ? "▲" : "▼"}</span>
               </div>
               {projFilesOpen && (
@@ -1765,8 +1765,8 @@ export default function App() {
                     <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
                       <input ref={cotFileRef} type="file" multiple style={{ display: "none" }} onChange={e => { const fs = Array.from(e.target.files || []); if (fs.length > 0) { setPendingUpload({ files: fs, type: "cotizacion" }); setCotVisibleTo([]); } e.target.value = ""; }} />
                       <input ref={ocFileRef} type="file" multiple style={{ display: "none" }} onChange={e => { const fs = Array.from(e.target.files || []); if (fs.length > 0) { setPendingUpload({ files: fs, type: "orden_compra" }); setCotVisibleTo([]); } e.target.value = ""; }} />
-                      <button onClick={() => cotFileRef.current?.click()} disabled={uploadingFile} style={{ flex: 1, height: 40, backgroundColor: C.orangeDim, border: `0.5px solid ${C.orange}40`, borderRadius: 10, color: C.orange, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>📄 Subir cotización</button>
-                      <button onClick={() => ocFileRef.current?.click()} disabled={uploadingFile} style={{ flex: 1, height: 40, backgroundColor: C.infoDim, border: `0.5px solid ${C.info}40`, borderRadius: 10, color: C.info, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>🧾 Subir orden de compra</button>
+                      <button onClick={() => cotFileRef.current?.click()} disabled={uploadingFile} style={{ flex: 1, height: 40, backgroundColor: C.orangeDim, border: `0.5px solid ${C.orange}40`, borderRadius: 10, color: C.orange, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Subir cotización</button>
+                      <button onClick={() => ocFileRef.current?.click()} disabled={uploadingFile} style={{ flex: 1, height: 40, backgroundColor: C.infoDim, border: `0.5px solid ${C.info}40`, borderRadius: 10, color: C.info, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Subir orden de compra</button>
                     </div>
                   )}
 
@@ -1895,12 +1895,12 @@ export default function App() {
               >
                 <option value="">Todos — filtrar por responsable</option>
                 {staff.filter(s => s.role_type === "jefe").length > 0 && (
-                  <optgroup label="👷 Jefes a cargo">
+                  <optgroup label="Jefes a cargo">
                     {staff.filter(s => s.role_type === "jefe").map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </optgroup>
                 )}
                 {staff.filter(s => s.role_type === "supervisor").length > 0 && (
-                  <optgroup label="🛠 Supervisores">
+                  <optgroup label="Supervisores">
                     {staff.filter(s => s.role_type === "supervisor").map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </optgroup>
                 )}
@@ -1924,7 +1924,7 @@ export default function App() {
                   <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Nuevo integrante</div>
                   <input value={newStaffName} onChange={e => setNewStaffName(e.target.value)} placeholder="Nombre completo" style={inp} />
                   <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                    {([["jefe", "👷 Jefe a cargo"], ["supervisor", "🛠 Supervisor"]] as const).map(([key, label]) => (
+                    {([["jefe", "Jefe a cargo"], ["supervisor", "Supervisor"]] as const).map(([key, label]) => (
                       <button key={key} onClick={() => setNewStaffRole(key)} style={{ flex: 1, height: 40, borderRadius: 10, border: `0.5px solid ${newStaffRole === key ? C.orange : C.border}`, backgroundColor: newStaffRole === key ? C.orangeDim : C.cardAlt, color: newStaffRole === key ? C.orange : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>{label}</button>
                     ))}
                   </div>
@@ -1997,7 +1997,7 @@ export default function App() {
               return (
                 <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.success}50`, borderRadius: 14, padding: 14, marginBottom: 12 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700 }}>🟢 Pendientes de recepción conforme</div>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>Pendientes de recepción conforme</div>
                     <span style={{ fontSize: 10, fontWeight: 700, color: C.success, backgroundColor: C.successDim, borderRadius: 6, padding: "3px 8px" }}>{pendientes.length}</span>
                   </div>
                   {pendientes.map(p => (
@@ -2027,7 +2027,7 @@ export default function App() {
               return (
                 <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 12 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700 }}>⚠️ Prioridades</div>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>Prioridades</div>
                     <div style={{ display: "flex", gap: 6 }}>
                       {atrasadas.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: C.danger, backgroundColor: C.dangerDim, borderRadius: 6, padding: "3px 8px" }}>{atrasadas.length} atrasada{atrasadas.length !== 1 ? "s" : ""}</span>}
                       {porVencer.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "#b45309", backgroundColor: "#fef3c7", borderRadius: 6, padding: "3px 8px" }}>{porVencer.length} por vencer</span>}
@@ -2082,7 +2082,7 @@ export default function App() {
                     <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{p.client_name || "Sin cliente"}</div>
                     {(p.jefe_name || p.supervisor_name) && (
                       <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
-                        {p.jefe_name && `👷 Jefe: ${p.jefe_name}`}{p.jefe_name && p.supervisor_name && " · "}{p.supervisor_name && `🛠 Supervisor: ${p.supervisor_name}`}
+                        {p.jefe_name && `Jefe: ${p.jefe_name}`}{p.jefe_name && p.supervisor_name && " · "}{p.supervisor_name && `Supervisor: ${p.supervisor_name}`}
                       </div>
                     )}
                     {(p.start_date || p.end_date) && <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>{p.start_date && `▶ ${fmtDate(p.start_date)}`}{p.end_date && ` · 🏁 ${fmtDate(p.end_date)}`}</div>}
@@ -2105,12 +2105,12 @@ export default function App() {
                   <div style={{ borderTop: `0.5px solid ${C.border}`, marginTop: 10, paddingTop: 10 }}>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
                       <select value={editProj.project_type} onChange={e => setEditProj(f => ({ ...f, project_type: e.target.value }))} style={{ height: 38, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 12, padding: "0 8px" }}>
-                        <option value="proyecto">🏗️ Proyecto</option>
-                        <option value="mantenimiento">🔧 Mantenimiento</option>
+                        <option value="proyecto">Proyecto</option>
+                        <option value="mantenimiento">Mantenimiento</option>
                       </select>
                       <select value={editProj.status} onChange={e => setEditProj(f => ({ ...f, status: e.target.value }))} style={{ height: 38, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 12, padding: "0 8px" }}>
-                        <option value="activo">✅ Activo</option>
-                        <option value="terminado">🏁 Terminado</option>
+                        <option value="activo">Activo</option>
+                        <option value="terminado">Terminado</option>
                       </select>
                     </div>
                     <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Correo del cliente (notificaciones)</div>
@@ -2183,7 +2183,7 @@ export default function App() {
             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ ...inp, marginBottom: 12 }} />
             <div style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>Tipo</div>
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              {([["proyecto", "🏗️ Proyecto"], ["mantenimiento", "🔧 Mantenimiento"]] as const).map(([key, label]) => (
+              {([["proyecto", "Proyecto"], ["mantenimiento", "Mantenimiento"]] as const).map(([key, label]) => (
                 <button key={key} onClick={() => setNewProjType(key)} style={{ flex: 1, height: 40, borderRadius: 10, border: `0.5px solid ${newProjType === key ? C.orange : C.border}`, backgroundColor: newProjType === key ? C.orangeDim : C.cardAlt, color: newProjType === key ? C.orange : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>{label}</button>
               ))}
             </div>
@@ -2246,7 +2246,7 @@ export default function App() {
                 onClick={() => { const next = !trashOpen; setTrashOpen(next); if (next) loadTrash(); }}
                 style={{ display: "flex", justifyContent: "space-between", alignItems: "center", backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, cursor: "pointer" }}
               >
-                <div style={{ fontSize: 14, fontWeight: 700 }}>🗑️ Papelera de partidas</div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>Papelera de partidas</div>
                 <span style={{ fontSize: 12, color: C.muted }}>{trashOpen ? "▲" : "▼"}</span>
               </div>
               {trashOpen && (
@@ -2391,14 +2391,14 @@ export default function App() {
             {quoteStep === 1 && (
               <>
                 <div style={{ backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, padding: 14, marginBottom: 14, fontSize: 12, color: C.mutedSoft, lineHeight: 1.6 }}>
-                  📋 Sube el PDF de cotización MATFAU SPA. La IA extraerá las partidas automáticamente <strong style={{ color: C.text }}>sin mostrar precios</strong>.
+                  Sube el PDF de cotización MATFAU SPA. La IA extraerá las partidas automáticamente <strong style={{ color: C.text }}>sin mostrar precios</strong>.
                 </div>
                 <input ref={pdfInputRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={e => setPdfFile(e.target.files?.[0] || null)} />
                 <button onClick={() => pdfInputRef.current?.click()} style={{ width: "100%", height: 48, backgroundColor: C.cardAlt, border: `0.5px solid ${pdfFile ? C.orange : C.border}`, borderRadius: 10, color: pdfFile ? C.orange : C.mutedSoft, cursor: "pointer", fontSize: 13, marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                   <FileText size={16} /> {pdfFile ? `📎 ${pdfFile.name}` : "Seleccionar PDF"}
                 </button>
                 <button onClick={extractQuotePdf} disabled={extractingPdf || !pdfFile} style={{ width: "100%", height: 48, backgroundColor: !pdfFile ? C.cardAlt : C.orange, border: "none", borderRadius: 12, color: !pdfFile ? C.muted : "#fff", fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
-                  {extractingPdf ? "⏳ Extrayendo con IA..." : "Extraer partidas con IA"}
+                  {extractingPdf ? "Extrayendo con IA..." : "Extraer partidas con IA"}
                 </button>
               </>
             )}
@@ -2454,7 +2454,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ── GASTOS ── */}
+      {/* ─GASTOS ── */}
       {screen === "gastos" && (
         <>
           {/* Modal agregar gasto */}
@@ -2536,10 +2536,10 @@ export default function App() {
           {/* TAB: RESUMEN */}
           {gastosTab === "resumen" && canSeeGastosResumen && (
             <>
-              {/* ── SECCIÓN NUBOX ── */}
+              {/* ─SECCIÓN NUBOX ── */}
               <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 14 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>🧾 Facturas Nubox — {fmtMonth(gastosMonth)}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>Facturas Nubox — {fmtMonth(gastosMonth)}</div>
                   {!nuboxSummary && <div style={{ fontSize: 11, color: C.muted }}>Cargando...</div>}
                 </div>
                 {nuboxSummary && (
@@ -2563,7 +2563,7 @@ export default function App() {
                         onClick={() => setNuboxKpiExpanded(e => !e)}
                         style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: `0.5px solid ${C.border}`, fontSize: 12, cursor: "pointer" }}
                       >
-                        <span style={{ color: C.muted }}>✅ Asignadas a centros de costo</span>
+                        <span style={{ color: C.muted }}>Asignadas a centros de costo</span>
                         <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           <span style={{ fontWeight: 700, color: C.success }}>{fmtCLP(nuboxSummary.total_asignado)} ({nuboxSummary.asignadas})</span>
                           <span style={{ fontSize: 10, color: C.muted }}>{nuboxKpiExpanded ? "▲" : "▼"}</span>
@@ -2595,11 +2595,11 @@ export default function App() {
                 )}
               </div>
 
-              {/* ── SECCIÓN REMUNERACIONES ── */}
+              {/* ─SECCIÓN REMUNERACIONES ── */}
               <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 14 }}>
                 <input ref={payrollPdfRef} type="file" accept=".xlsx,.xls,.pdf" style={{ display: "none" }} onChange={e => { if (e.target.files?.[0]) uploadPayrollPdf(e.target.files[0]); e.target.value = ""; }} />
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>👥 Remuneraciones — {fmtMonth(gastosMonth)}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>Remuneraciones — {fmtMonth(gastosMonth)}</div>
                   <div style={{ display: "flex", gap: 6 }}>
                     <button onClick={() => payrollPdfRef.current?.click()} disabled={uploadingPayrollPdf} style={{ backgroundColor: C.infoDim, border: `0.5px solid ${C.info}`, borderRadius: 8, padding: "5px 10px", color: C.info, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
                       {uploadingPayrollPdf ? "Leyendo..." : "Excel/PDF"}
@@ -2609,7 +2609,7 @@ export default function App() {
                     </button>
                   </div>
                 </div>
-                {uploadingPayrollPdf && <div style={{ fontSize: 12, color: C.info, padding: "8px 0" }}>🤖 Leyendo PDF con IA...</div>}
+                {uploadingPayrollPdf && <div style={{ fontSize: 12, color: C.info, padding: "8px 0" }}>Leyendo PDF con IA...</div>}
                 {payroll ? (
                   <div>
                     <div style={{ fontSize: 22, fontWeight: 800, color: C.purple }}>{fmtCLP(payroll.total_amount)}</div>
@@ -2659,10 +2659,10 @@ export default function App() {
                 )}
               </div>
 
-              {/* ── SECCIÓN IVA ── */}
+              {/* ─SECCIÓN IVA ── */}
               {nuboxSalesSummary?.iva && (
                 <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 14 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>🏛️ Estimación IVA — {fmtMonth(gastosMonth)}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Estimación IVA — {fmtMonth(gastosMonth)}</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
                     <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 10, textAlign: "center" }}>
                       <div style={{ fontSize: 9, color: C.muted, marginBottom: 2 }}>Débito fiscal</div>
@@ -2684,10 +2684,10 @@ export default function App() {
                 </div>
               )}
 
-              {/* ── SECCIÓN VENTAS NUBOX (solo admin) ── */}
+              {/* ─SECCIÓN VENTAS NUBOX (solo admin) ── */}
               {isAdmin && <div onClick={() => { setGastosTab("nubox"); setNuboxView("ventas"); loadProjects(); if (!nuboxSalesSummary) loadNuboxSummary(); }} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 14, cursor: "pointer" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>📤 Ventas emitidas — {fmtMonth(gastosMonth)}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>Ventas emitidas — {fmtMonth(gastosMonth)}</div>
                   <div style={{ fontSize: 12, color: C.orange, fontWeight: 700 }}>Ver facturas →</div>
                 </div>
                 {!nuboxSalesSummary && <div style={{ fontSize: 12, color: C.muted }}>Cargando...</div>}
@@ -2707,7 +2707,7 @@ export default function App() {
                 )}
               </div>}
 
-              {/* ── MARGEN ── */}
+              {/* ─MARGEN ── */}
               {(() => {
                 const ventasNeto = Number(nuboxSalesSummary?.sales?.total_neto) || 0;
                 const comprasNeto = Number(nuboxSummary?.total_neto) || 0;
@@ -2776,7 +2776,7 @@ export default function App() {
                 );
               })()}
 
-              {/* ── SECCIÓN GASTOS MANUALES ── */}
+              {/* ─SECCIÓN GASTOS MANUALES ── */}
               {!expenseSummary && <div style={{ textAlign: "center", color: C.muted, padding: 20, cursor: "pointer" }} onClick={() => loadExpenses()}>Toca para cargar gastos</div>}
               {expenseSummary && (
                 <>
@@ -2880,8 +2880,8 @@ export default function App() {
               {/* Config certificado */}
               <div style={{ backgroundColor: C.card, border: `0.5px solid ${siiConfigured ? C.success : C.border}`, borderRadius: 14, padding: 14, marginBottom: 16 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>🏛️ Certificado SII</div>
-                  {siiConfigured && <div style={{ backgroundColor: C.successDim, border: `0.5px solid ${C.success}`, borderRadius: 6, padding: "3px 10px", fontSize: 11, color: C.success, fontWeight: 700 }}>✅ Configurado</div>}
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>Certificado SII</div>
+                  {siiConfigured && <div style={{ backgroundColor: C.successDim, border: `0.5px solid ${C.success}`, borderRadius: 6, padding: "3px 10px", fontSize: 11, color: C.success, fontWeight: 700 }}>Configurado</div>}
                 </div>
                 {siiConfigured ? (
                   <>
@@ -2894,7 +2894,7 @@ export default function App() {
                 <input value={siiRut} onChange={e => setSiiRut(e.target.value)} placeholder="RUT empresa (ej: 76982672-6)" style={{ ...inp }} />
                 <input ref={siiP12Ref} type="file" accept=".p12,.pfx" style={{ display: "none" }} onChange={e => setSiiP12File(e.target.files?.[0] || null)} />
                 <button onClick={() => siiP12Ref.current?.click()} style={{ width: "100%", height: 44, backgroundColor: C.cardAlt, border: `0.5px solid ${siiP12File ? C.success : C.border}`, borderRadius: 10, color: siiP12File ? C.success : C.mutedSoft, fontSize: 13, cursor: "pointer", marginBottom: 10 }}>
-                  {siiP12File ? `✅ ${siiP12File.name}` : "📎 Seleccionar certificado .p12"}
+                  {siiP12File ? `✅ ${siiP12File.name}` : "Seleccionar certificado .p12"}
                 </button>
                 <input type="password" value={siiPassword} onChange={e => setSiiPassword(e.target.value)} placeholder="Clave del certificado .p12" style={{ ...inp }} />
                 <button onClick={uploadSiiCert} disabled={uploadingSii} style={{ ...btnPrimary, backgroundColor: siiConfigured ? C.cardAlt : C.orange, color: siiConfigured ? C.muted : "#fff" }}>{uploadingSii ? "Guardando..." : siiConfigured ? "Actualizar certificado" : "Guardar certificado SII"}</button>
@@ -2903,7 +2903,7 @@ export default function App() {
               {/* Consultar facturas */}
               <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
                 <button onClick={loadSiiFacturas} disabled={loadingSiiFacturas} style={{ flex: 2, height: 46, backgroundColor: C.orangeDim, border: `0.5px solid ${C.orange}`, borderRadius: 10, color: C.orange, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                  {loadingSiiFacturas ? "Consultando SII..." : "🔄 Consultar facturas"}
+                  {loadingSiiFacturas ? "Consultando SII..." : "Consultar facturas"}
                 </button>
                 <button onClick={async () => {
                   try {
@@ -2913,7 +2913,7 @@ export default function App() {
                     alert(msg);
                   } catch(e) { alert("Error de red"); }
                 }} style={{ flex: 1, height: 46, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.mutedSoft, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
-                  🔍 Diagnóstico
+                  Diagnóstico
                 </button>
               </div>
 
@@ -2939,7 +2939,7 @@ export default function App() {
                     </div>
                   </div>
                   {f.expense_id ? (
-                    <div style={{ fontSize: 11, color: C.success, fontWeight: 600 }}>✅ Importada al módulo de gastos</div>
+                    <div style={{ fontSize: 11, color: C.success, fontWeight: 600 }}>Importada al módulo de gastos</div>
                   ) : (
                     <div style={{ display: "flex", gap: 8 }}>
                       <select defaultValue="" style={{ flex: 1, height: 36, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, color: C.mutedSoft, fontSize: 12, padding: "0 8px" }}
@@ -2963,14 +2963,14 @@ export default function App() {
               {/* Toggle Compras / Ventas */}
               <div style={{ display: "flex", backgroundColor: C.cardAlt, borderRadius: 10, padding: 4, marginBottom: 12, gap: 3 }}>
                 <button onClick={() => { setNuboxView("compras"); loadNuboxPurchases(); }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: nuboxView === "compras" ? C.card : "transparent", color: nuboxView === "compras" ? C.orange : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                  🧾 Compras
+                  Compras
                 </button>
                 {isAdmin && <button onClick={() => { setNuboxView("ventas"); loadNuboxSummary(); loadProjects(); }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: nuboxView === "ventas" ? C.card : "transparent", color: nuboxView === "ventas" ? C.orange : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                  📤 Ventas
+                  Ventas
                 </button>}
               </div>
 
-              {/* ── VISTA COMPRAS ── */}
+              {/* ─VISTA COMPRAS ── */}
               {nuboxView === "compras" && <>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
                 <button onClick={() => setNuboxShowAll(false)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", backgroundColor: !nuboxShowAll ? C.orange : C.cardAlt, color: !nuboxShowAll ? "#fff" : C.muted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Sin asignar</button>
@@ -2987,7 +2987,7 @@ export default function App() {
                 const filtered = nuboxShowAll ? nuboxPurchases : nuboxPurchases.filter(p => !p.assigned);
                 if (filtered.length === 0) return (
                   <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>
-                    {nuboxShowAll ? `Sin facturas en ${fmtMonth(gastosMonth)}` : "✅ Todas las facturas están asignadas"}
+                    {nuboxShowAll ? `Sin facturas en ${fmtMonth(gastosMonth)}` : "Todas las facturas están asignadas"}
                   </div>
                 );
                 return filtered.map(p => {
@@ -3041,7 +3041,7 @@ export default function App() {
                         )}
                         {hasDupe && !isAssigned && (
                           <div style={{ fontSize: 11, color: "#b45309", fontWeight: 600, marginTop: 4, backgroundColor: "#fef3c7", borderRadius: 6, padding: "3px 8px", display: "inline-block" }}>
-                            ⚠️ Ya existe como gasto manual
+                            Ya existe como gasto manual
                           </div>
                         )}
                       </div>
@@ -3095,7 +3095,7 @@ export default function App() {
                               style={{ flex: 1, height: 36, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 12, padding: "0 8px" }}
                             >
                               <option value="">— Seleccionar centro de costo —</option>
-                              <option value="__sin_centro__">🚫 Sin centro de costo (igual queda en el informe)</option>
+                              <option value="__sin_centro__">Sin centro de costo (igual queda en el informe)</option>
                               {costCenters.filter(cc => cc.project_id).length > 0 && (
                                 <optgroup label="Proyectos">
                                   {costCenters.filter(cc => cc.project_id).map(cc => (
@@ -3104,7 +3104,7 @@ export default function App() {
                                 </optgroup>
                               )}
                               {costCenters.filter(cc => !cc.project_id).length > 0 && (
-                                <optgroup label="📂 Otros centros">
+                                <optgroup label="Otros centros">
                                   {costCenters.filter(cc => !cc.project_id).map(cc => (
                                     <option key={cc.id} value={cc.id}>{cc.code ? `[${cc.code}] ` : ""}{cc.name}</option>
                                   ))}
@@ -3127,7 +3127,7 @@ export default function App() {
               })()}
             </>}
 
-              {/* ── VISTA VENTAS ── */}
+              {/* ─VISTA VENTAS ── */}
               {nuboxView === "ventas" && isAdmin && (
                 <>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -3155,7 +3155,7 @@ export default function App() {
                           <div style={{ fontSize: 10, color: C.muted }}>Neto {isNC ? "-" : ""}{fmtCLP(Math.abs(sale.total_net))}</div>
                         </div>
                       </div>
-                      {sale.assigned && <div style={{ fontSize: 11, color: C.success, fontWeight: 600, marginBottom: 6 }}>✅ Asignado a {sale.assigned.project_name || sale.assigned.cc_name || "Sin centro de costo"}</div>}
+                      {sale.assigned && <div style={{ fontSize: 11, color: C.success, fontWeight: 600, marginBottom: 6 }}>Asignado a {sale.assigned.project_name || sale.assigned.cc_name || "Sin centro de costo"}</div>}
                       {isAdmin && (
                         <div style={{ display: "flex", gap: 8 }}>
                           <select
@@ -3164,7 +3164,7 @@ export default function App() {
                             style={{ flex: 1, height: 36, borderRadius: 8, border: `0.5px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, fontSize: 12, padding: "0 8px" }}
                           >
                             <option value="">— Seleccionar proyecto —</option>
-                            <option value="__sin_centro__">🚫 Sin centro de costo (igual queda en el informe)</option>
+                            <option value="__sin_centro__">Sin centro de costo (igual queda en el informe)</option>
                             {projects.map(pr => <option key={pr.id} value={pr.id}>{pr.code ? `[${pr.code}] ` : ""}{pr.name}</option>)}
                           </select>
                           <button
@@ -3229,16 +3229,16 @@ export default function App() {
         </>
       )}
 
-      {/* ── PANTALLA COTIZACIONES ─────────────────────────────────────────────── */}
+      {/* ─PANTALLA COTIZACIONES ─────────────────────────────────────────────── */}
       {screen === "cotizaciones" && <CotizacionesScreen token={token} isAdmin={isAdmin} />}
 
-      {/* ── PANTALLA RENDICIONES ──────────────────────────────────────────────── */}
+      {/* ─PANTALLA RENDICIONES ──────────────────────────────────────────────── */}
       {screen === "rendiciones" && canSeeRendiciones && <RendicionesScreen token={token} userName={userName} />}
 
-      {/* ── PANTALLA FACTURACIÓN ──────────────────────────────────────────────── */}
+      {/* ─PANTALLA FACTURACIÓN ──────────────────────────────────────────────── */}
       {screen === "facturacion" && canSeeFacturacion && <FacturacionScreen API_URL={API_URL} token={token!} isAdmin={isAdmin} />}
 
-      {/* ── PANTALLA ESTADO DE RESULTADO ──────────────────────────────────────── */}
+      {/* ─PANTALLA ESTADO DE RESULTADO ──────────────────────────────────────── */}
       {screen === "estadoResultado" && canSeeEstadoResultado && <EstadoResultadoScreen token={token!} isAdmin={isAdmin} />}
 
       {screen === "charlas" && (() => {
@@ -3251,7 +3251,7 @@ export default function App() {
 
             {deHoy ? (
               <div style={{ backgroundColor: C.successDim, border: `0.5px solid ${C.success}40`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: C.success }}>✓ Charla de hoy registrada</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.success }}>Charla de hoy registrada</div>
                 <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Subida por {deHoy.subida_por || "—"}. Puedes reemplazarla subiendo otra foto.</div>
               </div>
             ) : (
@@ -3419,7 +3419,7 @@ function BookmarkletRenewer({ apiUrl, token, onRenewed, hasCredentials }: { apiU
 
   if (step === "done") return (
     <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: 12, textAlign: "center" }}>
-      <div style={{ fontWeight: 700, color: "#15803d" }}>✅ Nubox conectado y credenciales guardadas</div>
+      <div style={{ fontWeight: 700, color: "#15803d" }}>Nubox conectado y credenciales guardadas</div>
       <div style={{ fontSize: 12, color: "#16a34a", marginTop: 4 }}>El token se renovará automáticamente en el futuro</div>
       <button onClick={() => setStep("idle")} style={{ marginTop: 8, background: "none", border: "none", color: "#6b7280", fontSize: 12, cursor: "pointer" }}>Cambiar credenciales</button>
     </div>
@@ -3427,7 +3427,7 @@ function BookmarkletRenewer({ apiUrl, token, onRenewed, hasCredentials }: { apiU
 
   if (step === "form" || step === "loading") return (
     <div style={{ backgroundColor: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: 14 }}>
-      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: "#1e40af" }}>🔑 Conectar Nubox automáticamente</div>
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: "#1e40af" }}>Conectar Nubox automáticamente</div>
       <div style={{ fontSize: 12, color: "#3b82f6", marginBottom: 10 }}>Guarda tus credenciales para que el token se renueve solo desde el celular</div>
       <input value={rut} onChange={e => setRut(e.target.value)} placeholder="RUT o email de Nubox (ej: 12345678-9)"
         disabled={step === "loading"}
@@ -3439,7 +3439,7 @@ function BookmarkletRenewer({ apiUrl, token, onRenewed, hasCredentials }: { apiU
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={saveAndLogin} disabled={step === "loading" || !rut || !password}
           style={{ flex: 1, backgroundColor: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: (step === "loading" || !rut || !password) ? 0.5 : 1 }}>
-          {step === "loading" ? "Conectando... (puede tardar ~30s)" : "🚀 Guardar y conectar"}
+          {step === "loading" ? "Conectando... (puede tardar ~30s)" : "Guardar y conectar"}
         </button>
         <button onClick={() => setStep("idle")} disabled={step === "loading"} style={{ backgroundColor: "#e5e7eb", color: "#374151", border: "none", borderRadius: 8, padding: "10px 14px", fontSize: 13, cursor: "pointer" }}>
           Cancelar
@@ -3450,7 +3450,7 @@ function BookmarkletRenewer({ apiUrl, token, onRenewed, hasCredentials }: { apiU
 
   return (
     <button onClick={() => setStep("form")} style={{ width: "100%", backgroundColor: hasCredentials ? "#059669" : "#2563eb", color: "#fff", border: "none", borderRadius: 10, padding: "12px 0", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 12 }}>
-      {hasCredentials ? "🔄 Renovar token Nubox automáticamente" : "🔑 Configurar auto-renovación Nubox"}
+      {hasCredentials ? "Renovar token Nubox automáticamente" : "Configurar auto-renovación Nubox"}
     </button>
   );
 }
@@ -3515,9 +3515,9 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
         method: "POST", headers: { ...h, "Content-Type": "application/json" },
         body: JSON.stringify({ jwtToken: nuboxJwt.trim(), nuboxCompanyId: nuboxCompanyId || undefined }),
       }).then(r => r.json());
-      if (r.ok) { setMsg("✅ Nubox conectado correctamente"); setNuboxJwt(""); loadAll(); }
+      if (r.ok) { setMsg("Nubox conectado correctamente"); setNuboxJwt(""); loadAll(); }
       else setMsg("❌ " + r.message);
-    } catch (_) { setMsg("❌ Error de conexión"); }
+    } catch (_) { setMsg("Error de conexión"); }
     setConnecting(false);
   }
 
@@ -3527,7 +3527,7 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
       const r = await fetch(`${API_URL}/nubox/products/sync`, { method: "POST", headers: h }).then(r => r.json());
       if (r.ok) { setMsg(`✅ ${r.synced} productos sincronizados desde Nubox`); loadAll(); }
       else setMsg("❌ " + r.message);
-    } catch (_) { setMsg("❌ Error al sincronizar"); }
+    } catch (_) { setMsg("Error al sincronizar"); }
     setSyncing(false);
   }
 
@@ -3541,7 +3541,7 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
       const r = await fetch(`${API_URL}/quotations/process`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd }).then(r => r.json());
       if (r.ok) { setAiResult(r.result); setMsg(""); }
       else setMsg("❌ " + r.message);
-    } catch (_) { setMsg("❌ Error al procesar"); }
+    } catch (_) { setMsg("Error al procesar"); }
     setProcessing(false);
   }
 
@@ -3594,7 +3594,7 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
         setAiResult(null); setUploadText(""); setUploadFiles([]);
         loadAll(); setTab("lista");
         if (bp.notFoundServices?.length > 0) {
-          setMsg(`⚠️ COT creada. Partidas SIN código CLM (incluidas con precio estimado): ${bp.notFoundServices.join(", ")}`);
+          setMsg(`COT creada. Partidas SIN código CLM (incluidas con precio estimado): ${bp.notFoundServices.join(", ")}`);
         }
       } else setMsg("❌ " + r.message);
     } catch (e: unknown) { setMsg("❌ " + (e instanceof Error ? e.message : "Error al crear")); }
@@ -3616,7 +3616,7 @@ const fmtCLP = (n: number) => {
       <div style={{ backgroundColor: C.orange, padding: "52px 20px 16px", color: "#fff" }}>
         <div style={{ fontSize: 20, fontWeight: 700 }}>Cotizaciones</div>
         <div style={{ fontSize: 12, opacity: 0.85 }}>
-          {nuboxStatus?.connected ? `✅ Nubox conectado · ${productCount} productos` : "⚠️ Nubox no conectado"}
+          {nuboxStatus?.connected ? `Nubox conectado · ${productCount} productos` : "Nubox no conectado"}
         </div>
       </div>
 
@@ -3634,9 +3634,9 @@ const fmtCLP = (n: number) => {
 
         {createResult && (
           <div style={{ backgroundColor: C.successDim, border: `1px solid ${C.success}`, borderRadius: 10, padding: 14, marginBottom: 12 }}>
-            <div style={{ fontWeight: 700, color: C.success, marginBottom: 6 }}>✅ Cotizaciones creadas en Nubox</div>
-            {createResult.cotServices && <div style={{ fontSize: 13, color: C.text }}>📋 Servicios — COT N°{createResult.cotServices.documentNumber || createResult.cotServices.number || createResult.cotServices.folio || createResult.cotServices.id}</div>}
-            {createResult.cotMaterials && <div style={{ fontSize: 13, color: C.text }}>🧱 Materiales — COT N°{createResult.cotMaterials.documentNumber || createResult.cotMaterials.number || createResult.cotMaterials.folio || createResult.cotMaterials.id}</div>}
+            <div style={{ fontWeight: 700, color: C.success, marginBottom: 6 }}>Cotizaciones creadas en Nubox</div>
+            {createResult.cotServices && <div style={{ fontSize: 13, color: C.text }}>Servicios — COT N°{createResult.cotServices.documentNumber || createResult.cotServices.number || createResult.cotServices.folio || createResult.cotServices.id}</div>}
+            {createResult.cotMaterials && <div style={{ fontSize: 13, color: C.text }}>Materiales — COT N°{createResult.cotMaterials.documentNumber || createResult.cotMaterials.number || createResult.cotMaterials.folio || createResult.cotMaterials.id}</div>}
             {createResult.newProductsCreated && createResult.newProductsCreated.length > 0 && (
               <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Productos creados en Nubox: {createResult.newProductsCreated.join(", ")}</div>
             )}
@@ -3644,7 +3644,7 @@ const fmtCLP = (n: number) => {
           </div>
         )}
 
-        {/* ── LISTA ── */}
+        {/* ─LISTA ── */}
         {tab === "lista" && (
           <>
             {loading ? <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Cargando...</div>
@@ -3661,7 +3661,7 @@ const fmtCLP = (n: number) => {
                       <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{q.client_name || "Cliente no detectado"}</div>
                       <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{q.reference}</div>
                       <div style={{ fontSize: 11, color: C.mutedSoft, marginTop: 4 }}>
-                        {q.source_type === "email" ? "📧 Email automático" : "📎 Manual"} · {new Date(q.created_at).toLocaleDateString("es-CL")}
+                        {q.source_type === "email" ? "Email automático" : "Manual"} · {new Date(q.created_at).toLocaleDateString("es-CL")}
                       </div>
                     </div>
                     <span style={{ backgroundColor: statusColor(q.status) + "20", color: statusColor(q.status), borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 600 }}>{statusLabel(q.status)}</span>
@@ -3687,19 +3687,19 @@ const fmtCLP = (n: number) => {
           </>
         )}
 
-        {/* ── NUEVA COT MANUAL ── */}
+        {/* ─NUEVA COT MANUAL ── */}
         {tab === "nueva" && (
           <div>
             {!nuboxStatus?.connected && (
               <div style={{ backgroundColor: C.dangerDim, border: `1px solid ${C.danger}`, borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 13, color: C.danger }}>
-                ⚠️ Nubox no está conectado. Ve a Configuración para conectarlo.
+                Nubox no está conectado. Ve a Configuración para conectarlo.
               </div>
             )}
 
             {!aiResult ? (
               <>
                 <div style={{ backgroundColor: C.card, borderRadius: 10, padding: 16, marginBottom: 12, border: `1px solid ${C.border}` }}>
-                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10, color: C.text }}>📎 Subir OT, email o descripción</div>
+                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10, color: C.text }}>Subir OT, email o descripción</div>
                   <textarea
                     value={uploadText}
                     onChange={e => setUploadText(e.target.value)}
@@ -3710,12 +3710,12 @@ const fmtCLP = (n: number) => {
                   <div style={{ marginTop: 10 }}>
                     <input ref={fileRef} type="file" multiple accept="image/*,.pdf" style={{ display: "none" }} onChange={e => setUploadFiles(Array.from(e.target.files || []))} />
                     <button onClick={() => fileRef.current?.click()} style={{ backgroundColor: C.cardAlt, border: `1px dashed ${C.border}`, borderRadius: 8, padding: "10px 16px", width: "100%", cursor: "pointer", fontSize: 13, color: C.muted }}>
-                      📷 Adjuntar fotos o PDF {uploadFiles.length > 0 && `(${uploadFiles.length} archivos)`}
+                      Adjuntar fotos o PDF {uploadFiles.length > 0 && `(${uploadFiles.length} archivos)`}
                     </button>
                   </div>
                 </div>
                 <button onClick={processOT} disabled={processing} style={{ width: "100%", backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 10, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.7 : 1 }}>
-                  {processing ? "🤖 Analizando con IA..." : "🤖 Analizar y cubicar"}
+                  {processing ? "Analizando con IA..." : "Analizar y cubicar"}
                 </button>
               </>
             ) : (
@@ -3729,13 +3729,13 @@ const fmtCLP = (n: number) => {
 
                 {aiResult.services?.length > 0 && (
                   <div style={{ backgroundColor: C.card, borderRadius: 10, padding: 14, marginBottom: 12, border: `1px solid ${C.border}` }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: C.info, marginBottom: 8 }}>📋 Servicios / Mano de obra</div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: C.info, marginBottom: 8 }}>Servicios / Mano de obra</div>
                     {aiResult.services.map((s, i) => (
                       <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 6, marginBottom: 6, borderBottom: i < aiResult.services.length - 1 ? `1px solid ${C.border}` : "none" }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 13, color: C.text }}>{s.name}</div>
                           <div style={{ fontSize: 11, color: C.muted }}>{s.quantity} {s.unit} × {fmtCLP(s.price_neto)}</div>
-                          {s.is_new && <span style={{ fontSize: 10, color: C.orange, fontWeight: 600 }}>✨ Nuevo en Nubox</span>}
+                          {s.is_new && <span style={{ fontSize: 10, color: C.orange, fontWeight: 600 }}>Nuevo en Nubox</span>}
                         </div>
                         <div style={{ fontWeight: 700, fontSize: 13, color: C.text }}>{fmtCLP(s.quantity * s.price_neto)}</div>
                       </div>
@@ -3748,13 +3748,13 @@ const fmtCLP = (n: number) => {
 
                 {aiResult.materials?.length > 0 && (
                   <div style={{ backgroundColor: C.card, borderRadius: 10, padding: 14, marginBottom: 12, border: `1px solid ${C.border}` }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: C.orange, marginBottom: 8 }}>🧱 Materiales e insumos</div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: C.orange, marginBottom: 8 }}>Materiales e insumos</div>
                     {aiResult.materials.map((m, i) => (
                       <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 6, marginBottom: 6, borderBottom: i < aiResult.materials.length - 1 ? `1px solid ${C.border}` : "none" }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 13, color: C.text }}>{m.name}</div>
                           <div style={{ fontSize: 11, color: C.muted }}>{m.quantity} {m.unit} × {fmtCLP(m.price_neto)}</div>
-                          {m.is_new && <span style={{ fontSize: 10, color: C.orange, fontWeight: 600 }}>✨ Nuevo en Nubox</span>}
+                          {m.is_new && <span style={{ fontSize: 10, color: C.orange, fontWeight: 600 }}>Nuevo en Nubox</span>}
                         </div>
                         <div style={{ fontWeight: 700, fontSize: 13, color: C.text }}>{fmtCLP(m.quantity * m.price_neto)}</div>
                       </div>
@@ -3772,7 +3772,7 @@ const fmtCLP = (n: number) => {
                     ← Editar
                   </button>
                   <button onClick={createQuotations} disabled={creating || !nuboxStatus?.connected} style={{ flex: 2, backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 10, padding: "12px 0", fontSize: 14, fontWeight: 700, cursor: creating ? "not-allowed" : "pointer", opacity: creating ? 0.7 : 1 }}>
-                    {creating ? "Creando en Nubox..." : "✅ Crear en Nubox"}
+                    {creating ? "Creando en Nubox..." : "Crear en Nubox"}
                   </button>
                 </div>
               </>
@@ -3780,14 +3780,14 @@ const fmtCLP = (n: number) => {
           </div>
         )}
 
-        {/* ── CONFIG NUBOX ── */}
+        {/* ─CONFIG NUBOX ── */}
         {tab === "config" && isAdmin && (
           <div>
             <div style={{ backgroundColor: C.card, borderRadius: 10, padding: 16, marginBottom: 12, border: `1px solid ${C.border}` }}>
               <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4, color: C.text }}>Conexión Nubox</div>
               {nuboxStatus?.connected ? (
                 <div style={{ backgroundColor: C.successDim, borderRadius: 8, padding: 10, marginBottom: 12 }}>
-                  <div style={{ color: C.success, fontWeight: 600, fontSize: 13 }}>✅ Conectado</div>
+                  <div style={{ color: C.success, fontWeight: 600, fontSize: 13 }}>Conectado</div>
                   <div style={{ fontSize: 12, color: C.muted }}>{nuboxStatus.email}</div>
                   <div style={{ fontSize: 11, color: nuboxStatus.tokenValid ? C.success : C.danger, marginTop: 2 }}>
                     Token: {nuboxStatus.tokenValid ? "Válido (se renueva automáticamente)" : "Expirado — se renovará en el próximo uso"}
@@ -3799,7 +3799,7 @@ const fmtCLP = (n: number) => {
                 </div>
               )}
               {/* Renovación automática con bookmarklet */}
-              <BookmarkletRenewer apiUrl={API_URL} token={token} hasCredentials={!!nuboxStatus?.email} onRenewed={() => { setMsg("✅ Token Nubox renovado"); loadAll(); }} />
+              <BookmarkletRenewer apiUrl={API_URL} token={token} hasCredentials={!!nuboxStatus?.email} onRenewed={() => { setMsg("Token Nubox renovado"); loadAll(); }} />
 
               {/* Conexión manual como respaldo */}
               <details style={{ marginTop: 12 }}>
@@ -3822,14 +3822,14 @@ const fmtCLP = (n: number) => {
                 {productCount > 0 ? `${productCount} productos sincronizados` : "Sin productos. Sincroniza para que la IA pueda mapear códigos."} La IA usa estos productos para cubicar y crear cotizaciones. El email watcher corre cada 5 minutos.
               </div>
               <button onClick={syncProducts} disabled={syncing || !nuboxStatus?.connected} style={{ width: "100%", backgroundColor: C.info, color: "#fff", border: "none", borderRadius: 10, padding: "12px 0", fontSize: 14, fontWeight: 700, cursor: syncing ? "not-allowed" : "pointer", opacity: (syncing || !nuboxStatus?.connected) ? 0.6 : 1 }}>
-                {syncing ? "Sincronizando..." : "🔄 Sincronizar productos desde Nubox"}
+                {syncing ? "Sincronizando..." : "Sincronizar productos desde Nubox"}
               </button>
 
               {/* Sub-tabs config */}
               <div style={{ display: "flex", gap: 8, marginTop: 24, marginBottom: 16 }}>
                 {(["nubox", "productos"] as const).map(t => (
                   <button key={t} onClick={() => setConfigSubTab(t)} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: `2px solid ${configSubTab === t ? C.orange : C.border}`, backgroundColor: configSubTab === t ? C.orange : "transparent", color: configSubTab === t ? "#fff" : C.text, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                    {t === "nubox" ? "👤 Clientes Nubox" : "📦 Catálogo Proyecto"}
+                    {t === "nubox" ? "Clientes Nubox" : "Catálogo Proyecto"}
                   </button>
                 ))}
               </div>
@@ -3851,7 +3851,7 @@ const fmtCLP = (n: number) => {
                     if (importRef.current) importRef.current.value = "";
                   }} />
                   <button onClick={() => importRef.current?.click()} disabled={importingExcel} style={{ width: "100%", padding: "11px 0", backgroundColor: C.info, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: importingExcel ? "not-allowed" : "pointer", opacity: importingExcel ? 0.6 : 1, marginBottom: 16 }}>
-                    {importingExcel ? "Importando..." : "📥 Importar Excel del contrato"}
+                    {importingExcel ? "Importando..." : "Importar Excel del contrato"}
                   </button>
                   {projectProducts.length === 0 && <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>Sin productos en el catálogo todavía.</div>}
                   {projectProducts.map(p => (
@@ -3882,7 +3882,7 @@ const fmtCLP = (n: number) => {
                     <button onClick={async () => {
                       if (!newPP.name || !newPP.price_neto) return setMsg("Nombre y precio son obligatorios");
                       const r = await fetch(`${API_URL}/project-products`, { method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify({ ...newPP, price_neto: parseInt(newPP.price_neto) }) }).then(r => r.json());
-                      if (r.ok) { setMsg("✅ Producto agregado al catálogo"); setNewPP({ nubox_code: "", name: "", unit: "UND", price_neto: "", category: "materiales" }); loadAll(); }
+                      if (r.ok) { setMsg("Producto agregado al catálogo"); setNewPP({ nubox_code: "", name: "", unit: "UND", price_neto: "", category: "materiales" }); loadAll(); }
                       else setMsg("❌ " + r.message);
                     }} style={{ padding: "10px 0", backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                       + Agregar al catálogo
@@ -3913,7 +3913,7 @@ const fmtCLP = (n: number) => {
                 <button onClick={async () => {
                   if (!newClientRut || !newClientNuboxId) return setMsg("RUT e ID Nubox son obligatorios");
                   const r = await fetch(`${API_URL}/nubox/clients`, { method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify({ rut: newClientRut, name: newClientName, nuboxId: newClientNuboxId }) }).then(r => r.json());
-                  if (r.ok) { setMsg("✅ Cliente registrado"); setNewClientRut(""); setNewClientName(""); setNewClientNuboxId(""); loadAll(); }
+                  if (r.ok) { setMsg("Cliente registrado"); setNewClientRut(""); setNewClientName(""); setNewClientNuboxId(""); loadAll(); }
                   else setMsg("❌ " + r.message);
                 }} style={{ padding: "10px 0", backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                   + Agregar cliente
@@ -3998,10 +3998,10 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
         }));
         setFormReady(true);
         showMsg(r.aiFailed
-          ? "📷 Boleta guardada. La IA no pudo leerla — completa los datos manualmente."
-          : "✅ IA leyó la boleta. Revisa y ajusta los datos.");
+          ? "Boleta guardada. La IA no pudo leerla — completa los datos manualmente."
+          : "IA leyó la boleta. Revisa y ajusta los datos.");
       } else { showMsg("❌ " + r.message); }
-    } catch { showMsg("❌ Error al analizar la imagen"); }
+    } catch { showMsg("Error al analizar la imagen"); }
     setScanning(false);
   }
 
@@ -4010,13 +4010,13 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = ev => { setDocPreview(ev.target?.result as string); showMsg("📄 Documento listo."); };
+    reader.onload = ev => { setDocPreview(ev.target?.result as string); showMsg("Documento listo."); };
     reader.readAsDataURL(file);
   }
 
   // Guardar rendición
   async function handleGuardar() {
-    if (!form.vendor || !form.amount) { showMsg("⚠️ Completa al menos proveedor y monto"); return; }
+    if (!form.vendor || !form.amount) { showMsg("Completa al menos proveedor y monto"); return; }
     setSaving(true);
     const body = {
       ...form,
@@ -4033,8 +4033,8 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
     setSaving(false);
     if (r.ok) {
       const folio = r.rendicion?.folio ? ` (REN-${String(r.rendicion.folio).padStart(4,"0")})` : "";
-      const emailMsg = r.emailSent ? " · 📧 Correo enviado a Paulette" : "";
-      showMsg(`✅ Guardada${folio}${emailMsg}`);
+      const emailMsg = r.emailSent ? " · Correo enviado a Paulette" : "";
+      showMsg(`Guardada${folio}${emailMsg}`);
       loadRendiciones();
       resetForm();
       setTab("lista");
@@ -4054,7 +4054,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
         body: JSON.stringify({ doc_firmado_data })
       }).then(r => r.json());
       setAttachingId(null);
-      if (r.ok) { showMsg(`✅ Documento adjunto${r.folioStr ? " · " + r.folioStr : ""} · 📧 Correo enviado`); loadRendiciones(); }
+      if (r.ok) { showMsg(`Documento adjunto${r.folioStr ? " · " + r.folioStr : ""} · Correo enviado`); loadRendiciones(); }
       else showMsg("❌ " + r.message);
     };
     reader.readAsDataURL(file);
@@ -4063,7 +4063,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
   // Marcar como pagado
   async function handlePagado(id: string) {
     const r = await fetch(`${API_URL}/rendiciones/${id}/marcar-pagado`, { method: "POST", headers: h }).then(r => r.json());
-    if (r.ok) { showMsg("✅ Marcado como pagado"); loadRendiciones(); }
+    if (r.ok) { showMsg("Marcado como pagado"); loadRendiciones(); }
     else showMsg("❌ " + r.message);
   }
 
@@ -4078,7 +4078,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
       method: "PUT", headers: { ...h, "Content-Type": "application/json" },
       body: JSON.stringify({ ...editForm, amount: parseFloat(editForm.amount || "0") })
     }).then(r => r.json());
-    if (r.ok) { showMsg("✅ Actualizada"); setEditingId(null); loadRendiciones(); }
+    if (r.ok) { showMsg("Actualizada"); setEditingId(null); loadRendiciones(); }
     else showMsg("❌ " + r.message);
   }
 
@@ -4093,11 +4093,11 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
   // Status badge helper
   function StatusBadge({ status }: { status: string }) {
     const cfg: Record<string, { bg: string; color: string; label: string }> = {
-      guardado:       { bg: "#f3f4f6", color: "#374151", label: "💾 Guardado" },
-      pendiente_pago: { bg: "#fef9c3", color: "#854d0e", label: "⏳ Pendiente pago" },
-      pagado:         { bg: "#dcfce7", color: "#15803d", label: "✅ Pagado" },
-      borrador:       { bg: "#f3f4f6", color: "#374151", label: "💾 Guardado" },
-      enviada:        { bg: "#fef9c3", color: "#854d0e", label: "⏳ Pendiente pago" },
+      guardado:       { bg: "#f3f4f6", color: "#374151", label: "Guardado" },
+      pendiente_pago: { bg: "#fef9c3", color: "#854d0e", label: "Pendiente pago" },
+      pagado:         { bg: "#dcfce7", color: "#15803d", label: "Pagado" },
+      borrador:       { bg: "#f3f4f6", color: "#374151", label: "Guardado" },
+      enviada:        { bg: "#fef9c3", color: "#854d0e", label: "Pendiente pago" },
     };
     const s = cfg[status] || cfg.guardado;
     return <span style={{ fontSize: 11, backgroundColor: s.bg, color: s.color, padding: "2px 8px", borderRadius: 20, fontWeight: 600 }}>{s.label}</span>;
@@ -4130,7 +4130,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
 
       {msg && <div style={{ margin: "12px 16px 0", padding: "10px 14px", backgroundColor: msg.startsWith("✅") ? "#f0fdf4" : msg.startsWith("⚠️") ? "#fffbeb" : "#fef2f2", borderRadius: 8, fontSize: 13, color: msg.startsWith("✅") ? "#15803d" : msg.startsWith("⚠️") ? "#92400e" : "#dc2626" }}>{msg}</div>}
 
-      {/* ── TAB: HISTORIAL ── */}
+      {/* ─TAB: HISTORIAL ── */}
       {tab === "lista" && (
         <div style={{ padding: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -4162,7 +4162,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                         <span style={{ fontSize: 15 }}>{CAT_ICON[r.category] || "📦"}</span>
                         <span style={{ fontWeight: 700, fontSize: 14 }}>{r.vendor || "Sin proveedor"}</span>
                         <StatusBadge status={r.status} />
-                        {r.folio && <span style={{ fontSize: 11, color: "#f97316", fontWeight: 700 }}>🔖 REN-{String(r.folio).padStart(4,"0")}</span>}
+                        {r.folio && <span style={{ fontSize: 11, color: "#f97316", fontWeight: 700 }}>REN-{String(r.folio).padStart(4,"0")}</span>}
                       </div>
                       <div style={{ fontSize: 20, fontWeight: 800, color: C.orange }}>${Number(r.amount || 0).toLocaleString("es-CL")}</div>
                       <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>👤 {r.worker_name} · 📅 {fmtDate(r.date)}</div>
@@ -4190,15 +4190,15 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                         </div>
                         {/* Links OneDrive */}
                         <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-                          {r.onedrive_url && <a href={r.onedrive_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#0284c7", padding: "5px 10px", backgroundColor: "#f0f9ff", borderRadius: 8 }}>📷 Ver boleta →</a>}
-                          {r.doc_firmado_onedrive_url && <a href={r.doc_firmado_onedrive_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#16a34a", padding: "5px 10px", backgroundColor: "#f0fdf4", borderRadius: 8 }}>📄 Ver doc firmado →</a>}
+                          {r.onedrive_url && <a href={r.onedrive_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#0284c7", padding: "5px 10px", backgroundColor: "#f0f9ff", borderRadius: 8 }}>Ver boleta →</a>}
+                          {r.doc_firmado_onedrive_url && <a href={r.doc_firmado_onedrive_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#16a34a", padding: "5px 10px", backgroundColor: "#f0fdf4", borderRadius: 8 }}>Ver doc firmado →</a>}
                         </div>
                         {/* Botones de acción */}
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           {r.status === "guardado" && (
                             <>
                               <label style={{ flex: 1, minWidth: 140, backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "center", display: "block", opacity: attachingId === r.id ? 0.6 : 1 }}>
-                                {attachingId === r.id ? "Subiendo..." : "📄 Adjuntar doc rendición"}
+                                {attachingId === r.id ? "Subiendo..." : "Adjuntar doc rendición"}
                                 <input type="file" accept="image/*,application/pdf" capture="environment" style={{ display: "none" }}
                                   onChange={e => handleAttachDoc(r.id, e)} disabled={attachingId === r.id} />
                               </label>
@@ -4207,12 +4207,12 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                           {r.status === "pendiente_pago" && (
                             <button onClick={() => handlePagado(r.id)}
                               style={{ flex: 1, minWidth: 140, backgroundColor: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                              ✅ Marcar pagado
+                              Marcar pagado
                             </button>
                           )}
                           <button onClick={() => { setEditingId(r.id); setEditForm({ vendor: r.vendor, rut_vendor: r.rut_vendor || "", boleta_date: r.boleta_date || "", rendicion_date: r.date, amount: String(r.amount), description: r.description, category: r.category, cost_center_id: r.cost_center_id || "", worker_name: r.worker_name }); }}
                             style={{ backgroundColor: "#eff6ff", color: "#1d4ed8", border: "none", borderRadius: 8, padding: "10px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                            ✏️ Editar
+                            Editar
                           </button>
                           <button onClick={() => handleDelete(r.id)}
                             style={{ backgroundColor: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 8, padding: "10px 12px", fontSize: 13, cursor: "pointer" }}>
@@ -4223,19 +4223,19 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                     ) : (
                       /* Formulario de edición inline */
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>✏️ Editar rendición</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Editar rendición</div>
                         {fInp("Trabajador", "worker_name", editForm.worker_name || "", v => setEditForm(f => ({ ...f, worker_name: v })))}
                         {fInp("Proveedor", "vendor", editForm.vendor || "", v => setEditForm(f => ({ ...f, vendor: v })))}
                         {fInp("RUT Proveedor", "rut_vendor", editForm.rut_vendor || "", v => setEditForm(f => ({ ...f, rut_vendor: v })))}
                         {fInp("N° Boleta / Folio", "boleta_number", editForm.boleta_number || "", v => setEditForm(f => ({ ...f, boleta_number: v })))}
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
                           <div>
-                            <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>📅 Fecha rendición</div>
+                            <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>Fecha rendición</div>
                             <input type="date" value={editForm.rendicion_date || ""} onChange={e => setEditForm(f => ({ ...f, rendicion_date: e.target.value }))}
                               style={{ width: "100%", padding: "9px 8px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, backgroundColor: C.bg, color: C.text, boxSizing: "border-box" }} />
                           </div>
                           <div>
-                            <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>🧾 Fecha boleta</div>
+                            <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>Fecha boleta</div>
                             <input type="date" value={editForm.boleta_date || ""} onChange={e => setEditForm(f => ({ ...f, boleta_date: e.target.value }))}
                               style={{ width: "100%", padding: "9px 8px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, backgroundColor: C.bg, color: C.text, boxSizing: "border-box" }} />
                           </div>
@@ -4252,7 +4252,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                         </div>
                         <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={() => handleEdit(r.id)} style={{ flex: 1, backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                            💾 Guardar cambios
+                            Guardar cambios
                           </button>
                           <button onClick={() => setEditingId(null)} style={{ backgroundColor: C.bg, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, cursor: "pointer" }}>
                             Cancelar
@@ -4268,11 +4268,11 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
         </div>
       )}
 
-      {/* ── TAB: NUEVA ── */}
+      {/* ─TAB: NUEVA ── */}
       {tab === "nueva" && (
         <div style={{ padding: 16 }}>
 
-          {/* ─── Paso 1: Dos botones naranjos ─── */}
+          {/* ──Paso 1: Dos botones naranjos ─── */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
             {/* Botón boleta */}
             <div style={{ position: "relative" }}>
@@ -4307,8 +4307,8 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
           {(imagePreview || docPreview) && (
             <div style={{ marginBottom: 14, padding: "10px 14px", borderRadius: 10, backgroundColor: docPreview ? "#f0fdf4" : "#fff7ed", border: `1px solid ${docPreview ? "#86efac" : "#fed7aa"}`, fontSize: 12, color: docPreview ? "#15803d" : "#92400e" }}>
               {docPreview
-                ? "📧 Al guardar: se asignará folio correlativo y se enviará correo a Paulette con el documento adjunto. Estado: Pendiente pago."
-                : "💾 Al guardar: solo se guardará la boleta en OneDrive. Puedes adjuntar el doc firmado después desde el historial. Estado: Guardado."}
+                ? "Al guardar: se asignará folio correlativo y se enviará correo a Paulette con el documento adjunto. Estado: Pendiente pago."
+                : "Al guardar: solo se guardará la boleta en OneDrive. Puedes adjuntar el doc firmado después desde el historial. Estado: Guardado."}
             </div>
           )}
 
@@ -4335,10 +4335,10 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
             </div>
           )}
 
-          {/* ─── Paso 2: Formulario (aparece tras scan) ─── */}
+          {/* ──Paso 2: Formulario (aparece tras scan) ─── */}
           {formReady && (
             <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: C.text }}>📝 Revisa y completa los datos</div>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: C.text }}>Revisa y completa los datos</div>
 
               {fInp("Trabajador", "worker_name", form.worker_name, v => setForm(f => ({ ...f, worker_name: v })))}
               {fInp("Proveedor *", "vendor", form.vendor, v => setForm(f => ({ ...f, vendor: v })), { placeholder: "Sodimac, Easy, ferretería..." })}
@@ -4347,12 +4347,12 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                 <div>
-                  <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>📅 Fecha rendición</div>
+                  <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>Fecha rendición</div>
                   <input type="date" value={form.rendicion_date} onChange={e => setForm(f => ({ ...f, rendicion_date: e.target.value }))}
                     style={{ width: "100%", padding: "9px 8px", borderRadius: 8, border: `2px solid ${C.orange}`, fontSize: 13, backgroundColor: C.bg, color: C.text, boxSizing: "border-box" }} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>🧾 Fecha boleta</div>
+                  <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>Fecha boleta</div>
                   <input type="date" value={form.boleta_date} onChange={e => setForm(f => ({ ...f, boleta_date: e.target.value }))}
                     style={{ width: "100%", padding: "9px 8px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, backgroundColor: C.bg, color: C.text, boxSizing: "border-box" }} />
                 </div>
@@ -4374,7 +4374,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
               </div>
 
               <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>🏗️ Centro de Costo</div>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, fontWeight: 600 }}>Centro de Costo</div>
                 <select value={form.cost_center_id} onChange={e => setForm(f => ({ ...f, cost_center_id: e.target.value }))}
                   style={{ width: "100%", padding: "9px 11px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, backgroundColor: C.bg, color: C.text, boxSizing: "border-box" }}>
                   <option value="">— Sin centro de costo —</option>
@@ -4384,7 +4384,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
 
               <button onClick={handleGuardar} disabled={saving || !form.vendor || !form.amount}
                 style={{ width: "100%", backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 10, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: (saving || !form.vendor || !form.amount) ? 0.5 : 1 }}>
-                {saving ? "Guardando..." : docPreview ? "📤 Guardar y enviar correo" : "💾 Guardar rendición"}
+                {saving ? "Guardando..." : docPreview ? "Guardar y enviar correo" : "Guardar rendición"}
               </button>
             </div>
           )}
@@ -4392,7 +4392,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
           {/* Si no ha escaneado boleta aún, mostrar indicación */}
           {!imagePreview && !scanning && !formReady && (
             <div style={{ textAlign: "center", padding: "20px 0", color: C.muted, fontSize: 13 }}>
-              Toca <strong style={{ color: C.orange }}>📷 Foto boleta</strong> para comenzar.<br/>
+              Toca <strong style={{ color: C.orange }}>Foto boleta</strong> para comenzar.<br/>
               <span style={{ fontSize: 12 }}>La IA leerá los datos automáticamente.</span>
             </div>
           )}
@@ -4402,7 +4402,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
   );
 }
 
-// ── ESTADO DE RESULTADO ──────────────────────────────────────────────────────
+// ─ESTADO DE RESULTADO ──────────────────────────────────────────────────────
 type ERMonth = { ingresos: number; gastos: number; boletas: number; remuneraciones: number; margen: number };
 type ERCenter = { cost_center_id: string | null; name: string; code: string | null; months: Record<string, ERMonth>; total: ERMonth };
 
@@ -4549,7 +4549,7 @@ function EstadoResultadoScreen({ token, isAdmin }: { token: string; isAdmin: boo
               <div>
                 <input ref={libroRef} type="file" accept=".xlsx,.xls,.pdf" style={{ display: "none" }} onChange={e => { if (e.target.files?.[0]) uploadLibro(e.target.files[0]); e.target.value = ""; }} />
                 <button onClick={() => libroRef.current?.click()} disabled={uploadingLibro} style={{ backgroundColor: C.infoDim, border: `0.5px solid ${C.info}`, borderRadius: 8, padding: "5px 10px", color: C.info, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
-                  {uploadingLibro ? "Leyendo..." : "📥 Subir libro (IA)"}
+                  {uploadingLibro ? "Leyendo..." : "Subir libro (IA)"}
                 </button>
               </div>
             </div>
@@ -4593,7 +4593,7 @@ function EstadoResultadoScreen({ token, isAdmin }: { token: string; isAdmin: boo
             ))}
             {entries.length > 0 && (
               <button onClick={saveEntries} disabled={savingEntries} style={{ width: "100%", marginTop: 10, height: 40, backgroundColor: C.orange, color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: savingEntries ? 0.6 : 1 }}>
-                {savingEntries ? "Guardando..." : "💾 Guardar sueldos del mes"}
+                {savingEntries ? "Guardando..." : "Guardar sueldos del mes"}
               </button>
             )}
           </div>
