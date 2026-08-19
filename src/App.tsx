@@ -110,7 +110,7 @@ function DraggableCreateButton({ onPress, cardColor, orangeColor }: { onPress: (
   const btnRef = React.useRef<HTMLDivElement>(null);
 
   // Posición inicial: justo encima de la barra de nav, lado derecho
-  const defaultBottom = 72; // encima de la barra (58px aprox)
+  const defaultBottom = 84; // despeje sobre la barra inferior
   const defaultRight = 12;
 
   function getStyle(): React.CSSProperties {
@@ -151,7 +151,6 @@ function DraggableCreateButton({ onPress, cardColor, orangeColor }: { onPress: (
       <div style={{ width: 50, height: 50, background: orangeColor, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 14px rgba(249,115,22,0.45), 0 0 0 3px ${cardColor}`, cursor: "grab" }}>
         <Plus size={22} color="#fff" />
       </div>
-      <div style={{ fontSize: 9, fontWeight: 700, color: orangeColor, textAlign: "center", marginTop: 2, letterSpacing: 0.3 }}>Crear</div>
     </div>
   );
 }
@@ -1489,7 +1488,7 @@ export default function App() {
             {/* Header saludo */}
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 11, color: C.orange, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 4 }}>Panel de Control</div>
-              <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.5 }}>Hola, {userName.split(" ")[0]} 👋</div>
+              <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.5 }}>Hola, {userName.split(" ")[0]}</div>
               <div style={{ color: C.mutedSoft, fontSize: 13, marginTop: 2 }}>{new Date().toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}</div>
             </div>
 
@@ -1513,7 +1512,7 @@ export default function App() {
                 <div style={{ fontSize: 28, fontWeight: 800, color: C.text, marginTop: 10 }}>{kpis?.tareas.en_curso ?? 0}</div>
                 <div style={{ fontSize: 11, color: C.mutedSoft, marginTop: 2 }}>{(kpis?.tareas.en_curso || 0) === 1 ? "Partida en curso" : "Partidas en curso"}</div>
                 <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                  <div style={{ background: C.successDim, borderRadius: 5, padding: "2px 7px", fontSize: 10, color: C.success }}><CheckCircle2 size={9} style={{ marginRight: 3 }} />{kpis?.tareas.completadas ?? 0} ok</div>
+                  <div style={{ background: C.successDim, borderRadius: 5, padding: "2px 7px", fontSize: 10, color: C.success }}><CheckCircle2 size={9} style={{ marginRight: 3 }} />{kpis?.tareas.completadas ?? 0} completadas</div>
                   {(kpis?.tareas.atrasadas || 0) > 0 && <div style={{ background: C.dangerDim, borderRadius: 5, padding: "2px 7px", fontSize: 10, color: C.danger }}><AlertTriangle size={9} style={{ marginRight: 3 }} />{kpis?.tareas.atrasadas} atrasadas</div>}
                 </div>
               </div>
@@ -1542,11 +1541,11 @@ export default function App() {
             {projects.slice(0, 4).map(p => (
               <div key={p.id} onClick={() => { setSelectedProject(p); setScreen("partidas"); }} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ width: 44, height: 44, background: C.orangeDim, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <span style={{ fontSize: 20 }}>🏗️</span>
+                  <FolderOpen size={18} color={C.orange} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
-                  <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>#{p.code}{p.client_name ? ` · ${p.client_name}` : ""}</div>
+                  <div style={{ fontSize: 11, color: C.muted, marginTop: 2, textTransform: "none" as const, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>#{p.code}{p.client_name ? ` · ${p.client_name}` : ""}</div>
                   <div style={{ height: 4, background: C.border, borderRadius: 99, marginTop: 7, overflow: "hidden" }}>
                     <div style={{ width: `${p.progress_percent || 0}%`, height: "100%", background: `linear-gradient(90deg, ${C.orange}, #FFB347)`, borderRadius: 99, transition: "width 0.5s" }} />
                   </div>
