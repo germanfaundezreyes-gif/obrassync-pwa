@@ -1310,7 +1310,7 @@ export default function App() {
   );
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: C.bg, color: C.text, fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', sans-serif", paddingBottom: 80 }}>
+    <div style={{ minHeight: "100vh", backgroundColor: C.bg, color: C.text, fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', sans-serif", paddingBottom: 132 }}>
 
       {/* Modal editar partida */}
       {editingTask && (
@@ -4628,24 +4628,35 @@ function EstadoResultadoScreen({ token, isAdmin }: { token: string; isAdmin: boo
             </div>
           </div>
 
-          {/* EBITDA mensual (toda la empresa, suma de todos los centros) */}
-          <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 14, marginBottom: 14, overflowX: "auto" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>EBITDA mensual {year}</div>
-            <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11, minWidth: 560 }}>
-              <thead>
-                <tr>
-                  {ER_MESES.map(m => <th key={m} style={{ textAlign: "right", padding: "4px 6px", color: C.muted, borderBottom: `1px solid ${C.border}` }}>{m}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  {months.map(ym => {
-                    const v = items.reduce((s, cc) => s + (cc.months[ym]?.margen || 0), 0);
-                    return <td key={ym} style={{ textAlign: "right", padding: "6px 6px", fontWeight: 700, color: v >= 0 ? "#15803d" : "#dc2626" }}>{fmtCLP(v)}</td>;
-                  })}
-                </tr>
-              </tbody>
-            </table>
+          {/* EBITDA mensual: gráfico de barras en vez de tabla. La tabla exigía scroll
+              horizontal y se veía cortada al entrar, sin señal de que había más columnas. */}
+          <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>EBITDA mensual {year}</div>
+            {(() => {
+              const valores = months.map(ym => items.reduce((s, cc) => s + (cc.months[ym]?.margen || 0), 0));
+              const tope = Math.max(1, ...valores.map(v => Math.abs(v)));
+              return (
+                <>
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 110, marginBottom: 6 }}>
+                    {valores.map((v, i) => {
+                      const alto = Math.round((Math.abs(v) / tope) * 100);
+                      return (
+                        <div key={i} title={`${ER_MESES[i]}: ${fmtCLP(v)}`} style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", height: "100%" }}>
+                          <div style={{ height: `${alto}%`, minHeight: v === 0 ? 2 : 4, backgroundColor: v >= 0 ? "#16A34A" : "#DC2626", opacity: v === 0 ? 0.18 : 1, borderRadius: "3px 3px 0 0" }} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: "flex", gap: 3, marginBottom: 10 }}>
+                    {ER_MESES.map(m => <div key={m} style={{ flex: 1, textAlign: "center", fontSize: 8, color: C.muted }}>{m}</div>)}
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.muted, borderTop: `0.5px solid ${C.border}`, paddingTop: 8 }}>
+                    <span>Mejor mes: <b style={{ color: "#15803d" }}>{ER_MESES[valores.indexOf(Math.max(...valores))]}</b></span>
+                    <span>Peor mes: <b style={{ color: "#dc2626" }}>{ER_MESES[valores.indexOf(Math.min(...valores))]}</b></span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           {/* Por centro de costo */}
