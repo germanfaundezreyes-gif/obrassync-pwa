@@ -2,6 +2,25 @@ import React, { useState, useEffect, useRef } from "react";
 import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle, HardHat, CreditCard, Receipt, ClipboardList, Calculator, TrendingUp, Users, Settings, ChevronRight } from "lucide-react";
 import FacturacionScreen from "./Facturacion";
 
+// ---- Notificaciones push ----
+// El navegador entrega la llave VAPID como Uint8Array, no como el base64url del servidor.
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+// En iPhone el push web solo existe si la app está instalada en la pantalla de inicio.
+// Safari en pestaña normal no expone PushManager, así que conviene distinguir el caso
+// para poder explicárselo al usuario en vez de mostrar un error seco.
+const esIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent);
+const estaInstalada = () =>
+  window.matchMedia("(display-mode: standalone)").matches ||
+  (navigator as unknown as { standalone?: boolean }).standalone === true;
+const pushDisponible = () => "serviceWorker" in navigator && "PushManager" in window;
+
+
 const API_URL = "https://obrassync-backend-production.up.railway.app";
 
 const C = {
@@ -253,6 +272,74 @@ export default function App() {
   const [subiendoCharla, setSubiendoCharla] = useState(false);
   const [charlas, setCharlas] = useState<any[]>([]);
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const [pushEstado, setPushEstado] = useState<"off" | "on" | "no-soportado" | "ios-no-instalada">("off");
+  const [pushCargando, setPushCargando] = useState(false);
+  const [pushMsg, setPushMsg] = useState("");
+
+  // Registra el service worker al abrir la app y refleja si ya hay suscripción activa.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) { setPushEstado("no-soportado"); return; }
+    navigator.serviceWorker.register("/sw.js").then(async (reg) => {
+      if (!pushDisponible()) {
+        setPushEstado(esIOS() && !estaInstalada() ? "ios-no-instalada" : "no-soportado");
+        return;
+      }
+      const sub = await reg.pushManager.getSubscription();
+      setPushEstado(sub ? "on" : "off");
+    }).catch(() => setPushEstado("no-soportado"));
+  }, []);
+
+  const activarPush = async () => {
+    if (!token) return;
+    setPushCargando(true);
+    try {
+      const permiso = await Notification.requestPermission();
+      if (permiso !== "granted") {
+        setPushMsg("❌ Permiso de notificaciones denegado. Actívalo en los ajustes del teléfono.");
+        return;
+      }
+      const reg = await navigator.serviceWorker.ready;
+      const { publicKey } = await fetch(`${API_URL}/push/vapid`).then(r => r.json());
+      if (!publicKey) { setPushMsg("❌ El servidor aún no tiene configuradas las notificaciones."); return; }
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+      const r = await fetch(`${API_URL}/push/subscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(sub.toJSON()),
+      });
+      if (!r.ok) throw new Error("El servidor rechazó la suscripción");
+      setPushEstado("on");
+      setPushMsg("✅ Notificaciones activadas en este dispositivo.");
+    } catch (e) {
+      setPushMsg("❌ No se pudieron activar: " + (e as Error).message);
+    } finally { setPushCargando(false); }
+  };
+
+  const desactivarPush = async () => {
+    setPushCargando(true);
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        // Se avisa al servidor antes de romper la suscripción local: si el orden se
+        // invierte se pierde el endpoint y queda una fila muerta en la base.
+        await fetch(`${API_URL}/push/unsubscribe`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ endpoint: sub.endpoint }),
+        }).catch(() => {});
+        await sub.unsubscribe();
+      }
+      setPushEstado("off");
+      setPushMsg("✅ Notificaciones desactivadas en este dispositivo.");
+    } catch (e) {
+      setPushMsg("❌ " + (e as Error).message);
+    } finally { setPushCargando(false); }
+  };
+
   const [prevResumen, setPrevResumen] = useState<any[]>([]);
   const [savingTask, setSavingTask] = useState(false);
 
@@ -3378,6 +3465,35 @@ export default function App() {
                   <span style={{ color: C.muted, fontSize: 18 }}>›</span>
                 </button>
               ))}
+
+              {/* Notificaciones del teléfono. Vive en el menú y no en Mi perfil porque
+                  el permiso es por dispositivo: quien entre desde otro teléfono debe
+                  activarlo ahí también, y así lo tiene a mano. */}
+              <div style={{ marginTop: 6, paddingTop: 14, borderTop: `0.5px solid ${C.border}` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "4px 12px 10px" }}>
+                  <span style={{ color: pushEstado === "on" ? C.orange : C.mutedSoft, display: "flex" }}><Bell size={20} /></span>
+                  <span style={{ flex: 1 }}>
+                    <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: C.text }}>Notificaciones</span>
+                    <span style={{ display: "block", fontSize: 11, color: C.muted, marginTop: 1 }}>
+                      {pushEstado === "on" ? "Activas en este dispositivo"
+                        : pushEstado === "ios-no-instalada" ? "Agrega ObrasSync a la pantalla de inicio para recibirlas"
+                        : pushEstado === "no-soportado" ? "Este navegador no las admite"
+                        : "Avisos de charla diaria y recepción conforme"}
+                    </span>
+                  </span>
+                  {(pushEstado === "on" || pushEstado === "off") && (
+                    <button onClick={pushEstado === "on" ? desactivarPush : activarPush} disabled={pushCargando}
+                      style={{ padding: "8px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: pushCargando ? "default" : "pointer", border: `1px solid ${pushEstado === "on" ? C.border : C.orange}`, backgroundColor: pushEstado === "on" ? C.cardAlt : C.orange, color: pushEstado === "on" ? C.text : "#fff", opacity: pushCargando ? 0.6 : 1 }}>
+                      {pushCargando ? "..." : pushEstado === "on" ? "Desactivar" : "Activar"}
+                    </button>
+                  )}
+                </div>
+                {pushMsg && (
+                  <div style={{ margin: "0 12px", padding: "8px 12px", borderRadius: 8, fontSize: 12, backgroundColor: pushMsg.startsWith("✅") ? C.successDim : C.dangerDim, color: pushMsg.startsWith("✅") ? C.success : C.danger }}>
+                    {pushMsg.replace(/^[✅❌⚠️]+\s*/, "")}
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}
