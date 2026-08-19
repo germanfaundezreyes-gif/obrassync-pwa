@@ -18,7 +18,7 @@ type Quotation = { id: string; client_name?: string; client_rut?: string; refere
 type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
 type AIItem = { nubox_id: number | null; name: string; unit: string; quantity: number; price_neto: number; is_new: boolean };
 type Project = { id: string; code: string; name: string; client_name?: string; start_date?: string; end_date?: string; progress_percent?: number; project_type?: string; status?: string; jefe_id?: string; supervisor_id?: string; jefe_name?: string; supervisor_name?: string; recepcion_conforme_at?: string; client_email?: string; inicio_notificado_at?: string; termino_notificado_at?: string };
-type Task = { id: string; name: string; duration?: string; start_date?: string; end_date?: string; progress_percent?: number; status?: string; photo_count?: number; unit?: string; quantity?: string; codigo?: string; esquema?: string };
+type Task = { id: string; name: string; duration?: string; start_date?: string; end_date?: string; fecha_ejecucion?: string | null; progress_percent?: number; status?: string; photo_count?: number; unit?: string; quantity?: string; codigo?: string; esquema?: string };
 type TaskPhoto = { id: string; filename: string; local_path?: string; onedrive_url?: string; created_at: string; taken_at?: string | null; description?: string; photo_type?: string };
 type QuoteItem = { tempId: string; name: string; codigo: string; quantity: string; unit: string; start_date: string; end_date: string; selected: boolean };
 type User = { id: string; full_name: string; email: string; role: string; is_active: boolean; permissions?: Record<string, boolean> };
@@ -235,6 +235,7 @@ export default function App() {
   const [taskName, setTaskName] = useState("");
   const [taskUnit, setTaskUnit] = useState("");
   const [taskQuantity, setTaskQuantity] = useState("");
+  const [taskFecha, setTaskFecha] = useState("");
   const [savingTask, setSavingTask] = useState(false);
 
   const [users, setUsers] = useState<User[]>([]);
@@ -600,7 +601,7 @@ export default function App() {
     setSavingTask(true);
     try {
       const progress = taskStatus === "completada" ? 100 : taskStatus === "pendiente" ? 0 : taskProgress;
-      const r = await fetch(`${API_URL}/tasks/${editingTask.id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ status: taskStatus, progressPercent: progress, name: taskName, unit: taskUnit || null, quantity: taskQuantity || null }) });
+      const r = await fetch(`${API_URL}/tasks/${editingTask.id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ status: taskStatus, progressPercent: progress, name: taskName, unit: taskUnit || null, quantity: taskQuantity || null, fecha_ejecucion: taskFecha || null }) });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert("Error"); return; }
       setEditingTask(null); await loadTasks(selectedProject.id);
@@ -1223,6 +1224,9 @@ export default function App() {
               <input value={taskQuantity} onChange={e => setTaskQuantity(e.target.value)} placeholder="Cantidad (ej: 150)" style={{ ...inp, flex: 1, marginBottom: 0 }} />
               <input value={taskUnit} onChange={e => setTaskUnit(e.target.value)} placeholder="Unidad (m², ml, un...)" style={{ ...inp, flex: 1, marginBottom: 0 }} />
             </div>
+            <div style={{ color: C.muted, fontSize: 11, fontWeight: 700, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Fecha de ejecución</div>
+            <input type="date" value={taskFecha} onChange={e => setTaskFecha(e.target.value)} style={{ ...inp, marginBottom: 4 }} />
+            <div style={{ fontSize: 10, color: C.muted, marginBottom: 14 }}>Día en que se ejecutó la partida en terreno. Es la fecha que sale en el informe y en la bitácora.</div>
             <div style={{ color: C.muted, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Estado</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
               {STATUS_OPTIONS.map(s => (
@@ -1696,7 +1700,7 @@ export default function App() {
                             <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: C.orange, color: "#fff", fontSize: 9, fontWeight: 800, width: 16, height: 16, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center" }}>{task.photo_count}</span>
                           )}
                         </button>
-                        <button onClick={() => { setEditingTask(task); setTaskStatus(task.status || "pendiente"); setTaskProgress(Number(task.progress_percent || 0)); setTaskName(task.name || ""); setTaskUnit(task.unit || ""); setTaskQuantity(task.quantity || ""); }} style={{ width: 38, height: 38, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>✏️</button>
+                        <button onClick={() => { setEditingTask(task); setTaskStatus(task.status || "pendiente"); setTaskProgress(Number(task.progress_percent || 0)); setTaskName(task.name || ""); setTaskUnit(task.unit || ""); setTaskQuantity(task.quantity || ""); setTaskFecha(task.fecha_ejecucion ? String(task.fecha_ejecucion).slice(0, 10) : ""); }} style={{ width: 38, height: 38, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>✏️</button>
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
