@@ -12,7 +12,7 @@ const C = {
   info: "#2563EB", infoDim: "#EFF6FF", purple: "#7C3AED", purpleDim: "#F5F3FF",
 };
 
-type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones" | "rendiciones" | "facturacion" | "estadoResultado";
+type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones" | "rendiciones" | "facturacion" | "estadoResultado" | "charlas";
 type Rendicion = { id: string; worker_name: string; worker_email?: string; date: string; boleta_date?: string; boleta_number?: string; amount: number; vendor: string; description: string; rut_vendor?: string; category: string; image_data?: string; onedrive_url?: string; onedrive_path?: string; cost_center_id?: string; cost_center_name?: string; cost_center_code?: string; tipo?: string; doc_firmado_data?: string; doc_firmado_onedrive_url?: string; reembolso_status?: string; folio?: number; status: string; submitted_at?: string; created_at: string };
 type Quotation = { id: string; client_name?: string; client_rut?: string; reference?: string; status: string; nubox_doc_number_services?: string; nubox_doc_number_materials?: string; total_services: number; total_materials: number; source_type: string; created_at: string; created_by_name?: string };
 type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
@@ -243,7 +243,6 @@ export default function App() {
   const [subiendoVisita, setSubiendoVisita] = useState(false);
   const [visitaResultado, setVisitaResultado] = useState<any>(null);
   const mediaRec = useRef<MediaRecorder | null>(null);
-  const [showCharla, setShowCharla] = useState(false);
   const [charlaFoto, setCharlaFoto] = useState<File | null>(null);
   const [charlaNotas, setCharlaNotas] = useState("");
   const [subiendoCharla, setSubiendoCharla] = useState(false);
@@ -632,27 +631,27 @@ export default function App() {
     }
   }
 
-  async function loadCharlas(projectId: string) {
+  async function loadCharlas() {
     try {
-      const r = await fetch(`${API_URL}/projects/${projectId}/charlas`, { headers: { Authorization: `Bearer ${token}` } });
+      const r = await fetch(`${API_URL}/charlas`, { headers: { Authorization: `Bearer ${token}` } });
       const d = await r.json();
       setCharlas(d.items || []);
     } catch { setCharlas([]); }
   }
 
   async function subirCharla() {
-    if (!selectedProject || !charlaFoto) return;
+    if (!charlaFoto) return;
     setSubiendoCharla(true);
     try {
       const comprimida = await compressImage(charlaFoto);
       const fd = new FormData();
       fd.append("photo", comprimida);
       if (charlaNotas.trim()) fd.append("notas", charlaNotas.trim());
-      const r = await fetch(`${API_URL}/projects/${selectedProject.id}/charla`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+      const r = await fetch(`${API_URL}/charlas`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert(d.message || "Error subiendo la charla"); return; }
       setCharlaFoto(null); setCharlaNotas("");
-      await loadCharlas(selectedProject.id);
+      await loadCharlas();
     } catch { alert("Error de conexión"); } finally { setSubiendoCharla(false); }
   }
 
@@ -1578,62 +1577,6 @@ export default function App() {
                 📊 Excel
               </button>
             </div>
-
-            {/* Charla diaria de seguridad */}
-            <button onClick={() => { const v = !showCharla; setShowCharla(v); if (v && selectedProject) loadCharlas(selectedProject.id); }} style={{ width: "100%", height: 44, marginBottom: 10, backgroundColor: showCharla ? C.orangeDim : C.cardAlt, border: `0.5px solid ${showCharla ? C.orange : C.border}`, borderRadius: 10, color: showCharla ? C.orange : C.mutedSoft, fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
-              📋 Charla diaria de seguridad
-            </button>
-
-            {showCharla && (() => {
-              const hoy = new Date().toLocaleDateString("en-CA");
-              const deHoy = charlas.find(c => String(c.fecha).slice(0, 10) === hoy);
-              return (
-                <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
-                  {deHoy ? (
-                    <div style={{ backgroundColor: C.successDim, border: `0.5px solid ${C.success}40`, borderRadius: 10, padding: 12, marginBottom: 12 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: C.success }}>✓ Charla de hoy registrada</div>
-                      <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Subida por {deHoy.subida_por || "—"}. Puedes reemplazarla subiendo otra foto.</div>
-                    </div>
-                  ) : (
-                    <div style={{ backgroundColor: C.dangerDim, border: `0.5px solid ${C.danger}40`, borderRadius: 10, padding: 12, marginBottom: 12 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: C.danger }}>Falta la charla de hoy</div>
-                      <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Si no se sube antes de las 13:00 se envía un aviso por WhatsApp.</div>
-                    </div>
-                  )}
-
-                  <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                    <label style={{ flex: 1, height: 40, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                      📷 Tomar foto
-                      <input type="file" accept="image/*" capture="environment" onChange={e => setCharlaFoto(e.target.files?.[0] || null)} style={{ display: "none" }} />
-                    </label>
-                    <label style={{ flex: 1, height: 40, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                      📁 Subir
-                      <input type="file" accept="image/*" onChange={e => setCharlaFoto(e.target.files?.[0] || null)} style={{ display: "none" }} />
-                    </label>
-                  </div>
-                  {charlaFoto && <div style={{ fontSize: 11, color: C.success, marginBottom: 10 }}>{charlaFoto.name}</div>}
-                  <input value={charlaNotas} onChange={e => setCharlaNotas(e.target.value)} placeholder="Tema tratado (opcional)" style={{ ...inp, marginBottom: 10 }} />
-                  <button onClick={subirCharla} disabled={!charlaFoto || subiendoCharla} style={{ width: "100%", height: 44, backgroundColor: !charlaFoto ? C.cardAlt : C.orange, border: "none", borderRadius: 10, color: !charlaFoto ? C.muted : "#fff", fontWeight: 700, fontSize: 13, cursor: !charlaFoto ? "default" : "pointer" }}>
-                    {subiendoCharla ? "Subiendo..." : "Registrar charla"}
-                  </button>
-
-                  {charlas.length > 0 && (
-                    <div style={{ marginTop: 14, paddingTop: 12, borderTop: `0.5px solid ${C.border}` }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Últimas charlas</div>
-                      {charlas.slice(0, 10).map(c => (
-                        <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `0.5px solid ${C.border}40` }}>
-                          <div>
-                            <div style={{ fontSize: 12, color: C.text }}>{String(c.fecha).slice(8, 10)}-{String(c.fecha).slice(5, 7)}-{String(c.fecha).slice(0, 4)}</div>
-                            {c.notas && <div style={{ fontSize: 10, color: C.muted }}>{c.notas}</div>}
-                          </div>
-                          <div style={{ fontSize: 10, color: C.muted }}>{c.subida_por || ""}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
 
             {/* Visita a terreno: video + nota de voz -> análisis de riesgo */}
             <button onClick={() => setShowVisita(!showVisita)} style={{ width: "100%", height: 44, marginBottom: 14, backgroundColor: showVisita ? C.orangeDim : C.cardAlt, border: `0.5px solid ${showVisita ? C.orange : C.border}`, borderRadius: 10, color: showVisita ? C.orange : C.mutedSoft, fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
@@ -3283,6 +3226,70 @@ export default function App() {
       {/* ── PANTALLA ESTADO DE RESULTADO ──────────────────────────────────────── */}
       {screen === "estadoResultado" && canSeeEstadoResultado && <EstadoResultadoScreen token={token!} isAdmin={isAdmin} />}
 
+      {screen === "charlas" && (() => {
+        const hoy = new Date().toLocaleDateString("en-CA");
+        const deHoy = charlas.find(c => String(c.fecha).slice(0, 10) === hoy);
+        return (
+          <div style={{ padding: "16px 16px 90px" }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: C.text, marginBottom: 4 }}>Charla diaria</div>
+            <div style={{ fontSize: 12, color: C.muted, marginBottom: 16 }}>Registro de la charla de seguridad. Una por día para toda la cuadrilla.</div>
+
+            {deHoy ? (
+              <div style={{ backgroundColor: C.successDim, border: `0.5px solid ${C.success}40`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.success }}>✓ Charla de hoy registrada</div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Subida por {deHoy.subida_por || "—"}. Puedes reemplazarla subiendo otra foto.</div>
+              </div>
+            ) : (
+              <div style={{ backgroundColor: C.dangerDim, border: `0.5px solid ${C.danger}40`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.danger }}>Falta la charla de hoy</div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Si no se sube antes de las 13:00 se envía un aviso por WhatsApp.</div>
+              </div>
+            )}
+
+            <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 14, marginBottom: 16 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <label style={{ flex: 1, height: 42, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                  📷 Tomar foto
+                  <input type="file" accept="image/*" capture="environment" onChange={e => setCharlaFoto(e.target.files?.[0] || null)} style={{ display: "none" }} />
+                </label>
+                <label style={{ flex: 1, height: 42, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                  📁 Subir
+                  <input type="file" accept="image/*" onChange={e => setCharlaFoto(e.target.files?.[0] || null)} style={{ display: "none" }} />
+                </label>
+              </div>
+              {charlaFoto && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: C.cardAlt, borderRadius: 8, padding: "8px 10px", marginBottom: 10 }}>
+                  <span style={{ fontSize: 11, color: C.success, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{charlaFoto.name}</span>
+                  <button onClick={() => setCharlaFoto(null)} style={{ background: "none", border: "none", color: C.danger, fontSize: 16, cursor: "pointer", padding: "0 4px" }}>✕</button>
+                </div>
+              )}
+              <input value={charlaNotas} onChange={e => setCharlaNotas(e.target.value)} placeholder="Tema tratado (opcional)" style={{ ...inp, marginBottom: 10 }} />
+              <button onClick={subirCharla} disabled={!charlaFoto || subiendoCharla} style={{ width: "100%", height: 44, backgroundColor: !charlaFoto ? C.cardAlt : C.orange, border: "none", borderRadius: 10, color: !charlaFoto ? C.muted : "#fff", fontWeight: 700, fontSize: 13, cursor: !charlaFoto ? "default" : "pointer" }}>
+                {subiendoCharla ? "Subiendo..." : "Registrar charla"}
+              </button>
+            </div>
+
+            {charlas.length > 0 && (
+              <>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Historial</div>
+                {charlas.map(c => (
+                  <div key={c.id} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 10, padding: 12, marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{String(c.fecha).slice(8, 10)}-{String(c.fecha).slice(5, 7)}-{String(c.fecha).slice(0, 4)}</div>
+                      {c.notas && <div style={{ fontSize: 11, color: C.mutedSoft, marginTop: 2 }}>{c.notas}</div>}
+                      <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>{c.subida_por || ""}</div>
+                    </div>
+                    <button onClick={async () => { if (!confirm("¿Eliminar esta charla?")) return; await fetch(`${API_URL}/charlas/${c.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); await loadCharlas(); }} style={{ width: 32, height: 32, backgroundColor: C.dangerDim, border: "none", borderRadius: 8, cursor: "pointer" }}>
+                      <Trash2 size={13} color={C.danger} />
+                    </button>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Nav inferior */}
       {/* Barra de navegación — sin botón Crear */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: C.card, borderTop: `0.5px solid ${C.border}`, display: "flex", padding: "6px 0 14px", zIndex: 100 }}>
@@ -3294,12 +3301,13 @@ export default function App() {
           ...(canSeeRendiciones ? [{ sc: "rendiciones" as Screen, icon: <Receipt size={19} />, label: "Rendir" }] : []),
           ...(canSeeFacturacion ? [{ sc: "facturacion" as Screen, icon: <Calculator size={19} />, label: "Facturar" }] : []),
           ...(canSeeEstadoResultado ? [{ sc: "estadoResultado" as Screen, icon: <TrendingUp size={19} />, label: "Resultado" }] : []),
+          { sc: "charlas" as Screen, icon: <CheckCircle2 size={19} />, label: "Charla" },
           ...(isAdmin ? [{ sc: "admin" as Screen, icon: <Shield size={19} />, label: "Admin" }] : []),
           { sc: "configuracion" as Screen, icon: <Av name={userName} size={20} />, label: "Perfil" },
         ] as { sc: Screen; icon: React.ReactNode; label: string }[]).map(({ sc, icon, label }) => {
           const active = screen === sc || (sc === "home" && (screen === "partidas" || screen === "fotos"));
           return (
-            <button key={sc} onClick={() => { setScreen(sc); if (sc === "gastos") { setGastosTab(canSeeGastosResumen ? "resumen" : "lista"); setExpenseSummary(null); setNuboxSummary(null); loadCostCenters(); loadExpenses(); loadNuboxSummary(); } }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", color: active ? C.orange : C.muted, padding: "2px 0" }}>
+            <button key={sc} onClick={() => { setScreen(sc); if (sc === "charlas") loadCharlas(); if (sc === "gastos") { setGastosTab(canSeeGastosResumen ? "resumen" : "lista"); setExpenseSummary(null); setNuboxSummary(null); loadCostCenters(); loadExpenses(); loadNuboxSummary(); } }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", color: active ? C.orange : C.muted, padding: "2px 0" }}>
               {icon}
               <span style={{ fontSize: 9, fontWeight: 600 }}>{label}</span>
             </button>
