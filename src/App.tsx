@@ -3300,7 +3300,7 @@ export default function App() {
           { sc: "home" as Screen, icon: <Home size={19} />, label: "Inicio" },
           { sc: "proyectos" as Screen, icon: <FolderOpen size={19} />, label: "Proyectos" },
           { sc: "charlas" as Screen, icon: <CheckCircle2 size={19} />, label: "Prevención" },
-          { sc: "configuracion" as Screen, icon: <Av name={userName} size={20} />, label: "Perfil" },
+          ...(canSeeGastos ? [{ sc: "gastos" as Screen, icon: <DollarSign size={19} />, label: "Gastos" }] : []),
         ] as { sc: Screen; icon: React.ReactNode; label: string }[]).map(({ sc, icon, label }) => {
           const active = screen === sc || (sc === "home" && (screen === "partidas" || screen === "fotos"));
           return (
@@ -3324,6 +3324,7 @@ export default function App() {
                 { sc: "facturacion" as Screen, icon: "🧮", label: "Facturación", sub: "Productos, inventario y OC", ver: canSeeFacturacion },
                 { sc: "estadoResultado" as Screen, icon: "📈", label: "Estado de Resultado", sub: "Márgenes por centro de costo", ver: canSeeEstadoResultado },
                 { sc: "admin" as Screen, icon: "👤", label: "Administración", sub: "Usuarios y permisos", ver: isAdmin },
+                { sc: "configuracion" as Screen, icon: "⚙️", label: "Mi perfil", sub: "Datos de la cuenta y cerrar sesión", ver: true },
               ]).filter(x => x.ver).map(({ sc, icon, label, sub }) => (
                 <button key={sc} onClick={() => { setMenuAbierto(false); setScreen(sc); if (sc === "charlas") loadCharlas(); if (sc === "gastos") { setGastosTab(canSeeGastosResumen ? "resumen" : "lista"); setExpenseSummary(null); setNuboxSummary(null); loadCostCenters(); loadExpenses(); loadNuboxSummary(); } }}
                   style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "14px 12px", marginBottom: 8, backgroundColor: screen === sc ? C.orangeDim : C.cardAlt, border: `0.5px solid ${screen === sc ? C.orange : C.border}`, borderRadius: 12, cursor: "pointer", textAlign: "left" }}>
