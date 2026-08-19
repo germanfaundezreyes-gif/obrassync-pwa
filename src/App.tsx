@@ -236,6 +236,13 @@ export default function App() {
   const [taskUnit, setTaskUnit] = useState("");
   const [taskQuantity, setTaskQuantity] = useState("");
   const [taskFecha, setTaskFecha] = useState("");
+  const [showVisita, setShowVisita] = useState(false);
+  const [visitaVideo, setVisitaVideo] = useState<File | null>(null);
+  const [visitaAudio, setVisitaAudio] = useState<File | null>(null);
+  const [grabandoAudio, setGrabandoAudio] = useState(false);
+  const [subiendoVisita, setSubiendoVisita] = useState(false);
+  const [visitaResultado, setVisitaResultado] = useState<any>(null);
+  const mediaRec = useRef<MediaRecorder | null>(null);
   const [savingTask, setSavingTask] = useState(false);
 
   const [users, setUsers] = useState<User[]>([]);
@@ -594,6 +601,57 @@ export default function App() {
       setTasks(d.tasks || []); setGanttFile(null); setShowGantt(false);
       alert(`✅ ${d.tasks?.length || 0} partidas importadas`);
     } catch { alert("Error"); } finally { setUploadingGantt(false); }
+  }
+
+  // Graba la nota de voz dentro de la app. El formato lo elige el navegador (m4a en
+  // Safari, webm en Chrome); Whisper acepta ambos, así que no se fuerza ninguno.
+  async function toggleGrabacion() {
+    if (grabandoAudio) { mediaRec.current?.stop(); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      const trozos: BlobPart[] = [];
+      rec.ondataavailable = e => { if (e.data.size) trozos.push(e.data); };
+      rec.onstop = () => {
+        stream.getTracks().forEach(t => t.stop());
+        const tipo = rec.mimeType || "audio/webm";
+        const ext = tipo.includes("mp4") ? "m4a" : tipo.includes("ogg") ? "ogg" : "webm";
+        setVisitaAudio(new File([new Blob(trozos, { type: tipo })], `nota_voz.${ext}`, { type: tipo }));
+        setGrabandoAudio(false);
+      };
+      mediaRec.current = rec;
+      rec.start();
+      setGrabandoAudio(true);
+    } catch {
+      alert("No se pudo acceder al micrófono. Revisa los permisos del navegador.");
+    }
+  }
+
+  async function subirVisita() {
+    if (!selectedProject || !visitaAudio) return;
+    setSubiendoVisita(true);
+    setVisitaResultado(null);
+    try {
+      const fd = new FormData();
+      fd.append("audio", visitaAudio);
+      if (visitaVideo) fd.append("video", visitaVideo);
+      const r = await fetch(`${API_URL}/projects/${selectedProject.id}/visitas`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { alert(d.message || "Error registrando la visita"); return; }
+      setVisitaResultado(d.visita);
+      setVisitaVideo(null); setVisitaAudio(null);
+    } catch { alert("Error de conexión"); } finally { setSubiendoVisita(false); }
+  }
+
+  async function aprobarVisita(id: string) {
+    if (!confirm("¿Enviar este análisis a prevención? Se manda con el video y el audio adjuntos.")) return;
+    try {
+      const r = await fetch(`${API_URL}/visitas/${id}/aprobar`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
+      alert(`Enviado a prevención (${d.adjuntos} adjuntos).`);
+      setVisitaResultado(null); setShowVisita(false);
+    } catch { alert("Error"); }
   }
 
   async function saveTask() {
@@ -1491,6 +1549,61 @@ export default function App() {
                 📊 Excel
               </button>
             </div>
+
+            {/* Visita a terreno: video + nota de voz -> análisis de riesgo */}
+            <button onClick={() => setShowVisita(!showVisita)} style={{ width: "100%", height: 44, marginBottom: 14, backgroundColor: showVisita ? C.orangeDim : C.cardAlt, border: `0.5px solid ${showVisita ? C.orange : C.border}`, borderRadius: 10, color: showVisita ? C.orange : C.mutedSoft, fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
+              🦺 Visita a terreno · Prevención
+            </button>
+
+            {showVisita && (
+              <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 12, lineHeight: 1.5 }}>
+                  Graba o sube un video de la obra y una nota de voz describiendo las condiciones. La IA transcribe el audio y genera el análisis de riesgo, que queda en borrador hasta que lo revises.
+                </div>
+
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Video {visitaVideo ? "✓" : "(opcional)"}</div>
+                <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                  <label style={{ flex: 1, height: 40, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                    🎥 Grabar
+                    <input type="file" accept="video/*" capture="environment" onChange={e => setVisitaVideo(e.target.files?.[0] || null)} style={{ display: "none" }} />
+                  </label>
+                  <label style={{ flex: 1, height: 40, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                    📁 Subir
+                    <input type="file" accept="video/*" onChange={e => setVisitaVideo(e.target.files?.[0] || null)} style={{ display: "none" }} />
+                  </label>
+                </div>
+                {visitaVideo && <div style={{ fontSize: 11, color: C.success, marginTop: -8, marginBottom: 12 }}>{visitaVideo.name} · {(visitaVideo.size / 1048576).toFixed(1)} MB</div>}
+
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Nota de voz {visitaAudio ? "✓" : "(obligatoria)"}</div>
+                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                  <button onClick={toggleGrabacion} style={{ flex: 1, height: 40, backgroundColor: grabandoAudio ? C.dangerDim : C.cardAlt, border: `0.5px solid ${grabandoAudio ? C.danger : C.border}`, borderRadius: 10, color: grabandoAudio ? C.danger : C.text, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    {grabandoAudio ? "⏹ Detener" : "🎙 Grabar"}
+                  </button>
+                  <label style={{ flex: 1, height: 40, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                    📁 Subir
+                    <input type="file" accept="audio/*" onChange={e => setVisitaAudio(e.target.files?.[0] || null)} style={{ display: "none" }} />
+                  </label>
+                </div>
+                {visitaAudio && <div style={{ fontSize: 11, color: C.success, marginBottom: 12 }}>{visitaAudio.name} · {(visitaAudio.size / 1024).toFixed(0)} KB</div>}
+
+                <button onClick={subirVisita} disabled={!visitaAudio || subiendoVisita} style={{ width: "100%", height: 44, marginTop: 6, backgroundColor: !visitaAudio ? C.cardAlt : C.orange, border: "none", borderRadius: 10, color: !visitaAudio ? C.muted : "#fff", fontWeight: 700, fontSize: 13, cursor: !visitaAudio ? "default" : "pointer" }}>
+                  {subiendoVisita ? "Transcribiendo y analizando..." : "Generar análisis"}
+                </button>
+
+                {visitaResultado && (
+                  <div style={{ marginTop: 14, paddingTop: 14, borderTop: `0.5px solid ${C.border}` }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Transcripción</div>
+                    <div style={{ fontSize: 12, color: C.mutedSoft, fontStyle: "italic", lineHeight: 1.5, marginBottom: 12, maxHeight: 120, overflowY: "auto" }}>{visitaResultado.transcripcion}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Análisis (borrador)</div>
+                    <div style={{ fontSize: 12, color: C.text, lineHeight: 1.5, whiteSpace: "pre-wrap", marginBottom: 12, maxHeight: 260, overflowY: "auto" }}>{visitaResultado.analisis}</div>
+                    <button onClick={() => aprobarVisita(visitaResultado.id)} style={{ width: "100%", height: 44, backgroundColor: C.success, border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                      ✓ Aprobar y enviar a prevención
+                    </button>
+                    <div style={{ fontSize: 10, color: C.muted, marginTop: 6, textAlign: "center" }}>Revisa el análisis antes de enviarlo. Se manda con el video y el audio adjuntos.</div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Notificaciones al cliente: inicio y término de trabajos */}
             <div style={{ display: "flex", gap: 8, marginBottom: notifyPanel ? 8 : 14 }}>
