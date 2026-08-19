@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Shield, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle, Receipt, Calculator, TrendingUp } from "lucide-react";
+import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle } from "lucide-react";
 import FacturacionScreen from "./Facturacion";
 
 const API_URL = "https://obrassync-backend-production.up.railway.app";
@@ -247,6 +247,7 @@ export default function App() {
   const [charlaNotas, setCharlaNotas] = useState("");
   const [subiendoCharla, setSubiendoCharla] = useState(false);
   const [charlas, setCharlas] = useState<any[]>([]);
+  const [menuAbierto, setMenuAbierto] = useState(false);
   const [savingTask, setSavingTask] = useState(false);
 
   const [users, setUsers] = useState<User[]>([]);
@@ -3293,16 +3294,12 @@ export default function App() {
       {/* Nav inferior */}
       {/* Barra de navegación — sin botón Crear */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: C.card, borderTop: `0.5px solid ${C.border}`, display: "flex", padding: "6px 0 14px", zIndex: 100 }}>
+        {/* Barra corta: sólo lo de uso diario. El resto vive en el menú, que además
+            se filtra por permisos, así nadie ve módulos que no puede abrir. */}
         {([
           { sc: "home" as Screen, icon: <Home size={19} />, label: "Inicio" },
           { sc: "proyectos" as Screen, icon: <FolderOpen size={19} />, label: "Proyectos" },
-          ...(canSeeGastos ? [{ sc: "gastos" as Screen, icon: <DollarSign size={19} />, label: "Gastos" }] : []),
-          ...(canSeeCotizaciones ? [{ sc: "cotizaciones" as Screen, icon: <FileText size={19} />, label: "Cotizar" }] : []),
-          ...(canSeeRendiciones ? [{ sc: "rendiciones" as Screen, icon: <Receipt size={19} />, label: "Rendir" }] : []),
-          ...(canSeeFacturacion ? [{ sc: "facturacion" as Screen, icon: <Calculator size={19} />, label: "Facturar" }] : []),
-          ...(canSeeEstadoResultado ? [{ sc: "estadoResultado" as Screen, icon: <TrendingUp size={19} />, label: "Resultado" }] : []),
-          { sc: "charlas" as Screen, icon: <CheckCircle2 size={19} />, label: "Charla" },
-          ...(isAdmin ? [{ sc: "admin" as Screen, icon: <Shield size={19} />, label: "Admin" }] : []),
+          { sc: "charlas" as Screen, icon: <CheckCircle2 size={19} />, label: "Prevención" },
           { sc: "configuracion" as Screen, icon: <Av name={userName} size={20} />, label: "Perfil" },
         ] as { sc: Screen; icon: React.ReactNode; label: string }[]).map(({ sc, icon, label }) => {
           const active = screen === sc || (sc === "home" && (screen === "partidas" || screen === "fotos"));
@@ -3313,6 +3310,40 @@ export default function App() {
             </button>
           );
         })}
+        {menuAbierto && (
+          <>
+            <div onClick={() => setMenuAbierto(false)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.45)", zIndex: 200 }} />
+            <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, backgroundColor: C.card, borderRadius: "20px 20px 0 0", zIndex: 201, padding: "10px 16px 24px", maxHeight: "82vh", overflowY: "auto", boxShadow: "0 -8px 30px rgba(0,0,0,0.25)" }}>
+              <div style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, margin: "0 auto 16px" }} />
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 14 }}>Módulos</div>
+              {([
+                { sc: "charlas" as Screen, icon: "🦺", label: "Prevención de riesgos", sub: "Charla diaria y visitas a terreno", ver: true },
+                { sc: "gastos" as Screen, icon: "💳", label: "Gastos", sub: "Registrar y revisar gastos", ver: canSeeGastos },
+                { sc: "rendiciones" as Screen, icon: "🧾", label: "Rendiciones", sub: "Subir boletas y rendir", ver: canSeeRendiciones },
+                { sc: "cotizaciones" as Screen, icon: "📋", label: "Cotizaciones", sub: "Cotizar en Nubox", ver: canSeeCotizaciones },
+                { sc: "facturacion" as Screen, icon: "🧮", label: "Facturación", sub: "Productos, inventario y OC", ver: canSeeFacturacion },
+                { sc: "estadoResultado" as Screen, icon: "📈", label: "Estado de Resultado", sub: "Márgenes por centro de costo", ver: canSeeEstadoResultado },
+                { sc: "admin" as Screen, icon: "👤", label: "Administración", sub: "Usuarios y permisos", ver: isAdmin },
+              ]).filter(x => x.ver).map(({ sc, icon, label, sub }) => (
+                <button key={sc} onClick={() => { setMenuAbierto(false); setScreen(sc); if (sc === "charlas") loadCharlas(); if (sc === "gastos") { setGastosTab(canSeeGastosResumen ? "resumen" : "lista"); setExpenseSummary(null); setNuboxSummary(null); loadCostCenters(); loadExpenses(); loadNuboxSummary(); } }}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "14px 12px", marginBottom: 8, backgroundColor: screen === sc ? C.orangeDim : C.cardAlt, border: `0.5px solid ${screen === sc ? C.orange : C.border}`, borderRadius: 12, cursor: "pointer", textAlign: "left" }}>
+                  <span style={{ fontSize: 22 }}>{icon}</span>
+                  <span style={{ flex: 1 }}>
+                    <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: screen === sc ? C.orange : C.text }}>{label}</span>
+                    <span style={{ display: "block", fontSize: 11, color: C.muted, marginTop: 1 }}>{sub}</span>
+                  </span>
+                  <span style={{ color: C.muted, fontSize: 18 }}>›</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        <button onClick={() => setMenuAbierto(true)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", color: menuAbierto ? C.orange : C.muted, padding: "2px 0" }}>
+          <div style={{ width: 19, height: 19, display: "flex", flexDirection: "column", justifyContent: "center", gap: 3 }}>
+            {[0, 1, 2].map(i => <div key={i} style={{ height: 2, borderRadius: 2, backgroundColor: "currentColor" }} />)}
+          </div>
+          <span style={{ fontSize: 9, fontWeight: 600 }}>Menú</span>
+        </button>
       </div>
 
       {/* Botón Crear flotante y arrastrable — oculto en Estado de Resultado: no hay nada que "crear" ahí y tapaba los montos de margen al hacer scroll */}
