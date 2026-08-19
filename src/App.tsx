@@ -318,6 +318,21 @@ export default function App() {
     } finally { setPushCargando(false); }
   };
 
+  // Envía una notificación solo a los dispositivos de quien la pide, para comprobar
+  // que el permiso quedó realmente concedido en este teléfono.
+  const probarPush = async () => {
+    setPushCargando(true);
+    try {
+      const r = await fetch(`${API_URL}/push/test`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      setPushMsg(d.enviados > 0
+        ? `✅ Enviada a ${d.enviados} dispositivo${d.enviados === 1 ? "" : "s"}. Debería aparecer en unos segundos.`
+        : `❌ No hay dispositivos suscritos${d.motivo ? ": " + d.motivo : "."}`);
+    } catch (e) {
+      setPushMsg("❌ " + (e as Error).message);
+    } finally { setPushCargando(false); }
+  };
+
   const desactivarPush = async () => {
     setPushCargando(true);
     try {
@@ -3481,6 +3496,12 @@ export default function App() {
                         : "Avisos de charla diaria y recepción conforme"}
                     </span>
                   </span>
+                  {pushEstado === "on" && (
+                    <button onClick={probarPush} disabled={pushCargando}
+                      style={{ padding: "8px 12px", marginRight: 6, borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: pushCargando ? "default" : "pointer", border: `1px solid ${C.border}`, backgroundColor: C.cardAlt, color: C.text, opacity: pushCargando ? 0.6 : 1 }}>
+                      Probar
+                    </button>
+                  )}
                   {(pushEstado === "on" || pushEstado === "off") && (
                     <button onClick={pushEstado === "on" ? desactivarPush : activarPush} disabled={pushCargando}
                       style={{ padding: "8px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: pushCargando ? "default" : "pointer", border: `1px solid ${pushEstado === "on" ? C.border : C.orange}`, backgroundColor: pushEstado === "on" ? C.cardAlt : C.orange, color: pushEstado === "on" ? C.text : "#fff", opacity: pushCargando ? 0.6 : 1 }}>
