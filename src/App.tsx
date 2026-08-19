@@ -30,15 +30,16 @@ type ExpenseSummary = { month: string; totals: { total: number; neto: number; iv
 type SiiFactura = { folio: number; rut_emisor: string; razon_social: string; fecha: string; monto_neto: number; monto_iva: number; monto_total: number; tipo_dte: number; expense_id?: string; cost_center_id?: string };
 
 const EXPENSE_CATEGORIES = [
-  { value: "materiales", label: "Materiales", icon: "🧱" },
-  { value: "mano_obra", label: "Mano de obra", icon: "👷" },
-  { value: "combustible", label: "Combustible", icon: "⛽" },
-  { value: "herramientas", label: "Herramientas", icon: "🔧" },
-  { value: "transporte", label: "Transporte", icon: "🚛" },
-  { value: "subcontrato", label: "Subcontrato", icon: "📋" },
-  { value: "admin", label: "Administración", icon: "🏢" },
-  { value: "otros", label: "Otros", icon: "📦" },
+  { value: "materiales", label: "Materiales", icon: "", color: "#B45309" },
+  { value: "mano_obra", label: "Mano de obra", icon: "", color: "#1D4ED8" },
+  { value: "combustible", label: "Combustible", icon: "", color: "#B91C1C" },
+  { value: "herramientas", label: "Herramientas", icon: "", color: "#6D28D9" },
+  { value: "transporte", label: "Transporte", icon: "", color: "#0E7490" },
+  { value: "subcontrato", label: "Subcontrato", icon: "", color: "#15803D" },
+  { value: "admin", label: "Administración", icon: "", color: "#4B5563" },
+  { value: "otros", label: "Otros", icon: "", color: "#9CA3AF" },
 ];
+const colorCategoria = (v?: string) => EXPENSE_CATEGORIES.find(c => c.value === v)?.color || "#9CA3AF";
 // Intl con es-CL entrega "$-52.485.416", con el signo entre el peso y la cifra, que se
 // lee como error tipográfico. En contabilidad chilena el menos va delante del símbolo.
 const fmtCLP = (n: number) => {
@@ -1236,7 +1237,7 @@ export default function App() {
         {loginView === "reset" && (
           resetDone ? (
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+              <div style={{ marginBottom: 12, display: "flex", justifyContent: "center" }}><CheckCircle2 size={40} color={C.success} /></div>
               <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 8 }}>Contraseña actualizada</div>
               <div style={{ fontSize: 13, color: C.muted, marginBottom: 24 }}>Ya puedes ingresar con tu nueva contraseña</div>
               <button onClick={() => setLoginView("login")} style={btnPrimary}>Ir al inicio de sesión</button>
@@ -1499,7 +1500,7 @@ export default function App() {
                   <div style={{ width: 36, height: 36, background: C.orangeDim, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}><FolderOpen size={18} color={C.orange} /></div>
                   {(kpis?.proyectos.atrasados || 0) > 0 && <div style={{ background: C.dangerDim, border: `0.5px solid ${C.danger}`, borderRadius: 6, padding: "2px 7px", fontSize: 10, color: C.danger, fontWeight: 700 }}>{kpis?.proyectos.atrasados} atrasados</div>}
                 </div>
-                <div style={{ fontSize: 28, fontWeight: 800, color: C.orange, marginTop: 10 }}>{kpis?.proyectos.total ?? projects.length}</div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: C.text, marginTop: 10 }}>{kpis?.proyectos.total ?? projects.length}</div>
                 <div style={{ fontSize: 11, color: C.mutedSoft, marginTop: 2 }}>Proyectos activos</div>
                 <div style={{ height: 3, background: C.border, borderRadius: 99, marginTop: 8, overflow: "hidden" }}>
                   <div style={{ width: `${kpis?.proyectos.avg_progress || 0}%`, height: "100%", background: C.orange, borderRadius: 99 }} />
@@ -1509,7 +1510,7 @@ export default function App() {
 
               <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
                 <div style={{ width: 36, height: 36, background: C.infoDim, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}><BarChart2 size={18} color={C.info} /></div>
-                <div style={{ fontSize: 28, fontWeight: 800, color: C.info, marginTop: 10 }}>{kpis?.tareas.en_curso ?? 0}</div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: C.text, marginTop: 10 }}>{kpis?.tareas.en_curso ?? 0}</div>
                 <div style={{ fontSize: 11, color: C.mutedSoft, marginTop: 2 }}>{(kpis?.tareas.en_curso || 0) === 1 ? "Partida en curso" : "Partidas en curso"}</div>
                 <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                   <div style={{ background: C.successDim, borderRadius: 5, padding: "2px 7px", fontSize: 10, color: C.success }}><CheckCircle2 size={9} style={{ marginRight: 3 }} />{kpis?.tareas.completadas ?? 0} ok</div>
@@ -1519,14 +1520,14 @@ export default function App() {
 
               <div style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
                 <div style={{ width: 36, height: 36, background: C.successDim, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}><Image size={18} color={C.success} /></div>
-                <div style={{ fontSize: 28, fontWeight: 800, color: C.success, marginTop: 10 }}>{kpis?.fotos.total ?? 0}</div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: C.text, marginTop: 10 }}>{kpis?.fotos.total ?? 0}</div>
                 <div style={{ fontSize: 11, color: C.mutedSoft, marginTop: 2 }}>Fotos registradas</div>
                 <div style={{ fontSize: 10, color: C.muted, marginTop: 6 }}>En todos los proyectos</div>
               </div>
 
               <div onClick={() => setScreen("gastos")} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 16, padding: 16, cursor: "pointer" }}>
                 <div style={{ width: 36, height: 36, background: C.purpleDim, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}><DollarSign size={18} color={C.purple} /></div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: C.purple, marginTop: 10 }}>{canSeeMontos ? (kpis ? fmtCLP(kpis.gastos.total_mes) : "$0") : "••••••"}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: C.text, marginTop: 10 }}>{canSeeMontos ? (kpis ? fmtCLP(kpis.gastos.total_mes) : "$0") : "••••••"}</div>
                 <div style={{ fontSize: 11, color: C.mutedSoft, marginTop: 2 }}>Gastos este mes</div>
                 <div style={{ fontSize: 10, color: C.orange, marginTop: 6 }}>Ver detalle →</div>
               </div>
@@ -1967,7 +1968,7 @@ export default function App() {
                     {[...activos].sort((a, b) => label === "Mantenimiento" ? (a.client_name || "zzz").localeCompare(b.client_name || "zzz") : 0).map((p, i, arr) => (
                       <React.Fragment key={p.id}>
                         {label === "Mantenimiento" && (i === 0 || (arr[i - 1].client_name || "") !== (p.client_name || "")) && (
-                          <div style={{ fontSize: 11, fontWeight: 800, color: C.orange, marginTop: 8, paddingTop: 6, borderTop: `0.5px solid ${C.border}` }}>🏢 {p.client_name || "Sin cliente"}</div>
+                          <div style={{ fontSize: 11, fontWeight: 800, color: C.orange, marginTop: 8, paddingTop: 6, borderTop: `0.5px solid ${C.border}` }}>{p.client_name || "Sin cliente"}</div>
                         )}
                         <div onClick={() => { setSelectedProject(p); setScreen("partidas"); }} style={{ padding: "8px 0", borderTop: label === "Mantenimiento" ? "none" : `0.5px solid ${C.border}`, cursor: "pointer" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -2079,7 +2080,7 @@ export default function App() {
                       {isFinished && <span style={{ fontSize: 10, fontWeight: 700, color: C.muted, backgroundColor: C.cardAlt, borderRadius: 6, padding: "2px 8px" }}>Terminado</span>}
                     </div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{p.name}</div>
-                    <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{p.client_name || "Sin cliente"}</div>
+                    {projTab !== "mantenimiento" && <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{p.client_name || "Sin cliente"}</div>}
                     {(p.jefe_name || p.supervisor_name) && (
                       <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
                         {p.jefe_name && `Jefe: ${p.jefe_name}`}{p.jefe_name && p.supervisor_name && " · "}{p.supervisor_name && `Supervisor: ${p.supervisor_name}`}
@@ -2468,7 +2469,7 @@ export default function App() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
                   {EXPENSE_CATEGORIES.map(cat => (
                     <button key={cat.value} onClick={() => setExpCategory(cat.value)} style={{ padding: "10px 8px", backgroundColor: expCategory === cat.value ? C.orangeDim : C.cardAlt, border: `0.5px solid ${expCategory === cat.value ? C.orange : C.border}`, borderRadius: 10, color: expCategory === cat.value ? C.orange : C.mutedSoft, fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-                      <span>{cat.icon}</span>{cat.label}
+                      <span style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: cat.color, display: "inline-block" }} />{cat.label}
                     </button>
                   ))}
                 </div>
@@ -2818,10 +2819,10 @@ export default function App() {
                       <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 16 }}>Por categoría</div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                         {expenseSummary.byCategory.map((row, i) => {
-                          const cat = EXPENSE_CATEGORIES.find(c => c.value === row.category) || { icon: "📦", label: row.category };
+                          const cat = EXPENSE_CATEGORIES.find(c => c.value === row.category) || { label: row.category, color: colorCategoria(row.category) };
                           return (
                             <div key={i} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 12 }}>
-                              <div style={{ fontSize: 18, marginBottom: 4 }}>{cat.icon}</div>
+                              <div style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: cat.color, marginBottom: 8 }} />
                               <div style={{ fontSize: 11, color: C.muted }}>{cat.label}</div>
                               <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginTop: 2 }}>{fmtCLP(row.total)}</div>
                             </div>
@@ -2849,12 +2850,12 @@ export default function App() {
                 </div>
               )}
               {expenses.map(exp => {
-                const cat = EXPENSE_CATEGORIES.find(c => c.value === exp.category) || { icon: "📦", label: exp.category };
+                const cat = EXPENSE_CATEGORIES.find(c => c.value === exp.category) || { label: exp.category, color: colorCategoria(exp.category) };
                 return (
                   <div key={exp.id} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 8 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                       <div style={{ display: "flex", gap: 10, flex: 1, minWidth: 0 }}>
-                        <div style={{ width: 38, height: 38, background: C.cardAlt, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{cat.icon}</div>
+                        <div style={{ width: 38, height: 38, background: cat.color + "1A", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><span style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: cat.color }} /></div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 600 }}>{exp.supplier_name || cat.label}</div>
                           <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{exp.project_name || exp.cost_center_name || "Sin asignación"}</div>
@@ -2894,7 +2895,7 @@ export default function App() {
                 <input value={siiRut} onChange={e => setSiiRut(e.target.value)} placeholder="RUT empresa (ej: 76982672-6)" style={{ ...inp }} />
                 <input ref={siiP12Ref} type="file" accept=".p12,.pfx" style={{ display: "none" }} onChange={e => setSiiP12File(e.target.files?.[0] || null)} />
                 <button onClick={() => siiP12Ref.current?.click()} style={{ width: "100%", height: 44, backgroundColor: C.cardAlt, border: `0.5px solid ${siiP12File ? C.success : C.border}`, borderRadius: 10, color: siiP12File ? C.success : C.mutedSoft, fontSize: 13, cursor: "pointer", marginBottom: 10 }}>
-                  {siiP12File ? `✅ ${siiP12File.name}` : "Seleccionar certificado .p12"}
+                  {siiP12File ? siiP12File.name : "Seleccionar certificado .p12"}
                 </button>
                 <input type="password" value={siiPassword} onChange={e => setSiiPassword(e.target.value)} placeholder="Clave del certificado .p12" style={{ ...inp }} />
                 <button onClick={uploadSiiCert} disabled={uploadingSii} style={{ ...btnPrimary, backgroundColor: siiConfigured ? C.cardAlt : C.orange, color: siiConfigured ? C.muted : "#fff" }}>{uploadingSii ? "Guardando..." : siiConfigured ? "Actualizar certificado" : "Guardar certificado SII"}</button>
@@ -2980,7 +2981,7 @@ export default function App() {
               {nuboxLoading && <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Cargando facturas Nubox...</div>}
               {nuboxError && (
                 <div style={{ backgroundColor: C.dangerDim, border: `0.5px solid ${C.danger}`, borderRadius: 12, padding: 14, marginBottom: 12, color: C.danger, fontSize: 13 }}>
-                  ❌ {nuboxError}
+                  {nuboxError}
                 </div>
               )}
               {!nuboxLoading && !nuboxError && (() => {
@@ -3036,7 +3037,7 @@ export default function App() {
                         </div>
                         {isAssigned && (
                           <div style={{ fontSize: 11, color: C.success, fontWeight: 600 }}>
-                            ✅ {assignedCC?.name || p.assigned.project_name || p.assigned.cc_name || "Asignado"}
+                            {assignedCC?.name || p.assigned.project_name || p.assigned.cc_name || "Asignado"}
                           </div>
                         )}
                         {hasDupe && !isAssigned && (
@@ -3630,7 +3631,7 @@ const fmtCLP = (n: number) => {
       </div>
 
       <div style={{ padding: 16 }}>
-        {msg && <div style={{ padding: "10px 14px", borderRadius: 8, backgroundColor: msg.startsWith("✅") ? C.successDim : C.dangerDim, color: msg.startsWith("✅") ? C.success : C.danger, fontSize: 13, marginBottom: 12 }}>{msg}</div>}
+        {msg && <div style={{ padding: "10px 14px", borderRadius: 8, backgroundColor: msg.startsWith("✅") ? C.successDim : C.dangerDim, color: msg.startsWith("✅") ? C.success : C.danger, fontSize: 13, marginBottom: 12 }}>{msg.replace(/^[✅❌⚠️]+\s*/, "")}</div>}
 
         {createResult && (
           <div style={{ backgroundColor: C.successDim, border: `1px solid ${C.success}`, borderRadius: 10, padding: 14, marginBottom: 12 }}>
@@ -4128,7 +4129,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
         </div>
       </div>
 
-      {msg && <div style={{ margin: "12px 16px 0", padding: "10px 14px", backgroundColor: msg.startsWith("✅") ? "#f0fdf4" : msg.startsWith("⚠️") ? "#fffbeb" : "#fef2f2", borderRadius: 8, fontSize: 13, color: msg.startsWith("✅") ? "#15803d" : msg.startsWith("⚠️") ? "#92400e" : "#dc2626" }}>{msg}</div>}
+      {msg && <div style={{ margin: "12px 16px 0", padding: "10px 14px", backgroundColor: msg.startsWith("✅") ? "#f0fdf4" : msg.startsWith("⚠️") ? "#fffbeb" : "#fef2f2", borderRadius: 8, fontSize: 13, color: msg.startsWith("✅") ? "#15803d" : msg.startsWith("⚠️") ? "#92400e" : "#dc2626" }}>{msg.replace(/^[✅❌⚠️]+\s*/, "")}</div>}
 
       {/* ─TAB: HISTORIAL ── */}
       {tab === "lista" && (
@@ -4281,7 +4282,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
                 {scanning ? (
                   <><div style={{ fontSize: 26, marginBottom: 4 }}>🔍</div><div>Analizando...</div></>
                 ) : imagePreview ? (
-                  <><div style={{ fontSize: 26, marginBottom: 4 }}>✅</div><div>Foto boleta</div><div style={{ fontSize: 10, marginTop: 2, opacity: 0.8 }}>Toca para cambiar</div></>
+                  <><div style={{ marginBottom: 4, display: "flex", justifyContent: "center" }}><CheckCircle2 size={24} /></div><div>Foto boleta</div><div style={{ fontSize: 10, marginTop: 2, opacity: 0.8 }}>Toca para cambiar</div></>
                 ) : (
                   <><div style={{ fontSize: 28, marginBottom: 4 }}>📷</div><div>Foto boleta</div><div style={{ fontSize: 10, marginTop: 2, opacity: 0.8 }}>La IA lee los datos</div></>
                 )}
@@ -4294,7 +4295,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
               <button onClick={() => docRef.current?.click()}
                 style={{ width: "100%", backgroundColor: docPreview ? "#16a34a" : C.orange, color: "#fff", border: "none", borderRadius: 14, padding: "18px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "center" }}>
                 {docPreview ? (
-                  <><div style={{ fontSize: 26, marginBottom: 4 }}>✅</div><div>Doc rendición</div><div style={{ fontSize: 10, marginTop: 2, opacity: 0.8 }}>Toca para cambiar</div></>
+                  <><div style={{ marginBottom: 4, display: "flex", justifyContent: "center" }}><CheckCircle2 size={24} /></div><div>Doc rendición</div><div style={{ fontSize: 10, marginTop: 2, opacity: 0.8 }}>Toca para cambiar</div></>
                 ) : (
                   <><div style={{ fontSize: 28, marginBottom: 4 }}>📄</div><div>Doc rendición</div><div style={{ fontSize: 10, marginTop: 2, opacity: 0.8 }}>Foto o PDF firmado</div></>
                 )}
