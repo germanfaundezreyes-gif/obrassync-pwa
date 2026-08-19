@@ -3316,7 +3316,11 @@ export default function App() {
             <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, backgroundColor: C.card, borderRadius: "20px 20px 0 0", zIndex: 201, padding: "10px 16px 24px", maxHeight: "82vh", overflowY: "auto", boxShadow: "0 -8px 30px rgba(0,0,0,0.25)" }}>
               <div style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, margin: "0 auto 16px" }} />
               <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 14 }}>Módulos</div>
+              {/* El menú lista todo, incluido lo que está en la barra: abajo son atajos,
+                  acá está el índice completo de lo que el usuario puede abrir. */}
               {([
+                { sc: "home" as Screen, icon: "🏠", label: "Inicio", sub: "Panel de control y resumen", ver: true },
+                { sc: "proyectos" as Screen, icon: "📁", label: "Proyectos", sub: "Obras, partidas y fotografías", ver: true },
                 { sc: "charlas" as Screen, icon: "🦺", label: "Prevención de riesgos", sub: "Charla diaria y visitas a terreno", ver: true },
                 { sc: "gastos" as Screen, icon: "💳", label: "Gastos", sub: "Registrar y revisar gastos", ver: canSeeGastos },
                 { sc: "rendiciones" as Screen, icon: "🧾", label: "Rendiciones", sub: "Subir boletas y rendir", ver: canSeeRendiciones },
