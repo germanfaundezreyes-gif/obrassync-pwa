@@ -1932,7 +1932,7 @@ export default function App() {
                 </div>
                 {staff.map(s => (
                   <div key={s.id} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: 12, marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 36, height: 36, background: s.role_type === "jefe" ? C.orangeDim : C.infoDim, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{s.role_type === "jefe" ? "👷" : "🛠"}</div>
+                    <div style={{ width: 36, height: 36, background: s.role_type === "jefe" ? C.orangeDim : C.infoDim, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{s.role_type === "jefe" ? "J" : "S"}</div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 600 }}>{s.name}</div>
                       <div style={{ fontSize: 11, color: C.muted }}>{s.role_type === "jefe" ? "Jefe a cargo" : "Supervisor (ingeniero)"}</div>
@@ -1947,15 +1947,15 @@ export default function App() {
             {/* Resumen */}
             {projTab === "resumen" && (() => {
               const base = projStaffFilter ? projects.filter(p => p.jefe_id === projStaffFilter || p.supervisor_id === projStaffFilter) : projects;
-              const grupos: [string, string, Project[]][] = [
-                ["🏗️", "Proyectos", base.filter(p => (p.project_type || "proyecto") === "proyecto")],
-                ["🔧", "Mantenimiento", base.filter(p => p.project_type === "mantenimiento")],
+              const grupos: [string, Project[]][] = [
+                ["Proyectos", base.filter(p => (p.project_type || "proyecto") === "proyecto")],
+                ["Mantenciones", base.filter(p => p.project_type === "mantenimiento")],
               ];
-              return grupos.map(([icon, label, items]) => {
+              return grupos.map(([label, items]) => {
                 const activos = items.filter(p => (p.status || "activo") === "activo");
                 return (
                   <div key={label} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 12 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>{icon} {label}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>{label}</div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
                       {[["Total", items.length, C.text], ["Activos", activos.length, C.success]].map(([l, v, c]) => (
                         <div key={String(l)} style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: 10, textAlign: "center" }}>
@@ -1973,7 +1973,7 @@ export default function App() {
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 12, fontWeight: 600 }}>{p.name}</div>
-                              <div style={{ fontSize: 10, color: C.muted }}>{p.jefe_name ? `👷 ${p.jefe_name}` : "Sin jefe"}{p.supervisor_name ? ` · 🛠 ${p.supervisor_name}` : ""}</div>
+                              <div style={{ fontSize: 10, color: C.muted }}>{p.jefe_name ? `Jefe: ${p.jefe_name}` : "Sin jefe"}{p.supervisor_name ? ` · Supervisor: ${p.supervisor_name}` : ""}</div>
                             </div>
                             <div style={{ fontSize: 12, fontWeight: 700, color: C.orange, flexShrink: 0 }}>{Math.round(+(p.progress_percent || 0))}%</div>
                           </div>
@@ -2005,8 +2005,8 @@ export default function App() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 12, fontWeight: 700, color: C.success }}>{p.name}</div>
                         <div style={{ fontSize: 10, color: C.muted }}>
-                          {p.project_type === "mantenimiento" ? "🔧" : "🏗️"} {p.client_name || "Sin cliente"}
-                          {p.jefe_name ? ` · 👷 ${p.jefe_name}` : ""}
+                          {p.client_name || "Sin cliente"}
+                          {p.jefe_name ? ` · ${p.jefe_name}` : ""}
                         </div>
                       </div>
                       <div style={{ fontSize: 10, fontWeight: 800, color: C.success, flexShrink: 0 }}>100% ✓</div>
@@ -2042,7 +2042,7 @@ export default function App() {
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 12, fontWeight: 700, color: isLate ? C.danger : "#b45309" }}>{pr.name}</div>
                             <div style={{ fontSize: 10, color: C.muted }}>
-                              {pr.project_type === "mantenimiento" ? "🔧" : "🏗️"} {pr.project_name}
+                              {pr.project_name}
                               {pr.end_date && ` · 🏁 ${fmtDate(pr.end_date)}`}
                             </div>
                           </div>
@@ -2495,7 +2495,7 @@ export default function App() {
                 </select>
                 <select value={expCostCenterId} onChange={e => setExpCostCenterId(e.target.value)} style={{ ...inp }}>
                   <option value="">Sin centro de costo</option>
-                  {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.name} {cc.type === "project" ? "🏗️" : "📂"}</option>)}
+                  {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.name}{cc.type === "project" ? " (obra)" : ""}</option>)}
                 </select>
                 <input value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="Descripción (opcional)" style={inp} />
                 {expAmount && <div style={{ backgroundColor: C.cardAlt, borderRadius: 10, padding: "10px 14px", marginBottom: 12, display: "flex", justifyContent: "space-between", fontSize: 12, color: C.mutedSoft }}>
@@ -2948,7 +2948,7 @@ export default function App() {
                           if (val) await importSiiFactura(f, val, expProjectId);
                         }}>
                         <option value="">Asignar a centro de costo...</option>
-                        {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.name} {cc.type === "project" ? "🏗️" : "📂"}</option>)}
+                        {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.name}{cc.type === "project" ? " (obra)" : ""}</option>)}
                       </select>
                     </div>
                   )}
