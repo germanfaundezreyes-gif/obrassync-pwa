@@ -248,6 +248,7 @@ export default function App() {
   const [subiendoCharla, setSubiendoCharla] = useState(false);
   const [charlas, setCharlas] = useState<any[]>([]);
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const [prevResumen, setPrevResumen] = useState<any[]>([]);
   const [savingTask, setSavingTask] = useState(false);
 
   const [users, setUsers] = useState<User[]>([]);
@@ -630,6 +631,14 @@ export default function App() {
     } catch {
       alert("No se pudo acceder al micrófono. Revisa los permisos del navegador.");
     }
+  }
+
+  async function loadPrevencion() {
+    try {
+      const r = await fetch(`${API_URL}/prevencion/resumen`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      setPrevResumen(d.proyectos || []);
+    } catch { setPrevResumen([]); }
   }
 
   async function loadCharlas() {
@@ -3270,9 +3279,33 @@ export default function App() {
               </button>
             </div>
 
+            {prevResumen.length > 0 && (
+              <>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Visitas a terreno por obra</div>
+                {prevResumen.map(pr => {
+                  const sinVisita = !pr.visitas;
+                  return (
+                    <button key={pr.id} onClick={() => { const proj = projects.find(x => x.id === pr.id); if (proj) { setSelectedProject(proj); setScreen("partidas"); loadTasks(proj.id); setShowVisita(true); } }}
+                      style={{ width: "100%", textAlign: "left", backgroundColor: C.card, border: `0.5px solid ${sinVisita ? C.danger + "60" : C.border}`, borderRadius: 10, padding: 12, marginBottom: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: 16 }}>{sinVisita ? "⚠️" : "✓"}</span>
+                      <span style={{ flex: 1 }}>
+                        <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.text }}>{pr.code ? `#${pr.code} ` : ""}{pr.name}</span>
+                        <span style={{ display: "block", fontSize: 11, color: sinVisita ? C.danger : C.muted, marginTop: 2 }}>
+                          {sinVisita ? "Sin visita registrada" : `${pr.visitas} visita${pr.visitas === 1 ? "" : "s"}${pr.ultima_visita ? ` · última ${String(pr.ultima_visita).slice(8, 10)}-${String(pr.ultima_visita).slice(5, 7)}` : ""}`}
+                          {pr.borradores > 0 ? ` · ${pr.borradores} sin enviar` : ""}
+                        </span>
+                      </span>
+                      <span style={{ color: C.muted, fontSize: 18 }}>›</span>
+                    </button>
+                  );
+                })}
+                <div style={{ height: 18 }} />
+              </>
+            )}
+
             {charlas.length > 0 && (
               <>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Historial</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.mutedSoft, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Historial de charlas</div>
                 {charlas.map(c => (
                   <div key={c.id} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 10, padding: 12, marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div style={{ flex: 1 }}>
@@ -3304,7 +3337,7 @@ export default function App() {
         ] as { sc: Screen; icon: React.ReactNode; label: string }[]).map(({ sc, icon, label }) => {
           const active = screen === sc || (sc === "home" && (screen === "partidas" || screen === "fotos"));
           return (
-            <button key={sc} onClick={() => { setScreen(sc); if (sc === "charlas") loadCharlas(); if (sc === "gastos") { setGastosTab(canSeeGastosResumen ? "resumen" : "lista"); setExpenseSummary(null); setNuboxSummary(null); loadCostCenters(); loadExpenses(); loadNuboxSummary(); } }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", color: active ? C.orange : C.muted, padding: "2px 0" }}>
+            <button key={sc} onClick={() => { setScreen(sc); if (sc === "charlas") { loadCharlas(); loadPrevencion(); } if (sc === "gastos") { setGastosTab(canSeeGastosResumen ? "resumen" : "lista"); setExpenseSummary(null); setNuboxSummary(null); loadCostCenters(); loadExpenses(); loadNuboxSummary(); } }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", color: active ? C.orange : C.muted, padding: "2px 0" }}>
               {icon}
               <span style={{ fontSize: 9, fontWeight: 600 }}>{label}</span>
             </button>
@@ -3330,7 +3363,7 @@ export default function App() {
                 { sc: "admin" as Screen, icon: "👤", label: "Administración", sub: "Usuarios y permisos", ver: isAdmin },
                 { sc: "configuracion" as Screen, icon: "⚙️", label: "Mi perfil", sub: "Datos de la cuenta y cerrar sesión", ver: true },
               ]).filter(x => x.ver).map(({ sc, icon, label, sub }) => (
-                <button key={sc} onClick={() => { setMenuAbierto(false); setScreen(sc); if (sc === "charlas") loadCharlas(); if (sc === "gastos") { setGastosTab(canSeeGastosResumen ? "resumen" : "lista"); setExpenseSummary(null); setNuboxSummary(null); loadCostCenters(); loadExpenses(); loadNuboxSummary(); } }}
+                <button key={sc} onClick={() => { setMenuAbierto(false); setScreen(sc); if (sc === "charlas") { loadCharlas(); loadPrevencion(); } if (sc === "gastos") { setGastosTab(canSeeGastosResumen ? "resumen" : "lista"); setExpenseSummary(null); setNuboxSummary(null); loadCostCenters(); loadExpenses(); loadNuboxSummary(); } }}
                   style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "14px 12px", marginBottom: 8, backgroundColor: screen === sc ? C.orangeDim : C.cardAlt, border: `0.5px solid ${screen === sc ? C.orange : C.border}`, borderRadius: 12, cursor: "pointer", textAlign: "left" }}>
                   <span style={{ fontSize: 22 }}>{icon}</span>
                   <span style={{ flex: 1 }}>
