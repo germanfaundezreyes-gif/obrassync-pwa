@@ -384,7 +384,12 @@ export default function App() {
       const r = await fetch(`${API_URL}/projects/${projectId}/documentos/resumen`, { headers: { Authorization: `Bearer ${token}` } });
       const d = await r.json();
       if (d.ok) setDocResumen(d.conteo);
-    } catch (e) { avisarFalloRed("el resumen de documentos", e); }
+    } catch (e) {
+      // La tarjeta de documentación es un complemento, no bloquea la obra. Si el backend
+      // todavía no expone el endpoint (despliegue en curso), se omite en silencio en vez
+      // de mostrar un aviso de error cada vez que se abre un proyecto.
+      console.error("[documentos] resumen no disponible:", e);
+    }
   };
 
   const loadNotificaciones = async () => {
