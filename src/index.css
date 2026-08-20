@@ -30,9 +30,10 @@ button, input, textarea, select, optgroup {
   font-size: 100%;
 }
 
-/* iOS aplica zoom si un campo tiene menos de 16px. Se fija el mínimo en los campos
-   de texto para que al escribir en terreno la pantalla no salte. */
-input, textarea, select { font-size: 16px; }
+/* iOS aplica zoom si un campo tiene menos de 16px. Va con !important porque los campos
+   llevan su tamaño en estilo en línea, que gana a la hoja: sin esto la pantalla salta
+   cada vez que alguien toca un campo en terreno. */
+input, textarea, select { font-size: 16px !important; }
 
 /* Área táctil mínima cómoda con guantes de trabajo. */
 button, [role="button"] { min-height: 44px; touch-action: manipulation; }
