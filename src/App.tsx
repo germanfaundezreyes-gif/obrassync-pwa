@@ -192,6 +192,9 @@ function DraggableCreateButton({ onPress, cardColor, orangeColor }: { onPress: (
   );
 }
 
+// Limpieza única: instalaciones anteriores dejaron la contraseña guardada en claro.
+try { localStorage.removeItem("remembered_password"); } catch { /* almacenamiento no disponible */ }
+
 export default function App() {
   const [token, setTokenState] = useState<string | null>(() => localStorage.getItem("obs_token"));
   const [userName, setUserName] = useState(() => localStorage.getItem("obs_name") || "");
@@ -199,7 +202,10 @@ export default function App() {
   const [userPerms, setUserPerms] = useState<Record<string, boolean>>(() => { try { return JSON.parse(localStorage.getItem("obs_perms") || "{}"); } catch { return {}; } });
   function setToken(t: string | null) { if (t) localStorage.setItem("obs_token", t); else { localStorage.removeItem("obs_token"); localStorage.removeItem("obs_name"); localStorage.removeItem("obs_role"); localStorage.removeItem("obs_perms"); } setTokenState(t); }
   const [email, setEmail] = useState(() => localStorage.getItem("remembered_email") || "");
-  const [password, setPassword] = useState(() => localStorage.getItem("remembered_password") || "");
+  // La contraseña ya no se recuerda: se guardaba en claro en localStorage, legible por
+  // cualquier script de la página o por quien tomara el teléfono desbloqueado. "Recordar
+  // sesión" conserva el correo; la sesión en sí la mantiene el token.
+  const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem("remembered_email"));
   const [showPass, setShowPass] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
@@ -567,7 +573,7 @@ export default function App() {
       if (!r.ok || !d.ok) { alert(d.message || "Credenciales inválidas"); return; }
       if (rememberMe) {
         localStorage.setItem("remembered_email", email);
-        localStorage.setItem("remembered_password", password);
+
       } else {
         localStorage.removeItem("remembered_email");
         localStorage.removeItem("remembered_password");
