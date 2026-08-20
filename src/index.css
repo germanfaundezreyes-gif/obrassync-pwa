@@ -1,1 +1,53 @@
+/* Estilos globales de ObrasSync.
+   Este archivo estaba vacío: sin tipografía global, la pantalla de login —que no está
+   dentro del contenedor con estilos en línea— caía a la fuente por defecto del navegador
+   y se mostraba en Times New Roman. */
 
+:root {
+  --obs-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto,
+              "Helvetica Neue", Arial, sans-serif;
+  --obs-naranja: #F97316;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--obs-font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Evita el zoom automático de iOS al enfocar un campo, que descuadra la pantalla */
+  -webkit-text-size-adjust: 100%;
+}
+
+#root { min-height: 100vh; }
+
+/* Los controles no heredan la fuente del documento por defecto: sin esto los botones
+   se veían en Arial mientras el resto de la interfaz usaba la fuente del sistema. */
+button, input, textarea, select, optgroup {
+  font-family: inherit;
+  font-size: 100%;
+}
+
+/* iOS aplica zoom si un campo tiene menos de 16px. Se fija el mínimo en los campos
+   de texto para que al escribir en terreno la pantalla no salte. */
+input, textarea, select { font-size: 16px; }
+
+/* Área táctil mínima cómoda con guantes de trabajo. */
+button, [role="button"] { min-height: 44px; touch-action: manipulation; }
+/* Los botones que ya declaran su alto en línea (iconos pequeños dentro de listas)
+   mantienen el suyo: esta regla solo sube el piso de los que no lo declaran. */
+
+a { color: var(--obs-naranja); }
+
+/* Foco visible: navegar con teclado no puede ser a ciegas. */
+:focus-visible { outline: 2px solid var(--obs-naranja); outline-offset: 2px; }
+
+/* Respeta a quien pidió menos movimiento en el sistema. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,6 +1,24 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle, HardHat, CreditCard, Receipt, ClipboardList, Calculator, TrendingUp, Users, Settings, ChevronRight } from "lucide-react";
-import FacturacionScreen from "./Facturacion";
+// Facturación se carga solo cuando se abre. Es el módulo más pesado y la mayoría de
+// los usuarios en terreno nunca lo usa: no tiene por qué descargarse antes del login.
+const FacturacionScreen = lazy(() => import("./Facturacion"));
+
+// ---- Avisos de red ----------------------------------------------------------
+// Antes había 18 bloques `catch (e) { console.error("[red]", e); }`: cuando una petición fallaba —lo habitual con señal
+// intermitente en obra— la lista quedaba vacía y el usuario no podía distinguir "no hay
+// datos" de "no hay señal". Ahora todo fallo se reporta por un canal común.
+let publicarFalloRed: (mensaje: string) => void = () => {};
+
+function avisarFalloRed(contexto: string, e: unknown) {
+  console.error(`[red] ${contexto}:`, e);
+  const sinConexion = typeof navigator !== "undefined" && navigator.onLine === false;
+  publicarFalloRed(
+    sinConexion
+      ? "Sin conexión. Lo que ves puede estar incompleto."
+      : `No se pudo cargar ${contexto}. Revisa la señal y reintenta.`
+  );
+}
 
 // ---- Notificaciones push ----
 // El navegador entrega la llave VAPID como Uint8Array, no como el base64url del servidor.
@@ -38,7 +56,7 @@ type AIQuotationResult = { client: { name: string; rut: string; email: string; a
 type AIItem = { nubox_id: number | null; name: string; unit: string; quantity: number; price_neto: number; is_new: boolean };
 type Project = { id: string; code: string; name: string; client_name?: string; start_date?: string; end_date?: string; progress_percent?: number; project_type?: string; status?: string; jefe_id?: string; supervisor_id?: string; jefe_name?: string; supervisor_name?: string; recepcion_conforme_at?: string; client_email?: string; inicio_notificado_at?: string; termino_notificado_at?: string };
 type Task = { id: string; name: string; duration?: string; start_date?: string; end_date?: string; fecha_ejecucion?: string | null; progress_percent?: number; status?: string; photo_count?: number; unit?: string; quantity?: string; codigo?: string; esquema?: string };
-type TaskPhoto = { id: string; filename: string; local_path?: string; onedrive_url?: string; created_at: string; taken_at?: string | null; description?: string; photo_type?: string };
+type TaskPhoto = { id: string; filename: string; local_path?: string; onedrive_url?: string; created_at: string; taken_at?: string | null; description?: string; photo_type?: string; image_url?: string };
 type QuoteItem = { tempId: string; name: string; codigo: string; quantity: string; unit: string; start_date: string; end_date: string; selected: boolean };
 type User = { id: string; full_name: string; email: string; role: string; is_active: boolean; permissions?: Record<string, boolean> };
 type Kpis = { proyectos: { total: number; avg_progress: number; atrasados: number }; tareas: { total: number; completadas: number; en_curso: number; atrasadas: number }; fotos: { total: number }; gastos: { total_mes: number } };
@@ -275,6 +293,30 @@ export default function App() {
   const [pushEstado, setPushEstado] = useState<"off" | "on" | "no-soportado" | "ios-no-instalada">("off");
   const [pushCargando, setPushCargando] = useState(false);
   const [pushMsg, setPushMsg] = useState("");
+  const [falloRed, setFalloRed] = useState("");
+  const [sinConexion, setSinConexion] = useState(() => typeof navigator !== "undefined" && navigator.onLine === false);
+
+  // Canal único para los fallos de red de toda la app, incluidos los módulos que viven
+  // en otros componentes y no alcanzan este estado.
+  useEffect(() => {
+    publicarFalloRed = (m: string) => setFalloRed(m);
+    const arriba = () => { setSinConexion(false); setFalloRed(""); };
+    const abajo = () => setSinConexion(true);
+    window.addEventListener("online", arriba);
+    window.addEventListener("offline", abajo);
+    return () => {
+      publicarFalloRed = () => {};
+      window.removeEventListener("online", arriba);
+      window.removeEventListener("offline", abajo);
+    };
+  }, []);
+
+  // El aviso se retira solo: es informativo, no requiere que el usuario lo cierre.
+  useEffect(() => {
+    if (!falloRed) return;
+    const t = setTimeout(() => setFalloRed(""), 6000);
+    return () => clearTimeout(t);
+  }, [falloRed]);
 
   // Registra el service worker al abrir la app y refleja si ya hay suscripción activa.
   useEffect(() => {
@@ -559,7 +601,7 @@ export default function App() {
   }
 
   async function loadProjects() {
-    try { const r = await fetch(`${API_URL}/projects`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); setProjects(d.items || []); } catch {}
+    try { const r = await fetch(`${API_URL}/projects`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); setProjects(d.items || []); } catch (e) { avisarFalloRed("los proyectos", e); }
   }
 
   async function createProject() {
@@ -575,7 +617,7 @@ export default function App() {
   }
 
   async function loadProjFiles(projectId: string) {
-    try { const r = await fetch(`${API_URL}/projects/${projectId}/files`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setProjFiles(d.items || []); } catch {}
+    try { const r = await fetch(`${API_URL}/projects/${projectId}/files`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setProjFiles(d.items || []); } catch (e) { avisarFalloRed("los proyectos", e); }
   }
 
   async function uploadProjFiles(files: File[], fileType: "cotizacion" | "orden_compra", visibleTo: string[]) {
@@ -653,11 +695,11 @@ export default function App() {
   }
 
   async function loadPriorities() {
-    try { const r = await fetch(`${API_URL}/tasks/priorities`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setPriorities(d.items || []); } catch {}
+    try { const r = await fetch(`${API_URL}/tasks/priorities`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setPriorities(d.items || []); } catch (e) { avisarFalloRed("las prioridades", e); }
   }
 
   async function loadStaff() {
-    try { const r = await fetch(`${API_URL}/staff`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setStaff(d.items || []); } catch {}
+    try { const r = await fetch(`${API_URL}/staff`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setStaff(d.items || []); } catch (e) { avisarFalloRed("el personal", e); }
   }
 
   async function createStaff() {
@@ -700,7 +742,7 @@ export default function App() {
   async function loadTasks(projectId: string) {
     setTasksLoading(true);
     try { const r = await fetch(`${API_URL}/projects/${projectId}/tasks`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); setTasks(d.items || []); }
-    catch {} finally { setTasksLoading(false); }
+    catch (e) { console.error("[red]", e); } finally { setTasksLoading(false); }
   }
 
   async function uploadGantt() {
@@ -822,7 +864,7 @@ export default function App() {
   async function openPhotos(task: Task) {
     setSelectedTask(task); setScreen("fotos"); setPhotosLoading(true);
     try { const r = await fetch(`${API_URL}/tasks/${task.id}/photos`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); setPhotos(d.items || []); }
-    catch {} finally { setPhotosLoading(false); }
+    catch (e) { console.error("[red]", e); } finally { setPhotosLoading(false); }
   }
 
   async function deletePhoto(id: string) {
@@ -1012,15 +1054,15 @@ export default function App() {
   }
 
   async function loadUsers() {
-    try { const r = await fetch(`${API_URL}/users`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); setUsers(d.items || []); } catch {}
+    try { const r = await fetch(`${API_URL}/users`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); setUsers(d.items || []); } catch (e) { avisarFalloRed("los usuarios", e); }
   }
 
   async function loadKpis() {
-    try { const r = await fetch(`${API_URL}/dashboard/kpis`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setKpis(d); } catch {}
+    try { const r = await fetch(`${API_URL}/dashboard/kpis`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setKpis(d); } catch (e) { avisarFalloRed("el panel", e); }
   }
 
   async function loadCostCenters() {
-    try { const r = await fetch(`${API_URL}/cost-centers`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setCostCenters(d.items || []); } catch {}
+    try { const r = await fetch(`${API_URL}/cost-centers`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setCostCenters(d.items || []); } catch (e) { avisarFalloRed("los centros de costo", e); }
   }
 
   async function loadExpenses(month?: string) {
@@ -1071,7 +1113,7 @@ export default function App() {
   }
 
   async function loadTrash() {
-    try { const r = await fetch(`${API_URL}/trash/tasks`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setTrashTasks(d.items || []); } catch {}
+    try { const r = await fetch(`${API_URL}/trash/tasks`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.ok) setTrashTasks(d.items || []); } catch (e) { avisarFalloRed("la papelera", e); }
   }
 
   async function restoreTask(id: string) {
@@ -1108,7 +1150,7 @@ export default function App() {
       const r = await fetch(`${API_URL}/sii/status`, { headers: { Authorization: `Bearer ${token}` } });
       const d = await r.json();
       if (d.ok) { setSiiConfigured(d.configured); if (d.rut) setSiiConfigRut(d.rut); }
-    } catch {}
+    } catch (e) { console.error("[red]", e); }
   };
   void checkSiiStatus;
 
@@ -1168,7 +1210,7 @@ export default function App() {
       const d1 = await r1.json(); if (d1.ok) setNuboxSummary(d1.nubox);
       const d2 = await r2.json(); if (d2.ok) setPayroll(d2.current);
       const d3 = await r3.json(); if (d3.ok) setNuboxSalesSummary(d3);
-    } catch {}
+    } catch (e) { console.error("[red]", e); }
   }
 
   async function assignNuboxSale(nuboxId: number | string, projectId: string, sale: any) {
@@ -1576,7 +1618,7 @@ export default function App() {
                         </div>
                       )}
                     </div>
-                    <img src={`${API_URL}/photos/${photo.id}/image`} alt={photo.filename} style={{ width: "100%", maxHeight: 300, objectFit: "cover", display: "block", backgroundColor: C.border }} />
+                    <img src={`${API_URL}${photo.image_url || `/photos/${photo.id}/image`}`} alt={photo.filename} style={{ width: "100%", maxHeight: 300, objectFit: "cover", display: "block", backgroundColor: C.border }} />
                   </div>
                 ))}
                   </div>;
@@ -3112,7 +3154,7 @@ export default function App() {
                         const r = await fetch(`${API_URL}/nubox/purchases/${p.id}`, { headers: { Authorization: `Bearer ${token}` } });
                         const d = await r.json();
                         if (d.ok) setNuboxDetail(prev => ({ ...prev, [p.id]: d.item }));
-                      } catch {}
+                      } catch (e) { console.error("[red]", e); }
                       finally { setNuboxDetailLoading(prev => ({ ...prev, [p.id]: false })); }
                     }
                   }
@@ -3338,7 +3380,11 @@ export default function App() {
       {screen === "rendiciones" && canSeeRendiciones && <RendicionesScreen token={token} userName={userName} />}
 
       {/* ─PANTALLA FACTURACIÓN ──────────────────────────────────────────────── */}
-      {screen === "facturacion" && canSeeFacturacion && <FacturacionScreen API_URL={API_URL} token={token!} isAdmin={isAdmin} />}
+      {screen === "facturacion" && canSeeFacturacion && (
+        <Suspense fallback={<div style={{ padding: 24, textAlign: "center", color: C.muted, fontSize: 13 }}>Cargando facturación...</div>}>
+          <FacturacionScreen API_URL={API_URL} token={token!} isAdmin={isAdmin} />
+        </Suspense>
+      )}
 
       {/* ─PANTALLA ESTADO DE RESULTADO ──────────────────────────────────────── */}
       {screen === "estadoResultado" && canSeeEstadoResultado && <EstadoResultadoScreen token={token!} isAdmin={isAdmin} />}
@@ -3430,6 +3476,17 @@ export default function App() {
           </div>
         );
       })()}
+
+      {/* Aviso de conexión. Fijo arriba para que se vea sin importar en qué pantalla esté. */}
+      {(sinConexion || falloRed) && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 300,
+          padding: "10px 16px", fontSize: 13, fontWeight: 600, textAlign: "center",
+          backgroundColor: sinConexion ? "#7C2D12" : "#B45309", color: "#fff",
+        }}>
+          {sinConexion ? "Sin conexión — reintentará al volver la señal" : falloRed}
+        </div>
+      )}
 
       {/* Nav inferior */}
       {/* Barra de navegación — sin botón Crear */}
@@ -3738,12 +3795,6 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
     setCreating(false);
   }
 
-  // Intl con es-CL entrega "$-52.485.416", con el signo entre el peso y la cifra, que se
-// lee como error tipográfico. En contabilidad chilena el menos va delante del símbolo.
-const fmtCLP = (n: number) => {
-  const v = Math.round(+n || 0);
-  return (v < 0 ? "-$" : "$") + Math.abs(v).toLocaleString("es-CL");
-};
   const statusColor = (s: string) => s === "created" ? C.info : s === "sent" ? C.orange : s === "approved" ? C.success : C.muted;
   const statusLabel = (s: string) => ({ created: "Creada", sent: "Enviada", approved: "Aprobada", rejected: "Rechazada" }[s] || s);
 
@@ -4577,10 +4628,10 @@ function EstadoResultadoScreen({ token, isAdmin }: { token: string; isAdmin: boo
   useEffect(() => { if (isAdmin && payrollTab === "nomina") loadEntries(); }, [payrollMonth, payrollTab]);
 
   async function loadCostCentersLite() {
-    try { const r = await fetch(`${API_URL}/cost-centers`, { headers: h }).then(r => r.json()); if (r.ok) setCostCenters(r.items || []); } catch {}
+    try { const r = await fetch(`${API_URL}/cost-centers`, { headers: h }).then(r => r.json()); if (r.ok) setCostCenters(r.items || []); } catch (e) { avisarFalloRed("los centros de costo", e); }
   }
   async function loadWorkers() {
-    try { const r = await fetch(`${API_URL}/payroll-workers`, { headers: h }).then(r => r.json()); if (r.ok) setWorkers(r.items || []); } catch {}
+    try { const r = await fetch(`${API_URL}/payroll-workers`, { headers: h }).then(r => r.json()); if (r.ok) setWorkers(r.items || []); } catch (e) { avisarFalloRed("los trabajadores", e); }
   }
   async function addWorker() {
     if (!newWorkerName.trim()) return;
@@ -4592,17 +4643,17 @@ function EstadoResultadoScreen({ token, isAdmin }: { token: string; isAdmin: boo
   }
   async function updateWorkerCC(workerId: string, ccId: string) {
     setWorkers(ws => ws.map(w => w.id === workerId ? { ...w, cost_center_id: ccId || null } : w));
-    try { await fetch(`${API_URL}/payroll-workers/${workerId}`, { method: "PUT", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify({ cost_center_id: ccId || null }) }); } catch {}
+    try { await fetch(`${API_URL}/payroll-workers/${workerId}`, { method: "PUT", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify({ cost_center_id: ccId || null }) }); } catch (e) { avisarFalloRed("los trabajadores", e); }
   }
   async function removeWorker(workerId: string) {
     if (!confirm("¿Quitar este trabajador de la nómina?")) return;
-    try { await fetch(`${API_URL}/payroll-workers/${workerId}`, { method: "DELETE", headers: h }); await loadWorkers(); await loadEntries(); } catch {}
+    try { await fetch(`${API_URL}/payroll-workers/${workerId}`, { method: "DELETE", headers: h }); await loadWorkers(); await loadEntries(); } catch (e) { avisarFalloRed("los trabajadores", e); }
   }
   async function loadEntries() {
     try {
       const r = await fetch(`${API_URL}/payroll-entries?month=${payrollMonth}`, { headers: h }).then(r => r.json());
       if (r.ok) setEntries((r.items || []).map((it: any) => ({ worker_id: it.worker_id, full_name: it.full_name, cost_center_id: it.cost_center_id, cost_center_name: it.cost_center_name, amount: Number(it.amount) || 0 })));
-    } catch {}
+    } catch (e) { console.error("[red]", e); }
   }
   async function saveEntries() {
     setSavingEntries(true);
