@@ -36,6 +36,9 @@ type Licitacion = {
   con_bases?: boolean | null;
   n_items?: number;
   postulacion_estado?: string | null;
+  fuente?: string;
+  rubro?: string | null;
+  ofertas_recibidas?: number | null;
   items?: { orden: number; nombre: string | null; descripcion: string | null; unidad: string | null; cantidad: number | null }[];
   analisis?: Analisis | null;
   documentos?: { id: string; filename: string; tipo: string; created_at: string }[];
@@ -57,6 +60,25 @@ type Resumen = {
   nuevas: number; analizadas: number; recomendadas: number; en_preparacion: number;
   documentos_pendientes: number; monto_potencial: number; compatibilidad_promedio: number | null;
   cierran_pronto: number;
+};
+
+// Cada mecanismo se distingue de un vistazo: una Compra Ágil se cotiza en días y una
+// licitación exige bases, garantías y plazos. Confundirlas cuesta caro.
+const FUENTES: Record<string, { etiqueta: string; color: string; fondo: string; nota: string }> = {
+  licitacion:  { etiqueta: "LICITACIÓN",  color: "#1D4ED8", fondo: "#EFF4FE", nota: "Requiere bases, garantías y plazos formales" },
+  compra_agil: { etiqueta: "COMPRA ÁGIL", color: "#15803D", fondo: "#EAF6EE", nota: "Compra simplificada: se cotiza directo, sin bases" },
+};
+
+const RUBROS: Record<string, string> = {
+  obra_construccion: "Obras y construcción",
+  mantencion: "Mantención y reparación",
+  servicios: "Servicios generales",
+  productos_ferreteria: "Ferretería y materiales",
+  productos_clinicos: "Insumos clínicos",
+  equipamiento: "Equipamiento y tecnología",
+  vehiculos: "Vehículos y transporte",
+  alimentos: "Alimentación",
+  otros: "Otros",
 };
 
 const FILTROS = [
@@ -108,6 +130,12 @@ export default function LicitacionesScreen({ API_URL, token, C, onCerrar }: Prop
   const [analizando, setAnalizando] = useState(false);
   const [aviso, setAviso] = useState("");
   const [estadoServicio, setEstadoServicio] = useState<{ ticket_configurado: boolean; cupo_restante: number; ultima_ingesta: { fecha: string } | null } | null>(null);
+  const [facetas, setFacetas] = useState<{ rubros: { id: string; nombre: string; n: number }[]; regiones: { region: string; n: number }[] } | null>(null);
+  const [rubros, setRubros] = useState<string[]>([]);
+  const [regiones, setRegiones] = useState<string[]>([]);
+  const [fuente, setFuente] = useState("");
+  const alternar = (v: string, lista: string[], set: (l: string[]) => void) =>
+    set(lista.includes(v) ? lista.filter(x => x !== v) : [...lista, v]);
 
   const buscar = useCallback(async () => {
     setCargando(true); setError("");
@@ -115,20 +143,25 @@ export default function LicitacionesScreen({ API_URL, token, C, onCerrar }: Prop
       const p = new URLSearchParams();
       if (texto.trim()) p.set("texto", texto.trim());
       if (filtro) p.set("filtro", filtro);
+      if (rubros.length) p.set("rubro", rubros.join(","));
+      if (regiones.length) p.set("region", regiones.join(","));
+      if (fuente) p.set("fuente", fuente);
       const r = await fetch(`${API_URL}/mercado-publico/licitaciones?${p}`, { headers: cab });
       const d = await r.json();
       if (!r.ok || !d.ok) throw new Error(d.message || "No se pudo consultar el catálogo");
       setItems(d.items || []); setTotal(d.total || 0);
     } catch (e) { setError((e as Error).message); setItems([]); }
     finally { setCargando(false); }
-  }, [texto, filtro]);
+  }, [texto, filtro, rubros, regiones, fuente]);
 
-  useEffect(() => { void buscar(); }, [filtro]);
+  useEffect(() => { void buscar(); }, [filtro, rubros, regiones, fuente]);
   useEffect(() => {
     fetch(`${API_URL}/mercado-publico/resumen`, { headers: cab })
       .then(r => r.json()).then(d => { if (d.ok) setResumen(d.resumen); }).catch(() => {});
     fetch(`${API_URL}/mercado-publico/estado`, { headers: cab })
       .then(r => r.json()).then(d => { if (d.ok) setEstadoServicio(d); }).catch(() => {});
+    fetch(`${API_URL}/mercado-publico/facetas`, { headers: cab })
+      .then(r => r.json()).then(d => { if (d.ok) setFacetas(d); }).catch(() => {});
   }, []);
 
   async function abrir(codigo: string) {
@@ -221,6 +254,57 @@ export default function LicitacionesScreen({ API_URL, token, C, onCerrar }: Prop
         <button type="submit" style={{ minHeight: 44, padding: "0 18px", borderRadius: 9, border: "none", backgroundColor: C.orange, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Buscar</button>
       </form>
 
+      {/* Mecanismo. Es la primera decisión: una Compra Ágil se cotiza en días, una
+          licitación es un proceso formal con bases y garantías. */}
+      <div style={{ display: "flex", gap: 7, marginBottom: 10 }}>
+        {[{ v: "", e: "Ambos" }, { v: "licitacion", e: "Licitaciones" }, { v: "compra_agil", e: "Compra Ágil" }].map(x => (
+          <button key={x.v} onClick={() => setFuente(x.v)}
+            style={{ flex: 1, minHeight: 38, borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+              border: `1px solid ${fuente === x.v ? (x.v === "compra_agil" ? "#15803D" : x.v === "licitacion" ? "#1D4ED8" : C.orange) : C.border}`,
+              backgroundColor: fuente === x.v ? (x.v === "compra_agil" ? "#EAF6EE" : x.v === "licitacion" ? "#EFF4FE" : C.orangeDim) : C.card,
+              color: fuente === x.v ? (x.v === "compra_agil" ? "#15803D" : x.v === "licitacion" ? "#1D4ED8" : C.orange) : C.mutedSoft }}>
+            {x.e}
+          </button>
+        ))}
+      </div>
+
+      {/* Rubro: es lo que reduce cinco mil licitaciones a las que son del oficio. */}
+      {facetas?.rubros?.length ? (
+        <div style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
+          {facetas.rubros.filter(r => r.n > 0).map(r => (
+            <button key={r.id} onClick={() => alternar(r.id, rubros, setRubros)}
+              style={{ flexShrink: 0, minHeight: 34, padding: "6px 12px", borderRadius: 17, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                border: `1px solid ${rubros.includes(r.id) ? C.orange : C.border}`,
+                backgroundColor: rubros.includes(r.id) ? C.orangeDim : C.card,
+                color: rubros.includes(r.id) ? C.orange : C.mutedSoft }}>
+              {RUBROS[r.id] || r.nombre} <span style={{ opacity: 0.65 }}>{r.n}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Región: se pueden marcar varias. */}
+      {facetas?.regiones?.length ? (
+        <div style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 6, marginBottom: 12 }}>
+          {facetas.regiones.slice(0, 10).map(r => (
+            <button key={r.region} onClick={() => alternar(r.region, regiones, setRegiones)}
+              style={{ flexShrink: 0, minHeight: 34, padding: "6px 12px", borderRadius: 17, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
+                border: `1px solid ${regiones.includes(r.region) ? C.orange : C.border}`,
+                backgroundColor: regiones.includes(r.region) ? C.orangeDim : C.card,
+                color: regiones.includes(r.region) ? C.orange : C.muted }}>
+              {r.region.replace(/^Regi[oó]n\s+(de\s+|del\s+)?/i, "")} <span style={{ opacity: 0.65 }}>{r.n}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {(rubros.length > 0 || regiones.length > 0 || fuente) && (
+        <button onClick={() => { setRubros([]); setRegiones([]); setFuente(""); }}
+          style={{ background: "none", border: "none", color: C.orange, fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "0 0 10px", minHeight: 32 }}>
+          Quitar filtros
+        </button>
+      )}
+
       <div style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 6, marginBottom: 14 }}>
         {FILTROS.map(f => (
           <button key={f.v} onClick={() => setFiltro(f.v)}
@@ -287,7 +371,14 @@ export default function LicitacionesScreen({ API_URL, token, C, onCerrar }: Prop
                   {l.monto_publicado
                     ? <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{fmtCLP(l.monto_estimado)}</span>
                     : <span style={{ fontSize: 11.5, color: C.muted, fontStyle: "italic" }}>Monto no publicado</span>}
+                  {(() => {
+                    const f = FUENTES[l.fuente || "licitacion"];
+                    return <span style={{ fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 5, backgroundColor: f.fondo, color: f.color, letterSpacing: 0.3 }}>{f.etiqueta}</span>;
+                  })()}
                   {l.es_obra && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 5, backgroundColor: C.orangeDim, color: C.orange }}>OBRA</span>}
+                  {typeof l.ofertas_recibidas === "number" && l.ofertas_recibidas > 0 && (
+                    <span style={{ fontSize: 10.5, color: C.muted }}>{l.ofertas_recibidas} cotizando</span>
+                  )}
                   {s && (
                     <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 5, backgroundColor: s.fondo, color: s.color }}>
                       {l.compatibilidad}% · {s.texto}
@@ -417,6 +508,16 @@ function Detalle({ l, C, API_URL, analizando, onCerrar, onAnalizar, onMarcar, on
           </div>
           <button onClick={onCerrar} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", minHeight: 44, minWidth: 44 }}><X size={20} /></button>
         </div>
+
+        {(() => {
+          const f = FUENTES[l.fuente || "licitacion"];
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 12px", borderRadius: 8, backgroundColor: f.fondo, marginTop: 10 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: f.color, letterSpacing: 0.3 }}>{f.etiqueta}</span>
+              <span style={{ fontSize: 11.5, color: f.color, opacity: 0.85 }}>{f.nota}</span>
+            </div>
+          );
+        })()}
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", fontSize: 12, color: C.muted, margin: "10px 0 14px" }}>
           {l.organismo_nombre && <span>{l.organismo_nombre}</span>}
