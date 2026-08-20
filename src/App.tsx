@@ -3,6 +3,7 @@ import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, Folder
 // Facturación se carga solo cuando se abre. Es el módulo más pesado y la mayoría de
 // los usuarios en terreno nunca lo usa: no tiene por qué descargarse antes del login.
 const FacturacionScreen = lazy(() => import("./Facturacion"));
+const DocumentosScreen = lazy(() => import("./Documentos"));
 import {
   encolar, listarOperaciones, operacionesDePartida, sincronizar, reintentarTodo,
   guardarCache, leerCache, urlLocal, hayIndexedDB, type Operacion,
@@ -55,7 +56,7 @@ const C = {
   info: "#2563EB", infoDim: "#EFF6FF", purple: "#7C3AED", purpleDim: "#F5F3FF",
 };
 
-type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones" | "rendiciones" | "facturacion" | "estadoResultado" | "charlas";
+type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones" | "rendiciones" | "facturacion" | "estadoResultado" | "charlas" | "documentos";
 type Rendicion = { id: string; worker_name: string; worker_email?: string; date: string; boleta_date?: string; boleta_number?: string; amount: number; vendor: string; description: string; rut_vendor?: string; category: string; image_data?: string; onedrive_url?: string; onedrive_path?: string; cost_center_id?: string; cost_center_name?: string; cost_center_code?: string; tipo?: string; doc_firmado_data?: string; doc_firmado_onedrive_url?: string; reembolso_status?: string; folio?: number; status: string; submitted_at?: string; created_at: string };
 type Quotation = { id: string; client_name?: string; client_rut?: string; reference?: string; status: string; nubox_doc_number_services?: string; nubox_doc_number_materials?: string; total_services: number; total_materials: number; source_type: string; created_at: string; created_by_name?: string };
 type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
@@ -121,6 +122,35 @@ const STATUS_OPTIONS = [
 
 function fmtDate(iso?: string) { if (!iso) return ""; const p = iso.substring(0, 10).split("-"); if (p.length !== 3) return iso; return `${p[2]}/${p[1]}/${p[0]}`; }
 function fmtMonth(ym: string) { const [y, m] = ym.split("-"); return new Date(+y, +m - 1).toLocaleDateString("es-CL", { month: "long", year: "numeric" }); }
+
+// Esqueleto de carga. Muestra la forma de lo que viene en vez de un "Cargando..." suelto,
+// que en conexión lenta deja la pantalla sin información durante segundos.
+function Esqueleto({ filas = 3, alto = 58 }: { filas?: number; alto?: number }) {
+  return (
+    <div>
+      {Array.from({ length: filas }).map((_, i) => (
+        <div key={i} style={{
+          height: alto, backgroundColor: C.card, border: `0.5px solid ${C.border}`,
+          borderRadius: 12, marginBottom: 9, padding: 14,
+        }}>
+          <div style={{ height: 12, width: `${65 - i * 9}%`, backgroundColor: C.cardAlt, borderRadius: 4, marginBottom: 9 }} />
+          <div style={{ height: 9, width: "40%", backgroundColor: C.cardAlt, borderRadius: 4 }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Estado vacío con explicación y, cuando corresponde, la acción que lo resuelve.
+function Vacio({ titulo, detalle, icono }: { titulo: string; detalle?: string; icono?: React.ReactNode }) {
+  return (
+    <div style={{ textAlign: "center", padding: "44px 24px", color: C.muted }}>
+      {icono && <div style={{ opacity: 0.35, marginBottom: 12, display: "flex", justifyContent: "center" }}>{icono}</div>}
+      <div style={{ fontSize: 14, fontWeight: 600, color: C.mutedSoft, marginBottom: 4 }}>{titulo}</div>
+      {detalle && <div style={{ fontSize: 12.5 }}>{detalle}</div>}
+    </div>
+  );
+}
 
 function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
@@ -309,6 +339,8 @@ export default function App() {
   const [pendientes, setPendientes] = useState<Operacion[]>([]);
   const [pendientesPartida, setPendientesPartida] = useState<Operacion[]>([]);
   const [sincronizandoUI, setSincronizandoUI] = useState(false);
+  const [docResumen, setDocResumen] = useState<{ total: number; vigentes: number; por_vencer: number; vencidos: number; faltantes: number } | null>(null);
+  const [notificaciones, setNotificaciones] = useState<{ id: string; tipo: string; titulo: string; mensaje: string | null; entidad_id: string | null; leida_at: string | null; created_at: string }[]>([]);
   const [sinConexion, setSinConexion] = useState(() => typeof navigator !== "undefined" && navigator.onLine === false);
 
   // Canal único para los fallos de red de toda la app, incluidos los módulos que viven
@@ -345,6 +377,30 @@ export default function App() {
       setPushEstado(sub ? "on" : "off");
     }).catch(() => setPushEstado("no-soportado"));
   }, []);
+
+  // Resumen documental del proyecto abierto, para la tarjeta del panel.
+  const loadDocResumen = async (projectId: string) => {
+    try {
+      const r = await fetch(`${API_URL}/projects/${projectId}/documentos/resumen`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      if (d.ok) setDocResumen(d.conteo);
+    } catch (e) { avisarFalloRed("el resumen de documentos", e); }
+  };
+
+  const loadNotificaciones = async () => {
+    try {
+      const r = await fetch(`${API_URL}/notificaciones`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      if (d.ok) setNotificaciones(d.items || []);
+    } catch { /* la bandeja no es crítica para operar */ }
+  };
+
+  useEffect(() => { if (token) void loadNotificaciones(); }, [token]);
+
+  const marcarLeida = async (id: string) => {
+    setNotificaciones(ns => ns.map(n => n.id === id ? { ...n, leida_at: new Date().toISOString() } : n));
+    await fetch(`${API_URL}/notificaciones/${id}/leida`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+  };
 
   // ── Cola sin conexión ──
   const refrescarPendientes = async () => {
@@ -1711,8 +1767,9 @@ export default function App() {
               </div>
             ))}
 
-            {photosLoading ? <div style={{ color: C.muted, textAlign: "center", padding: 32 }}>Cargando...</div>
-              : photos.length === 0 && pendientesPartida.length === 0 ? <div style={{ textAlign: "center", padding: 48, color: C.muted }}>Sin fotos todavía</div>
+            {photosLoading ? <Esqueleto filas={2} alto={120} />
+              : photos.length === 0 && pendientesPartida.length === 0
+                ? <Vacio titulo="Todavía no hay fotografías" detalle="Toma la primera con el botón de arriba." icono={<Image size={34} />} />
                 : (["previa", "trabajo"] as const).map(tipo => {
                   const fotosTipo = photos.filter(p => (p.photo_type || "trabajo") === tipo);
                   if (fotosTipo.length === 0) return null;
@@ -1778,6 +1835,40 @@ export default function App() {
               <div style={{ color: C.mutedSoft, fontSize: 13, marginTop: 2 }}>{new Date().toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}</div>
             </div>
 
+            {/* Alertas activas. Van arriba de todo porque son lo único de esta pantalla
+                que exige una acción, y tocarlas lleva directo al documento. */}
+            {notificaciones.filter(n => !n.leida_at).length > 0 && (
+              <div style={{ marginBottom: 18 }}>
+                {notificaciones.filter(n => !n.leida_at).slice(0, 4).map(n => {
+                  const critica = n.tipo === "documento_vencido";
+                  const col = critica ? C.danger : C.orange;
+                  const fondo = critica ? C.dangerDim : C.orangeDim;
+                  return (
+                    <div key={n.id}
+                      onClick={() => {
+                        void marcarLeida(n.id);
+                        const p = projects.find(pr => pr.id === (n as { project_id?: string }).project_id);
+                        if (p) { setSelectedProject(p); setScreen("documentos"); }
+                      }}
+                      style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 13px", marginBottom: 7, backgroundColor: fondo, border: `0.5px solid ${col}40`, borderRadius: 10, cursor: "pointer" }}>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: col, flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.titulo}</div>
+                        {n.mensaje && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.mensaje}</div>}
+                      </div>
+                      <ChevronRight size={16} color={col} />
+                    </div>
+                  );
+                })}
+                {notificaciones.filter(n => !n.leida_at).length > 4 && (
+                  <button onClick={() => { notificaciones.filter(n => !n.leida_at).forEach(n => void marcarLeida(n.id)); }}
+                    style={{ background: "none", border: "none", color: C.muted, fontSize: 12, cursor: "pointer", padding: "4px 0", minHeight: 36 }}>
+                    y {notificaciones.filter(n => !n.leida_at).length - 4} más · marcar todas como leídas
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* KPI Cards */}
             {canSeeKpis && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
               <div onClick={() => setScreen("proyectos")} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 16, padding: 16, cursor: "pointer" }}>
@@ -1825,7 +1916,7 @@ export default function App() {
             </div>
             {projects.length === 0 && <div style={{ color: C.muted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>Sin proyectos aún. Crea el primero ↓</div>}
             {projects.slice(0, 4).map(p => (
-              <div key={p.id} onClick={() => { setSelectedProject(p); setScreen("partidas"); }} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+              <div key={p.id} onClick={() => { setSelectedProject(p); setScreen("partidas"); void loadDocResumen(p.id); }} style={{ backgroundColor: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: 14, marginBottom: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ width: 44, height: 44, background: C.orangeDim, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <FolderOpen size={18} color={C.orange} />
                 </div>
@@ -1864,6 +1955,31 @@ export default function App() {
                   <div style={{ fontSize: 20, fontWeight: 700, color }}>{value}</div>
                 </div>
               ))}
+            </div>
+
+            {/* Documentación de la obra. Resume el estado y entra al módulo completo. */}
+            <div onClick={() => setScreen("documentos")}
+              style={{ backgroundColor: C.card, border: `0.5px solid ${(docResumen?.vencidos || 0) > 0 ? C.danger : C.border}`, borderRadius: 12, padding: 14, marginBottom: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: C.cardAlt, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <FileText size={17} color={(docResumen?.vencidos || 0) > 0 ? C.danger : C.mutedSoft} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Documentación</div>
+                <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>
+                  {docResumen
+                    ? `${docResumen.total} cargados · ${docResumen.vigentes} vigentes` +
+                      (docResumen.por_vencer ? ` · ${docResumen.por_vencer} por vencer` : "") +
+                      (docResumen.vencidos ? ` · ${docResumen.vencidos} vencidos` : "") +
+                      (docResumen.faltantes ? ` · ${docResumen.faltantes} faltantes` : "")
+                    : "Ver documentos de la obra"}
+                </div>
+              </div>
+              {((docResumen?.vencidos || 0) > 0 || (docResumen?.faltantes || 0) > 0) && (
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 5, backgroundColor: C.dangerDim, color: C.danger, whiteSpace: "nowrap" }}>
+                  {(docResumen?.vencidos || 0) > 0 ? "Vencidos" : "Faltantes"}
+                </span>
+              )}
+              <ChevronRight size={17} color={C.muted} />
             </div>
 
             {/* Acciones del proyecto */}
@@ -2255,7 +2371,7 @@ export default function App() {
                         {label === "Mantenimiento" && (i === 0 || (arr[i - 1].client_name || "") !== (p.client_name || "")) && (
                           <div style={{ fontSize: 11, fontWeight: 800, color: C.orange, marginTop: 8, paddingTop: 6, borderTop: `0.5px solid ${C.border}` }}>{p.client_name || "Sin cliente"}</div>
                         )}
-                        <div onClick={() => { setSelectedProject(p); setScreen("partidas"); }} style={{ padding: "8px 0", borderTop: label === "Mantenimiento" ? "none" : `0.5px solid ${C.border}`, cursor: "pointer" }}>
+                        <div onClick={() => { setSelectedProject(p); setScreen("partidas"); void loadDocResumen(p.id); }} style={{ padding: "8px 0", borderTop: label === "Mantenimiento" ? "none" : `0.5px solid ${C.border}`, cursor: "pointer" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 12, fontWeight: 600 }}>{p.name}</div>
@@ -2287,7 +2403,7 @@ export default function App() {
                     <span style={{ fontSize: 10, fontWeight: 700, color: C.success, backgroundColor: C.successDim, borderRadius: 6, padding: "3px 8px" }}>{pendientes.length}</span>
                   </div>
                   {pendientes.map(p => (
-                    <div key={p.id} onClick={() => { setSelectedProject(p); setScreen("partidas"); }} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", borderRadius: 10, backgroundColor: C.successDim, marginBottom: 6, cursor: "pointer" }}>
+                    <div key={p.id} onClick={() => { setSelectedProject(p); setScreen("partidas"); void loadDocResumen(p.id); }} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", borderRadius: 10, backgroundColor: C.successDim, marginBottom: 6, cursor: "pointer" }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 12, fontWeight: 700, color: C.success }}>{p.name}</div>
                         <div style={{ fontSize: 10, color: C.muted }}>
@@ -2359,7 +2475,7 @@ export default function App() {
               )}
               <div style={{ backgroundColor: C.card, border: `0.5px solid ${selectedProject?.id === p.id ? C.orange : C.border}`, borderRadius: 14, padding: 14, marginBottom: 8, opacity: isFinished ? 0.6 : 1 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <button onClick={() => { setSelectedProject(p); setScreen("partidas"); }} style={{ flex: 1, background: "none", border: "none", textAlign: "left", cursor: "pointer", padding: 0 }}>
+                  <button onClick={() => { setSelectedProject(p); setScreen("partidas"); void loadDocResumen(p.id); }} style={{ flex: 1, background: "none", border: "none", textAlign: "left", cursor: "pointer", padding: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                       <span style={{ fontSize: 11, color: C.orange, fontWeight: 700 }}>#{p.code}</span>
                       {isFinished && <span style={{ fontSize: 10, fontWeight: 700, color: C.muted, backgroundColor: C.cardAlt, borderRadius: 6, padding: "2px 8px" }}>Terminado</span>}
@@ -3420,7 +3536,7 @@ export default function App() {
                     <div style={{ fontSize: 12, color: C.muted }}>Facturas emitidas a clientes</div>
                     <button onClick={() => loadNuboxSummary()} style={{ backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", color: C.muted, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>↻</button>
                   </div>
-                  {!nuboxSalesSummary && <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Cargando...</div>}
+                  {!nuboxSalesSummary && <Esqueleto filas={2} />}
                   {nuboxSalesSummary?.items?.filter((s: any) => !s.annulled).map((sale: any) => {
                     const isNC = sale.total_amount < 0;
                     const amtColor = isNC ? C.danger : C.success;
@@ -3522,6 +3638,17 @@ export default function App() {
       {screen === "rendiciones" && canSeeRendiciones && <RendicionesScreen token={token} userName={userName} />}
 
       {/* ─PANTALLA FACTURACIÓN ──────────────────────────────────────────────── */}
+      {screen === "documentos" && selectedProject && (
+        <Suspense fallback={<div style={{ padding: 24, textAlign: "center", color: C.muted, fontSize: 13 }}>Cargando documentos...</div>}>
+          <DocumentosScreen
+            API_URL={API_URL} token={token!}
+            projectId={selectedProject.id} projectName={selectedProject.name}
+            C={C as unknown as Record<string, string>}
+            onCerrar={() => { setScreen("partidas"); void loadDocResumen(selectedProject.id); }}
+          />
+        </Suspense>
+      )}
+
       {screen === "facturacion" && canSeeFacturacion && (
         <Suspense fallback={<div style={{ padding: 24, textAlign: "center", color: C.muted, fontSize: 13 }}>Cargando facturación...</div>}>
           <FacturacionScreen API_URL={API_URL} token={token!} isAdmin={isAdmin} />
@@ -3998,13 +4125,11 @@ function CotizacionesScreen({ token, isAdmin }: { token: string; isAdmin: boolea
         {/* ─LISTA ── */}
         {tab === "lista" && (
           <>
-            {loading ? <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Cargando...</div>
+            {loading ? <Esqueleto />
               : quotations.length === 0 ? (
-                <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>
-                  <div style={{ fontSize: 36, marginBottom: 8 }}>📋</div>
-                  <div>No hay cotizaciones aún</div>
-                  <div style={{ fontSize: 12, marginTop: 4 }}>Los emails con "cotización" se procesan automáticamente</div>
-                </div>
+                <Vacio titulo="Todavía no hay cotizaciones"
+                       detalle="Sube un itemizado, o envía el requerimiento por correo y se procesa solo."
+                       icono={<ClipboardList size={34} />} />
               ) : quotations.map(q => (
                 <div key={q.id} style={{ backgroundColor: C.card, borderRadius: 10, padding: 14, marginBottom: 10, border: `1px solid ${C.border}` }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -4498,7 +4623,7 @@ function RendicionesScreen({ token, userName }: { token: string; userName: strin
             </button>
           </div>
 
-          {loading ? <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Cargando...</div> :
+          {loading ? <Esqueleto /> :
           rendiciones.length === 0 ? <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>Sin rendiciones. Toca "Nueva rendición" para comenzar.</div> :
           rendiciones.map(r => {
             const isExpanded = expandedId === r.id;
@@ -4962,7 +5087,7 @@ function EstadoResultadoScreen({ token, isAdmin }: { token: string; isAdmin: boo
 
       {msg && <div style={{ color: C.danger, fontSize: 12, marginBottom: 10 }}>{msg}</div>}
       {loading ? (
-        <div style={{ textAlign: "center", padding: 30, color: C.muted }}>Cargando...</div>
+        <Esqueleto filas={2} />
       ) : items.length === 0 ? (
         <div style={{ textAlign: "center", padding: 30, color: C.muted, fontSize: 13 }}>Sin datos para {year}.</div>
       ) : (
