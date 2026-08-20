@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle, HardHat, CreditCard, Receipt, ClipboardList, Calculator, TrendingUp, Users, Settings, ChevronRight } from "lucide-react";
+import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, FolderOpen, Home, Eye, EyeOff, Bell, Image, MessageSquare, DollarSign, BarChart2, X, CheckCircle2, AlertTriangle, HardHat, CreditCard, Receipt, ClipboardList, Calculator, TrendingUp, Users, Settings, ChevronRight, Gavel } from "lucide-react";
 // Facturación se carga solo cuando se abre. Es el módulo más pesado y la mayoría de
 // los usuarios en terreno nunca lo usa: no tiene por qué descargarse antes del login.
 const FacturacionScreen = lazy(() => import("./Facturacion"));
 const DocumentosScreen = lazy(() => import("./Documentos"));
+const LicitacionesScreen = lazy(() => import("./Licitaciones"));
 import {
   encolar, listarOperaciones, operacionesDePartida, sincronizar, reintentarTodo,
   guardarCache, leerCache, urlLocal, hayIndexedDB, type Operacion,
@@ -56,7 +57,7 @@ const C = {
   info: "#2563EB", infoDim: "#EFF6FF", purple: "#7C3AED", purpleDim: "#F5F3FF",
 };
 
-type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones" | "rendiciones" | "facturacion" | "estadoResultado" | "charlas" | "documentos";
+type Screen = "home" | "proyectos" | "crearProyecto" | "fotos" | "admin" | "editarUsuario" | "crearUsuario" | "partidas" | "configuracion" | "gastos" | "cotizaciones" | "rendiciones" | "facturacion" | "estadoResultado" | "charlas" | "documentos" | "licitaciones";
 type Rendicion = { id: string; worker_name: string; worker_email?: string; date: string; boleta_date?: string; boleta_number?: string; amount: number; vendor: string; description: string; rut_vendor?: string; category: string; image_data?: string; onedrive_url?: string; onedrive_path?: string; cost_center_id?: string; cost_center_name?: string; cost_center_code?: string; tipo?: string; doc_firmado_data?: string; doc_firmado_onedrive_url?: string; reembolso_status?: string; folio?: number; status: string; submitted_at?: string; created_at: string };
 type Quotation = { id: string; client_name?: string; client_rut?: string; reference?: string; status: string; nubox_doc_number_services?: string; nubox_doc_number_materials?: string; total_services: number; total_materials: number; source_type: string; created_at: string; created_by_name?: string };
 type AIQuotationResult = { client: { name: string; rut: string; email: string; address: string }; reference: string; services: AIItem[]; materials: AIItem[]; notes?: string };
@@ -626,6 +627,7 @@ export default function App() {
   // Permisos: admin siempre tiene todo, otros según asignación
   const canSee = (key: string) => isAdmin || userPerms[key] === true;
   const canSeeKpis = canSee("kpis");
+  const canSeeLicitaciones = canSee("licitaciones");
   const canSeeMontos = canSee("montos");
   const canSeeGastos = canSee("gastos");
   const canSeeGastosResumen = canSee("gastos_resumen");
@@ -3654,6 +3656,12 @@ export default function App() {
         </Suspense>
       )}
 
+      {screen === "licitaciones" && canSeeLicitaciones && (
+        <Suspense fallback={<div style={{ padding: 24, textAlign: "center", color: C.muted, fontSize: 13 }}>Cargando licitaciones...</div>}>
+          <LicitacionesScreen API_URL={API_URL} token={token!} C={C as unknown as Record<string, string>} onCerrar={() => setScreen("home")} />
+        </Suspense>
+      )}
+
       {screen === "facturacion" && canSeeFacturacion && (
         <Suspense fallback={<div style={{ padding: 24, textAlign: "center", color: C.muted, fontSize: 13 }}>Cargando facturación...</div>}>
           <FacturacionScreen API_URL={API_URL} token={token!} isAdmin={isAdmin} />
@@ -3819,6 +3827,7 @@ export default function App() {
                 { sc: "cotizaciones" as Screen, icon: <ClipboardList size={20} />, label: "Cotizaciones", sub: "Cotizar en Nubox", ver: canSeeCotizaciones },
                 { sc: "facturacion" as Screen, icon: <Calculator size={20} />, label: "Facturación", sub: "Productos, inventario y OC", ver: canSeeFacturacion },
                 { sc: "estadoResultado" as Screen, icon: <TrendingUp size={20} />, label: "Estado de Resultado", sub: "Márgenes por centro de costo", ver: canSeeEstadoResultado },
+                { sc: "licitaciones" as Screen, icon: <Gavel size={20} />, label: "Mercado Público", sub: "Licitaciones y postulaciones", ver: canSeeLicitaciones },
                 { sc: "admin" as Screen, icon: <Users size={20} />, label: "Administración", sub: "Usuarios y permisos", ver: isAdmin },
                 { sc: "configuracion" as Screen, icon: <Settings size={20} />, label: "Mi perfil", sub: "Datos de la cuenta y cerrar sesión", ver: true },
               ]).filter(x => x.ver).map(({ sc, icon, label, sub }) => (
