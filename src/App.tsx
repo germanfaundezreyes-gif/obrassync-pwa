@@ -3,6 +3,10 @@ import { Camera, LogOut, Mail, Lock, Trash2, FileText, Plus, ChevronLeft, Folder
 // Facturación se carga solo cuando se abre. Es el módulo más pesado y la mayoría de
 // los usuarios en terreno nunca lo usa: no tiene por qué descargarse antes del login.
 const FacturacionScreen = lazy(() => import("./Facturacion"));
+import {
+  encolar, listarOperaciones, operacionesDePartida, sincronizar, reintentarTodo,
+  guardarCache, leerCache, urlLocal, hayIndexedDB, type Operacion,
+} from "./offline";
 
 // ---- Avisos de red ----------------------------------------------------------
 // Antes había 18 bloques `catch (e) { console.error("[red]", e); }`: cuando una petición fallaba —lo habitual con señal
@@ -39,7 +43,9 @@ const estaInstalada = () =>
 const pushDisponible = () => "serviceWorker" in navigator && "PushManager" in window;
 
 
-const API_URL = "https://obrassync-backend-production.up.railway.app";
+// VITE_API_URL permite apuntar a un backend local durante el desarrollo y las pruebas.
+// Sin la variable se usa producción, que es el comportamiento de siempre.
+const API_URL = import.meta.env.VITE_API_URL || "https://obrassync-backend-production.up.railway.app";
 
 const C = {
   bg: "#F3F4F6", card: "#FFFFFF", cardAlt: "#E9EAEC", border: "#D1D5DB",
@@ -300,6 +306,9 @@ export default function App() {
   const [pushCargando, setPushCargando] = useState(false);
   const [pushMsg, setPushMsg] = useState("");
   const [falloRed, setFalloRed] = useState("");
+  const [pendientes, setPendientes] = useState<Operacion[]>([]);
+  const [pendientesPartida, setPendientesPartida] = useState<Operacion[]>([]);
+  const [sincronizandoUI, setSincronizandoUI] = useState(false);
   const [sinConexion, setSinConexion] = useState(() => typeof navigator !== "undefined" && navigator.onLine === false);
 
   // Canal único para los fallos de red de toda la app, incluidos los módulos que viven
@@ -336,6 +345,46 @@ export default function App() {
       setPushEstado(sub ? "on" : "off");
     }).catch(() => setPushEstado("no-soportado"));
   }, []);
+
+  // ── Cola sin conexión ──
+  const refrescarPendientes = async () => {
+    const todas = await listarOperaciones();
+    setPendientes(todas.filter(o => o.estado !== "completed"));
+    if (selectedTask) setPendientesPartida(await operacionesDePartida(selectedTask.id));
+  };
+
+  const sincronizarAhora = async () => {
+    if (!token || !navigator.onLine) return;
+    setSincronizandoUI(true);
+    try {
+      const r = await sincronizar(API_URL, token, () => { void refrescarPendientes(); });
+      await refrescarPendientes();
+      if (r.conflictos > 0) {
+        setFalloRed(`${r.conflictos} cambio(s) no se aplicaron: alguien más los modificó mientras estabas sin conexión.`);
+      } else if (r.fallidas > 0) {
+        setFalloRed(`${r.fallidas} operación(es) no se pudieron subir. Puedes reintentarlas desde el menú.`);
+      }
+      if (r.subidas > 0 && selectedTask) await loadPhotos(selectedTask.id);
+    } finally { setSincronizandoUI(false); }
+  };
+
+  const reintentarPendientes = async () => {
+    await reintentarTodo();
+    await refrescarPendientes();
+    await sincronizarAhora();
+  };
+
+  // Al abrir la app, al volver la señal, y cada minuto por si un reintento ya cumplió
+  // su espera. La función se protege sola contra ejecuciones simultáneas.
+  useEffect(() => {
+    if (!token) return;
+    void refrescarPendientes();
+    void sincronizarAhora();
+    const alVolver = () => { void sincronizarAhora(); };
+    window.addEventListener("online", alVolver);
+    const reloj = setInterval(() => { if (navigator.onLine) void sincronizarAhora(); }, 60_000);
+    return () => { window.removeEventListener("online", alVolver); clearInterval(reloj); };
+  }, [token]);
 
   const activarPush = async () => {
     if (!token) return;
@@ -852,11 +901,35 @@ export default function App() {
     setSavingTask(true);
     try {
       const progress = taskStatus === "completada" ? 100 : taskStatus === "pendiente" ? 0 : taskProgress;
+
+      // Sin señal solo se encola el avance. El resto de los campos (nombre, unidad,
+      // cantidad, fecha) necesitan al servidor y quedan para cuando vuelva la conexión.
+      if (!navigator.onLine && hayIndexedDB) {
+        await encolar({
+          tipo: "avance", taskId: editingTask.id, projectId: selectedProject.id,
+          progreso: progress, progresoPrevio: Number(editingTask.progress_percent || 0),
+        });
+        await refrescarPendientes();
+        setFalloRed("Avance guardado. Se enviará al volver la señal.");
+        setEditingTask(null);
+        return;
+      }
+
       const r = await fetch(`${API_URL}/tasks/${editingTask.id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ status: taskStatus, progressPercent: progress, name: taskName, unit: taskUnit || null, quantity: taskQuantity || null, fecha_ejecucion: taskFecha || null }) });
       const d = await r.json();
-      if (!r.ok || !d.ok) { alert("Error"); return; }
+      if (!r.ok || !d.ok) { alert(d.message || "No se pudo guardar la partida"); return; }
       setEditingTask(null); await loadTasks(selectedProject.id);
-    } catch { alert("Error"); } finally { setSavingTask(false); }
+    } catch (e) {
+      // La red falló a mitad de camino: se encola para no perder el cambio.
+      if (hayIndexedDB && editingTask) {
+        const progress = taskStatus === "completada" ? 100 : taskStatus === "pendiente" ? 0 : taskProgress;
+        await encolar({ tipo: "avance", taskId: editingTask.id, projectId: selectedProject.id,
+                        progreso: progress, progresoPrevio: Number(editingTask.progress_percent || 0) });
+        await refrescarPendientes();
+        setFalloRed("Sin conexión. El avance quedó guardado y se enviará solo.");
+        setEditingTask(null);
+      } else { avisarFalloRed("la partida", e); }
+    } finally { setSavingTask(false); }
   }
 
   async function deleteTask(taskId: string) {
@@ -868,9 +941,33 @@ export default function App() {
   }
 
   async function openPhotos(task: Task) {
-    setSelectedTask(task); setScreen("fotos"); setPhotosLoading(true);
-    try { const r = await fetch(`${API_URL}/tasks/${task.id}/photos`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); setPhotos(d.items || []); }
-    catch (e) { console.error("[red]", e); } finally { setPhotosLoading(false); }
+    setSelectedTask(task); setScreen("fotos");
+    await loadPhotos(task.id);
+  }
+
+  // Carga las fotografías del servidor y, si no hay señal, las últimas que se guardaron
+  // en el dispositivo. Después añade las que están en la cola para que el usuario vea de
+  // inmediato la que acaba de tomar, marcada como pendiente.
+  async function loadPhotos(taskId: string) {
+    setPhotosLoading(true);
+    try {
+      const r = await fetch(`${API_URL}/tasks/${taskId}/photos`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      setPhotos(d.items || []);
+      await guardarCache(`fotos_${taskId}`, d.items || []);
+    } catch (e) {
+      const cache = await leerCache<TaskPhoto[]>(`fotos_${taskId}`);
+      if (cache) {
+        setPhotos(cache.datos);
+        setFalloRed(`Mostrando las fotografías guardadas el ${new Date(cache.guardado).toLocaleString("es-CL")}`);
+      } else {
+        avisarFalloRed("las fotografías", e);
+        setPhotos([]);
+      }
+    } finally {
+      setPendientesPartida(await operacionesDePartida(taskId).catch(() => []));
+      setPhotosLoading(false);
+    }
   }
 
   async function deletePhoto(id: string) {
@@ -988,20 +1085,39 @@ export default function App() {
     } catch { return file; }
   }
 
+  // La fotografía se guarda primero en el dispositivo y solo se quita de la cola cuando
+  // el servidor confirma. Sin señal queda en espera y se sube sola al volver la conexión:
+  // antes se perdía sin aviso, y una foto de terreno no se puede volver a tomar.
   async function uploadPhotoWithDesc(file: File, description: string) {
     if (!selectedTask) return;
     setUploadingPhoto(true);
     try {
       const takenAt = await readCaptureDate(file);
       const compressed = await compressImage(file);
+
+      if (hayIndexedDB) {
+        await encolar({
+          tipo: "foto", taskId: selectedTask.id, projectId: selectedProject?.id,
+          blob: compressed, filename: file.name || "foto.jpg",
+          descripcion: description, takenAt,
+        });
+        await refrescarPendientes();
+        if (navigator.onLine) await sincronizarAhora();
+        else setFalloRed("Fotografía guardada. Se subirá al volver la señal.");
+        await loadPhotos(selectedTask.id);
+        return;
+      }
+
+      // Navegador sin IndexedDB: se mantiene el camino directo de siempre.
       const fd = new FormData(); fd.append("photo", compressed); fd.append("description", description); fd.append("photo_type", photoTypeInput);
       if (takenAt) fd.append("taken_at", takenAt);
       const r = await fetch(`${API_URL}/tasks/${selectedTask.id}/photos`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
       const d = await r.json();
       if (!r.ok || !d.ok) { alert(d.message || "Error"); return; }
-      const r2 = await fetch(`${API_URL}/tasks/${selectedTask.id}/photos`, { headers: { Authorization: `Bearer ${token}` } });
-      const d2 = await r2.json(); setPhotos(d2.items || []);
-    } catch { alert("Error"); } finally { setUploadingPhoto(false); }
+      await loadPhotos(selectedTask.id);
+    } catch (e) {
+      avisarFalloRed("la fotografía", e);
+    } finally { setUploadingPhoto(false); }
   }
 
   async function savePhotoDesc(photoId: string, desc: string, fecha: string) {
@@ -1575,8 +1691,28 @@ export default function App() {
               </button>
               <button onClick={() => photoInputRef.current?.click()} disabled={uploadingPhoto} style={{ flex: 1, height: 46, backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.mutedSoft, fontWeight: 600, cursor: "pointer", fontSize: 14 }}>Galería</button>
             </div>
+            {/* Fotografías todavía en la cola. Se muestran primero y desde el archivo local,
+                para que el usuario vea de inmediato la que acaba de tomar aunque no haya red. */}
+            {pendientesPartida.filter(o => o.tipo === "foto").map(op => (
+              <div key={op.id} style={{ marginBottom: 12, borderRadius: 12, overflow: "hidden", border: `1.5px dashed ${op.estado === "failed" ? C.danger : C.orange}` }}>
+                {op.blob && <img src={urlLocal(op.blob)} alt="" style={{ width: "100%", maxHeight: 300, objectFit: "cover", display: "block", opacity: 0.85 }} />}
+                <div style={{ padding: "8px 12px", backgroundColor: C.cardAlt, display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: op.estado === "failed" ? C.danger : op.estado === "uploading" ? "#1D4ED8" : C.orange, flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: op.estado === "failed" ? C.danger : C.muted, flex: 1 }}>
+                    {op.estado === "uploading" ? "SUBIENDO..."
+                      : op.estado === "failed" ? "NO SE PUDO SUBIR"
+                      : "PENDIENTE DE SINCRONIZACIÓN"}
+                  </span>
+                  {op.estado === "failed" && (
+                    <button onClick={() => { void reintentarPendientes(); }} style={{ background: "none", border: "none", color: C.orange, fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "4px 6px" }}>Reintentar</button>
+                  )}
+                </div>
+                {op.descripcion && <div style={{ padding: "0 12px 10px", backgroundColor: C.cardAlt, fontSize: 12, color: C.muted }}>{op.descripcion}</div>}
+              </div>
+            ))}
+
             {photosLoading ? <div style={{ color: C.muted, textAlign: "center", padding: 32 }}>Cargando...</div>
-              : photos.length === 0 ? <div style={{ textAlign: "center", padding: 48, color: C.muted }}>Sin fotos todavía</div>
+              : photos.length === 0 && pendientesPartida.length === 0 ? <div style={{ textAlign: "center", padding: 48, color: C.muted }}>Sin fotos todavía</div>
                 : (["previa", "trabajo"] as const).map(tipo => {
                   const fotosTipo = photos.filter(p => (p.photo_type || "trabajo") === tipo);
                   if (fotosTipo.length === 0) return null;
@@ -3483,16 +3619,37 @@ export default function App() {
         );
       })()}
 
-      {/* Aviso de conexión. Fijo arriba para que se vea sin importar en qué pantalla esté. */}
-      {(sinConexion || falloRed) && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, zIndex: 300,
-          padding: "10px 16px", fontSize: 13, fontWeight: 600, textAlign: "center",
-          backgroundColor: sinConexion ? "#7C2D12" : "#B45309", color: "#fff",
-        }}>
-          {sinConexion ? "Sin conexión — reintentará al volver la señal" : falloRed}
-        </div>
-      )}
+      {/* Estado de conexión y sincronización. Discreto salvo cuando hay algo que decir:
+          estar sin señal no puede bloquear la aplicación, solo informarla. */}
+      {(() => {
+        const nPend = pendientes.length;
+        const fallidas = pendientes.filter(p => p.estado === "failed").length;
+        let color = "", texto = "", mostrar = false;
+        if (sinConexion) {
+          color = "#B45309"; mostrar = true;
+          texto = nPend > 0 ? `Sin conexión — ${nPend} cambio(s) en espera` : "Sin conexión";
+        } else if (sincronizandoUI) {
+          color = "#1D4ED8"; mostrar = true; texto = "Sincronizando...";
+        } else if (fallidas > 0) {
+          color = "#B91C1C"; mostrar = true;
+          texto = `${fallidas} cambio(s) sin subir — toca para reintentar`;
+        } else if (falloRed) {
+          color = "#B45309"; mostrar = true; texto = falloRed;
+        }
+        if (!mostrar) return null;
+        return (
+          <div
+            onClick={fallidas > 0 ? () => { void reintentarPendientes(); } : undefined}
+            style={{
+              position: "fixed", top: 0, left: 0, right: 0, zIndex: 300,
+              padding: "10px 16px", fontSize: 13, fontWeight: 600, textAlign: "center",
+              backgroundColor: color, color: "#fff",
+              cursor: fallidas > 0 ? "pointer" : "default",
+            }}>
+            {texto}
+          </div>
+        );
+      })()}
 
       {/* Nav inferior */}
       {/* Barra de navegación — sin botón Crear */}
