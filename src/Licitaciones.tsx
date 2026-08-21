@@ -561,12 +561,12 @@ function Detalle({ l, C, API_URL, analizando, onCerrar, onAnalizar, onMarcar, on
             ))
           ) : (
             <p style={{ fontSize: 12.5, color: C.muted, margin: "0 0 10px" }}>
-              La API de Mercado Público no entrega las bases. Descárgalas del portal y súbelas aquí para que el análisis incluya requisitos, garantías y criterios de evaluación.
+              La API de Mercado Público no entrega las bases. Descárgalas del portal y súbelas aquí —PDF, Word o Excel— para que el análisis incluya requisitos, garantías y criterios de evaluación. Si el itemizado viene en Excel, se usa para valorizar.
             </p>
           )}
           <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, minHeight: 42, borderRadius: 9, border: `1px dashed ${C.border}`, color: C.mutedSoft, fontSize: 12.5, fontWeight: 600, cursor: "pointer", marginTop: 6 }}>
-            <Upload size={14} /> Subir bases (PDF o Excel)
-            <input type="file" style={{ display: "none" }} accept=".pdf,.xlsx,.xls,.csv,.txt"
+            <Upload size={14} /> Subir bases, anexos o formularios
+            <input type="file" style={{ display: "none" }} accept=".pdf,.docx,.xlsx,.xls,.csv,.txt"
               onChange={e => { const f = e.target.files?.[0]; if (f) onBases(f); e.target.value = ""; }} />
           </label>
         </Seccion>
