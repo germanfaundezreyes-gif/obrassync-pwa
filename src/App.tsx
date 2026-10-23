@@ -7,7 +7,7 @@ const DocumentosScreen = lazy(() => import("./Documentos"));
 const LicitacionesScreen = lazy(() => import("./Licitaciones"));
 import {
   encolar, listarOperaciones, operacionesDePartida, sincronizar, reintentarTodo,
-  guardarCache, leerCache, urlLocal, hayIndexedDB, type Operacion,
+  guardarCache, leerCache, urlLocal, hayIndexedDB, MAX_INTENTOS, type Operacion,
 } from "./offline";
 
 // ---- Avisos de red ----------------------------------------------------------
@@ -615,7 +615,12 @@ export default function App() {
   const siiP12Ref = useRef<HTMLInputElement>(null);
 
   // Photo description
-  const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
+  // Cola de fotos pendientes de describir. Desde la galería se pueden elegir varias de
+  // una vez: se van pidiendo una por una, porque la descripción es lo que después arma
+  // el informe y una leyenda común para diez fotos distintas no dice nada. Aun así se
+  // ofrece aplicar la misma a todas, que es lo razonable cuando son de la misma faena.
+  const [pendingPhotos, setPendingPhotos] = useState<File[]>([]);
+  const pendingPhotoFile = pendingPhotos[0] || null;
   const [photoDescInput, setPhotoDescInput] = useState("");
   const [photoTypeInput, setPhotoTypeInput] = useState<"previa" | "trabajo">("trabajo");
   const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
@@ -1162,7 +1167,7 @@ export default function App() {
         await encolar({
           tipo: "foto", taskId: selectedTask.id, projectId: selectedProject?.id,
           blob: compressed, filename: file.name || "foto.jpg",
-          descripcion: description, takenAt,
+          descripcion: description, photoType: photoTypeInput, takenAt,
         });
         await refrescarPendientes();
         if (navigator.onLine) await sincronizarAhora();
@@ -1723,7 +1728,14 @@ export default function App() {
             {pendingPhotoFile && (
               <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.9)", zIndex: 400, display: "flex", alignItems: "flex-end" }}>
                 <div style={{ backgroundColor: C.card, borderRadius: "20px 20px 0 0", padding: 20, width: "100%", maxWidth: 600, margin: "0 auto" }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Subir foto</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
+                    {pendingPhotos.length > 1 ? `Subir fotos · quedan ${pendingPhotos.length}` : "Subir foto"}
+                  </div>
+                  {/* Miniatura: con varias en cola hay que poder ver cuál se está describiendo. */}
+                  {pendingPhotoFile && (
+                    <img src={URL.createObjectURL(pendingPhotoFile)} alt=""
+                      style={{ width: "100%", maxHeight: 140, objectFit: "cover", borderRadius: 10, marginBottom: 10 }} />
+                  )}
                   {/* Selector tipo de foto */}
                   <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                     {(["previa", "trabajo"] as const).map(t => (
@@ -1735,9 +1747,27 @@ export default function App() {
                   <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>{photoTypeInput === "previa" ? "Foto del estado inicial antes de los trabajos" : "¿Qué trabajo muestra esta foto?"}</div>
                   <textarea value={photoDescInput} onChange={e => setPhotoDescInput(e.target.value)} placeholder={photoTypeInput === "previa" ? "Ej: Estado inicial de la zona de trabajo..." : "Ej: Instalación de pilar metálico en eje A-3..."} rows={3} style={{ width: "100%", backgroundColor: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 14, padding: 12, resize: "none", boxSizing: "border-box", outline: "none", marginBottom: 12 }} />
                   <div style={{ display: "flex", gap: 10 }}>
-                    <button onClick={() => { setPendingPhotoFile(null); setPhotoDescInput(""); setPhotoTypeInput("trabajo"); }} style={{ flex: 1, height: 46, background: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 12, color: C.muted, fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
-                    <button onClick={() => { uploadPhotoWithDesc(pendingPhotoFile!, photoDescInput); setPendingPhotoFile(null); setPhotoDescInput(""); }} disabled={uploadingPhoto} style={{ flex: 2, height: 46, background: C.orange, border: "none", borderRadius: 12, color: "#fff", fontWeight: 700, cursor: "pointer" }}>{uploadingPhoto ? "Subiendo..." : "Subir foto"}</button>
+                    <button onClick={() => { setPendingPhotos([]); setPhotoDescInput(""); setPhotoTypeInput("trabajo"); }} style={{ flex: 1, height: 46, background: C.cardAlt, border: `0.5px solid ${C.border}`, borderRadius: 12, color: C.muted, fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
+                    <button onClick={async () => {
+                      // Se sube la primera y la cola avanza sola: la descripción siguiente
+                      // parte en blanco porque pertenece a otra fotografía.
+                      const f = pendingPhotoFile!; const d = photoDescInput;
+                      setPendingPhotos(p => p.slice(1)); setPhotoDescInput("");
+                      await uploadPhotoWithDesc(f, d);
+                    }} disabled={uploadingPhoto} style={{ flex: 2, height: 46, background: C.orange, border: "none", borderRadius: 12, color: "#fff", fontWeight: 700, cursor: "pointer" }}>{uploadingPhoto ? "Subiendo..." : "Subir foto"}</button>
                   </div>
+                  {pendingPhotos.length > 1 && (
+                    <button onClick={async () => {
+                      // Mismo texto para todas: lo normal cuando son de una misma faena.
+                      // Se suben en orden, no en paralelo, para no saturar la conexión en
+                      // terreno ni desordenar la cola offline.
+                      const todas = pendingPhotos; const d = photoDescInput;
+                      setPendingPhotos([]); setPhotoDescInput("");
+                      for (const f of todas) await uploadPhotoWithDesc(f, d);
+                    }} disabled={uploadingPhoto} style={{ width: "100%", height: 42, marginTop: 10, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 12, color: C.mutedSoft, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                      Usar esta descripción para las {pendingPhotos.length}
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -1747,8 +1777,9 @@ export default function App() {
               <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{selectedTask.name}</div>
             </div>
             <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { setPendingPhotoFile(f); setPhotoDescInput(""); } e.target.value = ""; }} />
-              <input ref={photoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { setPendingPhotoFile(f); setPhotoDescInput(""); } e.target.value = ""; }} />
+              {/* La cámara toma de a una; la galería admite varias. */}
+              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { setPendingPhotos([f]); setPhotoDescInput(""); } e.target.value = ""; }} />
+              <input ref={photoInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={e => { const fs = Array.from(e.target.files || []); if (fs.length) { setPendingPhotos(fs); setPhotoDescInput(""); } e.target.value = ""; }} />
               <button onClick={() => cameraInputRef.current?.click()} disabled={uploadingPhoto} style={{ flex: 1, height: 46, backgroundColor: C.orange, border: "none", borderRadius: 10, color: "#fff", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 14 }}>
                 <Camera size={16} /> {uploadingPhoto ? "Subiendo..." : "Tomar foto"}
               </button>
@@ -1770,6 +1801,17 @@ export default function App() {
                     <button onClick={() => { void reintentarPendientes(); }} style={{ background: "none", border: "none", color: C.orange, fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "4px 6px" }}>Reintentar</button>
                   )}
                 </div>
+                {/* El motivo, cuando lo hay. Sin esto una subida que está fallando se ve
+                    igual que una que aún no ha empezado, y no hay forma de saber si hay
+                    que esperar o si algo va mal. */}
+                {op.ultimoError && (
+                  <div style={{ padding: "0 12px 8px", backgroundColor: C.cardAlt, fontSize: 11, color: op.estado === "failed" ? C.danger : C.muted }}>
+                    {op.ultimoError}
+                    {op.estado !== "failed" && op.proximoIntento > Date.now() &&
+                      ` · reintenta en ${Math.ceil((op.proximoIntento - Date.now()) / 1000)} s`}
+                    {op.intentos > 0 && ` · intento ${op.intentos} de ${MAX_INTENTOS}`}
+                  </div>
+                )}
                 {op.descripcion && <div style={{ padding: "0 12px 10px", backgroundColor: C.cardAlt, fontSize: 12, color: C.muted }}>{op.descripcion}</div>}
               </div>
             ))}

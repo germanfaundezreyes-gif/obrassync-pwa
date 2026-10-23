@@ -30,6 +30,10 @@ export type Operacion = {
   blob?: Blob;
   filename?: string;
   descripcion?: string;
+  // El tipo de foto (previa / trabajo) viaja en la cola. Antes no lo hacía, y toda foto
+  // subida sin conexión acababa marcada como "en ejecución" aunque el usuario hubiera
+  // elegido "previa": el informe quedaba sin el antes/después que justifica el trabajo.
+  photoType?: string;
   takenAt?: string | null;
   progreso?: number;
   progresoPrevio?: number;
@@ -200,6 +204,7 @@ async function enviarOperacion(apiUrl: string, token: string, op: Operacion): Pr
     const fd = new FormData();
     fd.append("photo", op.blob!, op.filename || "foto.jpg");
     if (op.descripcion) fd.append("description", op.descripcion);
+    if (op.photoType) fd.append("photo_type", op.photoType);
     if (op.takenAt) fd.append("taken_at", op.takenAt);
     const r = await fetch(`${apiUrl}/tasks/${op.taskId}/photos`, {
       method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd,
