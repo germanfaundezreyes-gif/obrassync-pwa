@@ -46,7 +46,7 @@ export const config = {
     tenantId: opcional("M365_TENANT_ID"),
     clientId: opcional("M365_CLIENT_ID"),
     clientSecret: opcional("M365_CLIENT_SECRET"),
-    buzon: opcional("M365_BUZON", "agentes@matfau.cl").toLowerCase(),
+    buzon: opcional("M365_BUZON", "asistente@matfau.cl").toLowerCase(),
     // Solo se responde a remitentes de estos dominios (o direcciones exactas).
     permitidos: lista("CORREO_PERMITIDOS").length ? lista("CORREO_PERMITIDOS") : ["matfau.cl"],
     intervaloSegundos: Number(opcional("CORREO_INTERVALO_SEGUNDOS", "60")),

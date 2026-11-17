@@ -88,7 +88,7 @@ async function atender(c: Correo) {
       recordar(clave, pregunta, respuesta);
     } catch (e) {
       console.error("[correo] el agente falló:", e);
-      respuesta = "Tuvimos un problema para responder tu correo. Intenta de nuevo en unos minutos.\n\nAgentes Matfau";
+      respuesta = "Tuvimos un problema para responder tu correo. Intenta de nuevo en unos minutos.\n\nAsistente Matfau";
     }
     await graph(`/messages/${c.id}/reply`, "POST", { comment: aHtml(respuesta) });
     console.log(`[correo] respondido a ${de}: ${c.subject ?? ""}`);

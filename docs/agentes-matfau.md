@@ -53,5 +53,5 @@ En una sesión normal también puedes llamar a un área directamente:
 
 ## WhatsApp y correo
 
-El mismo equipo responde por WhatsApp (número propio, API oficial de Meta) y por correo (`agentes@matfau.cl`, Microsoft 365).
+El mismo equipo responde por WhatsApp (número propio, API oficial de Meta) y por correo (`asistente@matfau.cl`, Microsoft 365).
 El servicio está en `agentes/`; la guía de configuración y despliegue en Railway está en `agentes/README.md`.

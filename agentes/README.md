@@ -1,7 +1,7 @@
 # Agentes Matfau: WhatsApp y correo
 
 Servicio que pone al equipo de agentes de Matfau (gerente + operaciones, finanzas, ventas, RR.HH. y prevención)
-a responder por **WhatsApp** y por **correo** (`agentes@matfau.cl`).
+a responder por **WhatsApp** y por **correo** (`asistente@matfau.cl`).
 
 ```
 WhatsApp (Meta) ─┐                        ┌─ matfau-operaciones ─┐
@@ -41,8 +41,8 @@ Correo (M365) ───┘                        ├─ matfau-ventas       │
    ⚠️ Estas dos llamadas y el campo `group_id` del webhook siguen la API de grupos de Meta de 2025–2026;
    confírmalas contra la documentación vigente (están aisladas en `src/whatsapp.ts`).
 
-### 2. Buzón agentes@matfau.cl (Microsoft 365)
-1. En el centro de administración de Microsoft 365 crea el buzón `agentes@matfau.cl` (usuario con licencia o buzón compartido).
+### 2. Buzón asistente@matfau.cl (Microsoft 365)
+1. En el centro de administración de Microsoft 365 crea el buzón `asistente@matfau.cl` (usuario con licencia o buzón compartido).
 2. En **Entra ID → Registros de aplicaciones** crea una app; en *Permisos de API* agrega **Microsoft Graph → permisos de aplicación**
    `Mail.ReadWrite` y `Mail.Send`, y otorga consentimiento de administrador.
 3. Crea un secreto de cliente. Anota *tenant ID*, *client ID* y el secreto → `M365_*`.
