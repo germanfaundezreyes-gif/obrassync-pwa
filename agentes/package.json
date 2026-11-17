@@ -1,0 +1,20 @@
+{
+  "name": "matfau-agentes",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Servicio que conecta a los agentes de Matfau con WhatsApp y el correo",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/servidor.js",
+    "dev": "tsc -p tsconfig.json && node --env-file-if-exists=.env dist/servidor.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.12.3",
+    "typescript": "~6.0.2"
+  }
+}

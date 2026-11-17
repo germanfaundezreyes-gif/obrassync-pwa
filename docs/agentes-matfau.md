@@ -50,3 +50,8 @@ Ejemplos:
 En una sesión normal también puedes llamar a un área directamente:
 - "Usa matfau-finanzas para ver qué facturas llevan más de 60 días sin cobrar."
 - "Pídele a matfau-prevencion las charlas que faltan esta semana."
+
+## WhatsApp y correo
+
+El mismo equipo responde por WhatsApp (número propio, API oficial de Meta) y por correo (`agentes@matfau.cl`, Microsoft 365).
+El servicio está en `agentes/`; la guía de configuración y despliegue en Railway está en `agentes/README.md`.
